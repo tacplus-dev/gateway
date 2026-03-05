@@ -1,0 +1,9 @@
+language: go
+src: /Users/jody/workspace/services/proto
+tag: latest
+pkg: gitlab.com/secondstarcavalier/controlplane/services/springsteen
+backends:
+  - services/elvis.ServiceHealthState:ro
+post-gen:
+  - cmd: go
+    args: ["run", "./bufgen"]

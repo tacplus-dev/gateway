@@ -1,0 +1,7 @@
+language: typescript
+src: /Users/jody/workspace/services/proto
+tag: latest
+frontend-clients:
+  - services/fleetwood.FleetwoodService
+  - services/ironmaiden.IronMaidenService
+  - services/queen.QueenService

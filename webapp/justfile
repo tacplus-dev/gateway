@@ -1,0 +1,3 @@
+build:
+  tacplus build
+  npm install && npm run build

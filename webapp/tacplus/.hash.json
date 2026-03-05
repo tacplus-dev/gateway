@@ -1,0 +1,18 @@
+{
+  "binary_hash": "bcdb6cb9dd422e29034c12d9726e6fcab2b86e94d51c7615a378f0c1ad5d2de1",
+  "config_hash": "ba4e41057a2eaf46daaffa00b760cb75ad0cfafe9f59c6f00260cfaeab220f7b",
+  "structure_hash": "0535d344e3592e301aed8a7be07bf6a1da163d43c0f6fb4a95407afd7dbed992",
+  "files": {
+    "dependencies.yaml": "b1e3b41802693b989403f5da77d07c50392cbeb70718fbb6341421ffc1ac2442",
+    "services/elvis.proto": "b03d82a461ccfb91b0b218a01d3e8ef57d5f403f6e58399f1268b54ff7568ae3",
+    "services/fleetwood.proto": "bca2397572a2122efeda8367804b03fd90514f4feaf994bf0460708c999090d1",
+    "services/genesis.proto": "93764358c5b5ac707d5de2a9e93a4d07c2a62d95e5c9094991b4b8143447f6d3",
+    "services/ironmaiden.proto": "85f8ab1c25e03a4c9c33f5dd6c3a0f12304306a4c06154b4db40055b8784408e",
+    "services/orchestrator.proto": "2b2ff73b1942541e137b6e7013ab26c7aceb4b40c8749980e4cf24497ccce714",
+    "services/presley.proto": "345989755a66c74c28de623e4335a4c1a93ad7d93bd5c4dfb43ae4a04d131a61",
+    "services/queen.proto": "696fd8dd5f1d2c09d295197604d19d2c23a42bab9dfd765bb890d3605f316ffc",
+    "services/snoopy.proto": "3ad109bdcf347d242779c738e937136ab095acf86d05a910307d56c6a84e25b9",
+    "services/springsteen.proto": "dbd8d915c9d34fa597f24e91c19704bebf1fe5ce43d7f14fb33e93a5dc2500a5",
+    "services/woodstock.proto": "07da50aa11dcb6531f46b0a6bc343cc766647b52c6f42dae5b21f304262f42db"
+  }
+}

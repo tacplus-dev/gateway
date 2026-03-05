@@ -1,0 +1,12 @@
+# Binary
+/springsteen
+*.exe
+*.dylib
+*.so
+*.test
+*.out
+.DS_Store
+
+# Webapp
+webapp/node_modules/
+webapp/dist/

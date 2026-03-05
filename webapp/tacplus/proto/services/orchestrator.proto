@@ -1,0 +1,23 @@
+// Copyright (c) 2024 Second Star Cavalier, LLC.
+
+syntax = "proto3";
+
+package orchestrator;
+
+// ============================================================================
+// Backend State
+// ============================================================================
+
+// OrchestratorState is the orchestrator's backend state root.
+// It has CALL access to elvis.ClusterState.reload_config so it can
+// trigger a config reload on the elvis cluster.
+message OrchestratorState {
+}
+// ============================================================================
+// Auto-generated Backend Service (tacplus)
+// ============================================================================
+
+service OrchestratorStateBackendService {
+}
+
+message MapEmpty {}

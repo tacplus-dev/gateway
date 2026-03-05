@@ -1,0 +1,35 @@
+{
+  "name": "johnnycash-tacplus-backendclient",
+  "version": "1.0.0",
+  "description": "gRPC client for remote distributed state operations (maps and locks)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "grpc",
+    "state",
+    "distributed",
+    "map",
+    "lock",
+    "typescript"
+  ],
+  "author": "Second Star Cavalier, LLC.",
+  "license": "PROPRIETARY",
+  "dependencies": {
+    "@grpc/grpc-js": "^1.9.0",
+    "johnnycash-tacplus-types-libs-backendclient": "*",
+    "johnnycash-tacplus-types-libs-spec": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

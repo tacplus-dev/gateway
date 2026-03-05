@@ -1,0 +1,21 @@
+{
+  "name": "johnnycash-tacplus",
+  "version": "1.0.0",
+  "description": "TypeScript type definitions for protocol buffers",
+  "private": true,
+  "workspaces": [
+    "libs/*",
+    "types/common/*",
+    "types/services/*/*",
+    "types/services/*/services"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "clean": "rm -rf */*/node_modules */*/*.js */*/*.d.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "keywords": ["protobuf", "typescript", "types"],
+  "license": "UNLICENSED"
+}
