@@ -22,10 +22,10 @@ import (
 
 // serviceInfo holds metadata extracted from an annotated proto file.
 type serviceInfo struct {
-	ProtoPackage string // e.g., "fleetwood"
-	ServiceName  string // e.g., "FleetwoodService"
-	GoImportPath string // e.g., "gitlab.com/.../tacplus/types/services/fleetwood"
-	GoAlias      string // e.g., "fleetwood_gw"
+	ProtoPackage string // e.g., "sentinel"
+	ServiceName  string // e.g., "SentinelService"
+	GoImportPath string // e.g., "gitlab.com/.../tacplus/types/services/sentinel"
+	GoAlias      string // e.g., "sentinel_gw"
 }
 
 func main() {
@@ -113,7 +113,7 @@ func main() {
 }
 
 // findModulePrefix extracts the module prefix from go_package options.
-// Given go_package = "gitlab.com/.../tacplus/types/services/fleetwood",
+// Given go_package = "gitlab.com/.../tacplus/types/services/sentinel",
 // returns "gitlab.com/.../tacplus/types".
 func findModulePrefix(protoDir string) (string, error) {
 	goPackageRe := regexp.MustCompile(`option\s+go_package\s*=\s*"([^"]+)"`)

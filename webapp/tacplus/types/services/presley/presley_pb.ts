@@ -413,14 +413,14 @@ export const AdminGraphInfoSchema: GenMessage<AdminGraphInfo> =
 export type AdminServiceConnection =
   Message<"presley.AdminServiceConnection"> & {
     /**
-     * Composite key: "service:fleetwood@node-uuid"
+     * Composite key: "service:sentinel@node-uuid"
      *
      * @generated from field: string id = 1;
      */
     id: string;
 
     /**
-     * Service identity from token sub claim: "service:fleetwood"
+     * Service identity from token sub claim: "service:sentinel"
      *
      * @generated from field: string service_id = 2;
      */
@@ -1651,14 +1651,14 @@ export const AdminTopicSubscriberSchema: GenMessage<AdminTopicSubscriber> =
  */
 export type AdminWatchHealth = Message<"presley.AdminWatchHealth"> & {
   /**
-   * Unique watch identifier: "service:fleetwood@node-uuid#WatchNodeMetrics#1"
+   * Unique watch identifier: "service:sentinel@node-uuid#WatchNodeMetrics#1"
    *
    * @generated from field: string watch_id = 1;
    */
   watchId: string;
 
   /**
-   * Service that opened this watch: "service:fleetwood"
+   * Service that opened this watch: "service:sentinel"
    *
    * @generated from field: string service_id = 2;
    */
@@ -1850,7 +1850,7 @@ export type AdminMutationRate = Message<"presley.AdminMutationRate"> & {
   deleteCount: bigint;
 
   /**
-   * Per-service mutation counts: "service:fleetwood" -> 50
+   * Per-service mutation counts: "service:sentinel" -> 50
    *
    * @generated from field: map<string, int64> per_service_mutations = 11;
    */

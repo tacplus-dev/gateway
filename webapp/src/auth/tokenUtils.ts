@@ -66,7 +66,7 @@ export function clearTokens(): void {
   }
 }
 
-/** Extract the service name from an API path like /api/fleetwood/v1/dashboard */
+/** Extract the service name from an API path like /api/sentinel/v1/dashboard */
 export function serviceFromPath(path: string): string | null {
   const match = path.match(/^\/api\/([^/]+)\//);
   return match ? match[1] : null;

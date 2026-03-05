@@ -22,28 +22,28 @@ import type {
   ConfigSchema as ConfigSchema$5,
 } from "../../../libs/serviceconfig/serviceconfig_pb.js";
 import { file_libs_serviceconfig } from "../../../libs/serviceconfig/serviceconfig_pb.js";
-import type { Config, ConfigSchema } from "../fleetwood/fleetwood_pb.js";
-import { file_services_fleetwood } from "../fleetwood/fleetwood_pb.js";
-import type {
-  Config as Config$3,
-  ConfigSchema as ConfigSchema$3,
-} from "../genesis/genesis_pb.js";
-import { file_services_genesis } from "../genesis/genesis_pb.js";
-import type {
-  Config as Config$1,
-  ConfigSchema as ConfigSchema$1,
-} from "../ironmaiden/ironmaiden_pb.js";
-import { file_services_ironmaiden } from "../ironmaiden/ironmaiden_pb.js";
-import type {
-  Config as Config$4,
-  ConfigSchema as ConfigSchema$4,
-} from "../queen/queen_pb.js";
-import { file_services_queen } from "../queen/queen_pb.js";
 import type {
   Config as Config$2,
   ConfigSchema as ConfigSchema$2,
-} from "../springsteen/springsteen_pb.js";
-import { file_services_springsteen } from "../springsteen/springsteen_pb.js";
+} from "../gateway/gateway_pb.js";
+import { file_services_gateway } from "../gateway/gateway_pb.js";
+import type {
+  Config as Config$1,
+  ConfigSchema as ConfigSchema$1,
+} from "../identity/identity_pb.js";
+import { file_services_identity } from "../identity/identity_pb.js";
+import type {
+  Config as Config$3,
+  ConfigSchema as ConfigSchema$3,
+} from "../letsencrypt/letsencrypt_pb.js";
+import { file_services_letsencrypt } from "../letsencrypt/letsencrypt_pb.js";
+import type {
+  Config as Config$4,
+  ConfigSchema as ConfigSchema$4,
+} from "../policy/policy_pb.js";
+import { file_services_policy } from "../policy/policy_pb.js";
+import type { Config, ConfigSchema } from "../sentinel/sentinel_pb.js";
+import { file_services_sentinel } from "../sentinel/sentinel_pb.js";
 import type { EmptySchema } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_empty } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
@@ -54,15 +54,15 @@ import type { Message } from "@bufbuild/protobuf";
 export const file_services_config_holder: GenFile =
   /*@__PURE__*/
   fileDesc(
-    "ChxzZXJ2aWNlcy9jb25maWdfaG9sZGVyLnByb3RvEg1jb25maWdfaG9sZGVyIukBCgxDb25maWdIb2xkZXISKwoQZmxlZXR3b29kX2NvbmZpZxgFIAEoCzIRLmZsZWV0d29vZC5Db25maWcSLQoRaXJvbm1haWRlbl9jb25maWcYBiABKAsyEi5pcm9ubWFpZGVuLkNvbmZpZxIvChJzcHJpbmdzdGVlbl9jb25maWcYByABKAsyEy5zcHJpbmdzdGVlbi5Db25maWcSJwoOZ2VuZXNpc19jb25maWcYCSABKAsyDy5nZW5lc2lzLkNvbmZpZxIjCgxxdWVlbl9jb25maWcYCiABKAsyDS5xdWVlbi5Db25maWciYQoURmxlZXR3b29kQ29uZmlnU3RhdGUSKwoGY29uZmlnGAEgASgLMhEuZmxlZXR3b29kLkNvbmZpZ0II4LUYAuC2GAE6HJqoHRRGbGVldHdvb2RDb25maWdTdGF0ZaCoHQIiZAoVSXJvbm1haWRlbkNvbmZpZ1N0YXRlEiwKBmNvbmZpZxgBIAEoCzISLmlyb25tYWlkZW4uQ29uZmlnQgjgtRgC4LYYATodmqgdFUlyb25tYWlkZW5Db25maWdTdGF0ZaCoHQIiZwoWU3ByaW5nc3RlZW5Db25maWdTdGF0ZRItCgZjb25maWcYASABKAsyEy5zcHJpbmdzdGVlbi5Db25maWdCCOC1GALgthgBOh6aqB0WU3ByaW5nc3RlZW5Db25maWdTdGF0ZaCoHQIiWwoSR2VuZXNpc0NvbmZpZ1N0YXRlEikKBmNvbmZpZxgBIAEoCzIPLmdlbmVzaXMuQ29uZmlnQgjgtRgC4LYYAToamqgdEkdlbmVzaXNDb25maWdTdGF0ZaCoHQIiVQoQUXVlZW5Db25maWdTdGF0ZRInCgZjb25maWcYASABKAsyDS5xdWVlbi5Db25maWdCCOC1GALgthgBOhiaqB0QUXVlZW5Db25maWdTdGF0ZaCoHQIiYQoSU2VydmljZUNvbmZpZ1N0YXRlEi8KBmNvbmZpZxgBIAEoCzIVLnNlcnZpY2Vjb25maWcuQ29uZmlnQgjgtRgC4LYYAToamqgdElNlcnZpY2VDb25maWdTdGF0ZaCoHQIiCgoITWFwRW1wdHkyywEKIkZsZWV0d29vZENvbmZpZ1N0YXRlQmFja2VuZFNlcnZpY2USNgoJR2V0Q29uZmlnEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5GhEuZmxlZXR3b29kLkNvbmZpZxIxCglTZXRDb25maWcSES5mbGVldHdvb2QuQ29uZmlnGhEuZmxlZXR3b29kLkNvbmZpZxI6CgtXYXRjaENvbmZpZxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRoRLmZsZWV0d29vZC5Db25maWcwATLQAQojSXJvbm1haWRlbkNvbmZpZ1N0YXRlQmFja2VuZFNlcnZpY2USNwoJR2V0Q29uZmlnEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5GhIuaXJvbm1haWRlbi5Db25maWcSMwoJU2V0Q29uZmlnEhIuaXJvbm1haWRlbi5Db25maWcaEi5pcm9ubWFpZGVuLkNvbmZpZxI7CgtXYXRjaENvbmZpZxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRoSLmlyb25tYWlkZW4uQ29uZmlnMAEy1QEKJFNwcmluZ3N0ZWVuQ29uZmlnU3RhdGVCYWNrZW5kU2VydmljZRI4CglHZXRDb25maWcSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaEy5zcHJpbmdzdGVlbi5Db25maWcSNQoJU2V0Q29uZmlnEhMuc3ByaW5nc3RlZW4uQ29uZmlnGhMuc3ByaW5nc3RlZW4uQ29uZmlnEjwKC1dhdGNoQ29uZmlnEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5GhMuc3ByaW5nc3RlZW4uQ29uZmlnMAEywQEKIEdlbmVzaXNDb25maWdTdGF0ZUJhY2tlbmRTZXJ2aWNlEjQKCUdldENvbmZpZxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRoPLmdlbmVzaXMuQ29uZmlnEi0KCVNldENvbmZpZxIPLmdlbmVzaXMuQ29uZmlnGg8uZ2VuZXNpcy5Db25maWcSOAoLV2F0Y2hDb25maWcSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaDy5nZW5lc2lzLkNvbmZpZzABMrcBCh5RdWVlbkNvbmZpZ1N0YXRlQmFja2VuZFNlcnZpY2USMgoJR2V0Q29uZmlnEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5Gg0ucXVlZW4uQ29uZmlnEikKCVNldENvbmZpZxINLnF1ZWVuLkNvbmZpZxoNLnF1ZWVuLkNvbmZpZxI2CgtXYXRjaENvbmZpZxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRoNLnF1ZWVuLkNvbmZpZzABMtkBCiBTZXJ2aWNlQ29uZmlnU3RhdGVCYWNrZW5kU2VydmljZRI6CglHZXRDb25maWcSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaFS5zZXJ2aWNlY29uZmlnLkNvbmZpZxI5CglTZXRDb25maWcSFS5zZXJ2aWNlY29uZmlnLkNvbmZpZxoVLnNlcnZpY2Vjb25maWcuQ29uZmlnEj4KC1dhdGNoQ29uZmlnEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5GhUuc2VydmljZWNvbmZpZy5Db25maWcwAWIGcHJvdG8z",
+    "ChxzZXJ2aWNlcy9jb25maWdfaG9sZGVyLnByb3RvEg1jb25maWdfaG9sZGVyIuUBCgxDb25maWdIb2xkZXISKQoPc2VudGluZWxfY29uZmlnGAUgASgLMhAuc2VudGluZWwuQ29uZmlnEikKD2lkZW50aXR5X2NvbmZpZxgGIAEoCzIQLmlkZW50aXR5LkNvbmZpZxInCg5nYXRld2F5X2NvbmZpZxgHIAEoCzIPLmdhdGV3YXkuQ29uZmlnEi8KEmxldHNlbmNyeXB0X2NvbmZpZxgJIAEoCzITLmxldHNlbmNyeXB0LkNvbmZpZxIlCg1wb2xpY3lfY29uZmlnGAogASgLMg4ucG9saWN5LkNvbmZpZyJeChNTZW50aW5lbENvbmZpZ1N0YXRlEioKBmNvbmZpZxgBIAEoCzIQLnNlbnRpbmVsLkNvbmZpZ0II4LUYAuC2GAE6G5qoHRNTZW50aW5lbENvbmZpZ1N0YXRloKgdAiJeChNJZGVudGl0eUNvbmZpZ1N0YXRlEioKBmNvbmZpZxgBIAEoCzIQLmlkZW50aXR5LkNvbmZpZ0II4LUYAuC2GAE6G5qoHRNJZGVudGl0eUNvbmZpZ1N0YXRloKgdAiJbChJHYXRld2F5Q29uZmlnU3RhdGUSKQoGY29uZmlnGAEgASgLMg8uZ2F0ZXdheS5Db25maWdCCOC1GALgthgBOhqaqB0SR2F0ZXdheUNvbmZpZ1N0YXRloKgdAiJnChZMZXRzZW5jcnlwdENvbmZpZ1N0YXRlEi0KBmNvbmZpZxgBIAEoCzITLmxldHNlbmNyeXB0LkNvbmZpZ0II4LUYAuC2GAE6HpqoHRZMZXRzZW5jcnlwdENvbmZpZ1N0YXRloKgdAiJYChFQb2xpY3lDb25maWdTdGF0ZRIoCgZjb25maWcYASABKAsyDi5wb2xpY3kuQ29uZmlnQgjgtRgC4LYYAToZmqgdEVBvbGljeUNvbmZpZ1N0YXRloKgdAiJhChJTZXJ2aWNlQ29uZmlnU3RhdGUSLwoGY29uZmlnGAEgASgLMhUuc2VydmljZWNvbmZpZy5Db25maWdCCOC1GALgthgBOhqaqB0SU2VydmljZUNvbmZpZ1N0YXRloKgdAiIKCghNYXBFbXB0eTLGAQohU2VudGluZWxDb25maWdTdGF0ZUJhY2tlbmRTZXJ2aWNlEjUKCUdldENvbmZpZxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRoQLnNlbnRpbmVsLkNvbmZpZxIvCglTZXRDb25maWcSEC5zZW50aW5lbC5Db25maWcaEC5zZW50aW5lbC5Db25maWcSOQoLV2F0Y2hDb25maWcSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaEC5zZW50aW5lbC5Db25maWcwATLGAQohSWRlbnRpdHlDb25maWdTdGF0ZUJhY2tlbmRTZXJ2aWNlEjUKCUdldENvbmZpZxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRoQLmlkZW50aXR5LkNvbmZpZxIvCglTZXRDb25maWcSEC5pZGVudGl0eS5Db25maWcaEC5pZGVudGl0eS5Db25maWcSOQoLV2F0Y2hDb25maWcSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaEC5pZGVudGl0eS5Db25maWcwATLBAQogR2F0ZXdheUNvbmZpZ1N0YXRlQmFja2VuZFNlcnZpY2USNAoJR2V0Q29uZmlnEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5Gg8uZ2F0ZXdheS5Db25maWcSLQoJU2V0Q29uZmlnEg8uZ2F0ZXdheS5Db25maWcaDy5nYXRld2F5LkNvbmZpZxI4CgtXYXRjaENvbmZpZxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRoPLmdhdGV3YXkuQ29uZmlnMAEy1QEKJExldHNlbmNyeXB0Q29uZmlnU3RhdGVCYWNrZW5kU2VydmljZRI4CglHZXRDb25maWcSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaEy5sZXRzZW5jcnlwdC5Db25maWcSNQoJU2V0Q29uZmlnEhMubGV0c2VuY3J5cHQuQ29uZmlnGhMubGV0c2VuY3J5cHQuQ29uZmlnEjwKC1dhdGNoQ29uZmlnEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5GhMubGV0c2VuY3J5cHQuQ29uZmlnMAEyvAEKH1BvbGljeUNvbmZpZ1N0YXRlQmFja2VuZFNlcnZpY2USMwoJR2V0Q29uZmlnEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5Gg4ucG9saWN5LkNvbmZpZxIrCglTZXRDb25maWcSDi5wb2xpY3kuQ29uZmlnGg4ucG9saWN5LkNvbmZpZxI3CgtXYXRjaENvbmZpZxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRoOLnBvbGljeS5Db25maWcwATLZAQogU2VydmljZUNvbmZpZ1N0YXRlQmFja2VuZFNlcnZpY2USOgoJR2V0Q29uZmlnEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5GhUuc2VydmljZWNvbmZpZy5Db25maWcSOQoJU2V0Q29uZmlnEhUuc2VydmljZWNvbmZpZy5Db25maWcaFS5zZXJ2aWNlY29uZmlnLkNvbmZpZxI+CgtXYXRjaENvbmZpZxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRoVLnNlcnZpY2Vjb25maWcuQ29uZmlnMAFiBnByb3RvMw",
     [
       file_libs_spec,
       file_libs_serviceconfig,
-      file_services_fleetwood,
-      file_services_genesis,
-      file_services_ironmaiden,
-      file_services_queen,
-      file_services_springsteen,
+      file_services_gateway,
+      file_services_identity,
+      file_services_letsencrypt,
+      file_services_policy,
+      file_services_sentinel,
       file_google_protobuf_empty,
     ],
   );
@@ -72,29 +72,29 @@ export const file_services_config_holder: GenFile =
  */
 export type ConfigHolder = Message<"config_holder.ConfigHolder"> & {
   /**
-   * @generated from field: fleetwood.Config fleetwood_config = 5;
+   * @generated from field: sentinel.Config sentinel_config = 5;
    */
-  fleetwoodConfig?: Config;
+  sentinelConfig?: Config;
 
   /**
-   * @generated from field: ironmaiden.Config ironmaiden_config = 6;
+   * @generated from field: identity.Config identity_config = 6;
    */
-  ironmaidenConfig?: Config$1;
+  identityConfig?: Config$1;
 
   /**
-   * @generated from field: springsteen.Config springsteen_config = 7;
+   * @generated from field: gateway.Config gateway_config = 7;
    */
-  springsteenConfig?: Config$2;
+  gatewayConfig?: Config$2;
 
   /**
-   * @generated from field: genesis.Config genesis_config = 9;
+   * @generated from field: letsencrypt.Config letsencrypt_config = 9;
    */
-  genesisConfig?: Config$3;
+  letsencryptConfig?: Config$3;
 
   /**
-   * @generated from field: queen.Config queen_config = 10;
+   * @generated from field: policy.Config policy_config = 10;
    */
-  queenConfig?: Config$4;
+  policyConfig?: Config$4;
 };
 
 /**
@@ -106,95 +106,95 @@ export const ConfigHolderSchema: GenMessage<ConfigHolder> =
   messageDesc(file_services_config_holder, 0);
 
 /**
- * @generated from message config_holder.FleetwoodConfigState
+ * @generated from message config_holder.SentinelConfigState
  */
-export type FleetwoodConfigState =
-  Message<"config_holder.FleetwoodConfigState"> & {
+export type SentinelConfigState =
+  Message<"config_holder.SentinelConfigState"> & {
     /**
-     * @generated from field: fleetwood.Config config = 1;
+     * @generated from field: sentinel.Config config = 1;
      */
     config?: Config;
   };
 
 /**
- * Describes the message config_holder.FleetwoodConfigState.
- * Use `create(FleetwoodConfigStateSchema)` to create a new message.
+ * Describes the message config_holder.SentinelConfigState.
+ * Use `create(SentinelConfigStateSchema)` to create a new message.
  */
-export const FleetwoodConfigStateSchema: GenMessage<FleetwoodConfigState> =
+export const SentinelConfigStateSchema: GenMessage<SentinelConfigState> =
   /*@__PURE__*/
   messageDesc(file_services_config_holder, 1);
 
 /**
- * @generated from message config_holder.IronmaidenConfigState
+ * @generated from message config_holder.IdentityConfigState
  */
-export type IronmaidenConfigState =
-  Message<"config_holder.IronmaidenConfigState"> & {
+export type IdentityConfigState =
+  Message<"config_holder.IdentityConfigState"> & {
     /**
-     * @generated from field: ironmaiden.Config config = 1;
+     * @generated from field: identity.Config config = 1;
      */
     config?: Config$1;
   };
 
 /**
- * Describes the message config_holder.IronmaidenConfigState.
- * Use `create(IronmaidenConfigStateSchema)` to create a new message.
+ * Describes the message config_holder.IdentityConfigState.
+ * Use `create(IdentityConfigStateSchema)` to create a new message.
  */
-export const IronmaidenConfigStateSchema: GenMessage<IronmaidenConfigState> =
+export const IdentityConfigStateSchema: GenMessage<IdentityConfigState> =
   /*@__PURE__*/
   messageDesc(file_services_config_holder, 2);
 
 /**
- * @generated from message config_holder.SpringsteenConfigState
+ * @generated from message config_holder.GatewayConfigState
  */
-export type SpringsteenConfigState =
-  Message<"config_holder.SpringsteenConfigState"> & {
-    /**
-     * @generated from field: springsteen.Config config = 1;
-     */
-    config?: Config$2;
-  };
+export type GatewayConfigState = Message<"config_holder.GatewayConfigState"> & {
+  /**
+   * @generated from field: gateway.Config config = 1;
+   */
+  config?: Config$2;
+};
 
 /**
- * Describes the message config_holder.SpringsteenConfigState.
- * Use `create(SpringsteenConfigStateSchema)` to create a new message.
+ * Describes the message config_holder.GatewayConfigState.
+ * Use `create(GatewayConfigStateSchema)` to create a new message.
  */
-export const SpringsteenConfigStateSchema: GenMessage<SpringsteenConfigState> =
+export const GatewayConfigStateSchema: GenMessage<GatewayConfigState> =
   /*@__PURE__*/
   messageDesc(file_services_config_holder, 3);
 
 /**
- * @generated from message config_holder.GenesisConfigState
+ * @generated from message config_holder.LetsencryptConfigState
  */
-export type GenesisConfigState = Message<"config_holder.GenesisConfigState"> & {
-  /**
-   * @generated from field: genesis.Config config = 1;
-   */
-  config?: Config$3;
-};
+export type LetsencryptConfigState =
+  Message<"config_holder.LetsencryptConfigState"> & {
+    /**
+     * @generated from field: letsencrypt.Config config = 1;
+     */
+    config?: Config$3;
+  };
 
 /**
- * Describes the message config_holder.GenesisConfigState.
- * Use `create(GenesisConfigStateSchema)` to create a new message.
+ * Describes the message config_holder.LetsencryptConfigState.
+ * Use `create(LetsencryptConfigStateSchema)` to create a new message.
  */
-export const GenesisConfigStateSchema: GenMessage<GenesisConfigState> =
+export const LetsencryptConfigStateSchema: GenMessage<LetsencryptConfigState> =
   /*@__PURE__*/
   messageDesc(file_services_config_holder, 4);
 
 /**
- * @generated from message config_holder.QueenConfigState
+ * @generated from message config_holder.PolicyConfigState
  */
-export type QueenConfigState = Message<"config_holder.QueenConfigState"> & {
+export type PolicyConfigState = Message<"config_holder.PolicyConfigState"> & {
   /**
-   * @generated from field: queen.Config config = 1;
+   * @generated from field: policy.Config config = 1;
    */
   config?: Config$4;
 };
 
 /**
- * Describes the message config_holder.QueenConfigState.
- * Use `create(QueenConfigStateSchema)` to create a new message.
+ * Describes the message config_holder.PolicyConfigState.
+ * Use `create(PolicyConfigStateSchema)` to create a new message.
  */
-export const QueenConfigStateSchema: GenMessage<QueenConfigState> =
+export const PolicyConfigStateSchema: GenMessage<PolicyConfigState> =
   /*@__PURE__*/
   messageDesc(file_services_config_holder, 5);
 
@@ -233,13 +233,13 @@ export const MapEmptySchema: GenMessage<MapEmpty> =
   messageDesc(file_services_config_holder, 7);
 
 /**
- * @generated from service config_holder.FleetwoodConfigStateBackendService
+ * @generated from service config_holder.SentinelConfigStateBackendService
  */
-export const FleetwoodConfigStateBackendService: GenService<{
+export const SentinelConfigStateBackendService: GenService<{
   /**
    * Singleton: Config
    *
-   * @generated from rpc config_holder.FleetwoodConfigStateBackendService.GetConfig
+   * @generated from rpc config_holder.SentinelConfigStateBackendService.GetConfig
    */
   getConfig: {
     methodKind: "unary";
@@ -247,7 +247,7 @@ export const FleetwoodConfigStateBackendService: GenService<{
     output: typeof ConfigSchema;
   };
   /**
-   * @generated from rpc config_holder.FleetwoodConfigStateBackendService.SetConfig
+   * @generated from rpc config_holder.SentinelConfigStateBackendService.SetConfig
    */
   setConfig: {
     methodKind: "unary";
@@ -255,7 +255,7 @@ export const FleetwoodConfigStateBackendService: GenService<{
     output: typeof ConfigSchema;
   };
   /**
-   * @generated from rpc config_holder.FleetwoodConfigStateBackendService.WatchConfig
+   * @generated from rpc config_holder.SentinelConfigStateBackendService.WatchConfig
    */
   watchConfig: {
     methodKind: "server_streaming";
@@ -265,13 +265,13 @@ export const FleetwoodConfigStateBackendService: GenService<{
 }> = /*@__PURE__*/ serviceDesc(file_services_config_holder, 0);
 
 /**
- * @generated from service config_holder.IronmaidenConfigStateBackendService
+ * @generated from service config_holder.IdentityConfigStateBackendService
  */
-export const IronmaidenConfigStateBackendService: GenService<{
+export const IdentityConfigStateBackendService: GenService<{
   /**
    * Singleton: Config
    *
-   * @generated from rpc config_holder.IronmaidenConfigStateBackendService.GetConfig
+   * @generated from rpc config_holder.IdentityConfigStateBackendService.GetConfig
    */
   getConfig: {
     methodKind: "unary";
@@ -279,7 +279,7 @@ export const IronmaidenConfigStateBackendService: GenService<{
     output: typeof ConfigSchema$1;
   };
   /**
-   * @generated from rpc config_holder.IronmaidenConfigStateBackendService.SetConfig
+   * @generated from rpc config_holder.IdentityConfigStateBackendService.SetConfig
    */
   setConfig: {
     methodKind: "unary";
@@ -287,7 +287,7 @@ export const IronmaidenConfigStateBackendService: GenService<{
     output: typeof ConfigSchema$1;
   };
   /**
-   * @generated from rpc config_holder.IronmaidenConfigStateBackendService.WatchConfig
+   * @generated from rpc config_holder.IdentityConfigStateBackendService.WatchConfig
    */
   watchConfig: {
     methodKind: "server_streaming";
@@ -297,13 +297,13 @@ export const IronmaidenConfigStateBackendService: GenService<{
 }> = /*@__PURE__*/ serviceDesc(file_services_config_holder, 1);
 
 /**
- * @generated from service config_holder.SpringsteenConfigStateBackendService
+ * @generated from service config_holder.GatewayConfigStateBackendService
  */
-export const SpringsteenConfigStateBackendService: GenService<{
+export const GatewayConfigStateBackendService: GenService<{
   /**
    * Singleton: Config
    *
-   * @generated from rpc config_holder.SpringsteenConfigStateBackendService.GetConfig
+   * @generated from rpc config_holder.GatewayConfigStateBackendService.GetConfig
    */
   getConfig: {
     methodKind: "unary";
@@ -311,7 +311,7 @@ export const SpringsteenConfigStateBackendService: GenService<{
     output: typeof ConfigSchema$2;
   };
   /**
-   * @generated from rpc config_holder.SpringsteenConfigStateBackendService.SetConfig
+   * @generated from rpc config_holder.GatewayConfigStateBackendService.SetConfig
    */
   setConfig: {
     methodKind: "unary";
@@ -319,7 +319,7 @@ export const SpringsteenConfigStateBackendService: GenService<{
     output: typeof ConfigSchema$2;
   };
   /**
-   * @generated from rpc config_holder.SpringsteenConfigStateBackendService.WatchConfig
+   * @generated from rpc config_holder.GatewayConfigStateBackendService.WatchConfig
    */
   watchConfig: {
     methodKind: "server_streaming";
@@ -329,13 +329,13 @@ export const SpringsteenConfigStateBackendService: GenService<{
 }> = /*@__PURE__*/ serviceDesc(file_services_config_holder, 2);
 
 /**
- * @generated from service config_holder.GenesisConfigStateBackendService
+ * @generated from service config_holder.LetsencryptConfigStateBackendService
  */
-export const GenesisConfigStateBackendService: GenService<{
+export const LetsencryptConfigStateBackendService: GenService<{
   /**
    * Singleton: Config
    *
-   * @generated from rpc config_holder.GenesisConfigStateBackendService.GetConfig
+   * @generated from rpc config_holder.LetsencryptConfigStateBackendService.GetConfig
    */
   getConfig: {
     methodKind: "unary";
@@ -343,7 +343,7 @@ export const GenesisConfigStateBackendService: GenService<{
     output: typeof ConfigSchema$3;
   };
   /**
-   * @generated from rpc config_holder.GenesisConfigStateBackendService.SetConfig
+   * @generated from rpc config_holder.LetsencryptConfigStateBackendService.SetConfig
    */
   setConfig: {
     methodKind: "unary";
@@ -351,7 +351,7 @@ export const GenesisConfigStateBackendService: GenService<{
     output: typeof ConfigSchema$3;
   };
   /**
-   * @generated from rpc config_holder.GenesisConfigStateBackendService.WatchConfig
+   * @generated from rpc config_holder.LetsencryptConfigStateBackendService.WatchConfig
    */
   watchConfig: {
     methodKind: "server_streaming";
@@ -361,13 +361,13 @@ export const GenesisConfigStateBackendService: GenService<{
 }> = /*@__PURE__*/ serviceDesc(file_services_config_holder, 3);
 
 /**
- * @generated from service config_holder.QueenConfigStateBackendService
+ * @generated from service config_holder.PolicyConfigStateBackendService
  */
-export const QueenConfigStateBackendService: GenService<{
+export const PolicyConfigStateBackendService: GenService<{
   /**
    * Singleton: Config
    *
-   * @generated from rpc config_holder.QueenConfigStateBackendService.GetConfig
+   * @generated from rpc config_holder.PolicyConfigStateBackendService.GetConfig
    */
   getConfig: {
     methodKind: "unary";
@@ -375,7 +375,7 @@ export const QueenConfigStateBackendService: GenService<{
     output: typeof ConfigSchema$4;
   };
   /**
-   * @generated from rpc config_holder.QueenConfigStateBackendService.SetConfig
+   * @generated from rpc config_holder.PolicyConfigStateBackendService.SetConfig
    */
   setConfig: {
     methodKind: "unary";
@@ -383,7 +383,7 @@ export const QueenConfigStateBackendService: GenService<{
     output: typeof ConfigSchema$4;
   };
   /**
-   * @generated from rpc config_holder.QueenConfigStateBackendService.WatchConfig
+   * @generated from rpc config_holder.PolicyConfigStateBackendService.WatchConfig
    */
   watchConfig: {
     methodKind: "server_streaming";

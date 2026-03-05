@@ -1463,6 +1463,27 @@ export function configDefaults(m: Config): void {
     m.shutdownTimeoutSeconds = DEFAULT_SHUTDOWN_TIMEOUT_SECONDS;
   }
 }
+// ============================================================
+// Type Undefaults
+// ============================================================
+/** Resets Config fields that match defaults back to zero for minimal persistence. */
+export function configUndefaults(m: Config): void {
+  if (m.pingIntervalMs === DEFAULT_PING_INTERVAL_MS) {
+    m.pingIntervalMs = 0;
+  }
+  if (m.rebalanceIntervalMs === DEFAULT_REBALANCE_INTERVAL_MS) {
+    m.rebalanceIntervalMs = 0;
+  }
+  if (m.maxRequestSize === BigInt(DEFAULT_MAX_REQUEST_SIZE)) {
+    m.maxRequestSize = 0n;
+  }
+  if (m.requestTimeoutSeconds === BigInt(DEFAULT_REQUEST_TIMEOUT_SECONDS)) {
+    m.requestTimeoutSeconds = 0n;
+  }
+  if (m.shutdownTimeoutSeconds === BigInt(DEFAULT_SHUTDOWN_TIMEOUT_SECONDS)) {
+    m.shutdownTimeoutSeconds = 0n;
+  }
+}
 
 // ============================================================
 // Merge: BootstrapConfig

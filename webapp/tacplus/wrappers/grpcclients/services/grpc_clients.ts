@@ -11,12 +11,7 @@
 //
 // Source: grpc_clients
 
-import { FleetwoodServiceGrpcClient } from "./fleetwood/fleetwood_service";
-import { IronMaidenServiceGrpcClient } from "./ironmaiden/iron_maiden_service";
-import { QueenServiceGrpcClient } from "./queen/queen_service";
+import { PolicyServiceGrpcClient } from "./policy/policy_service";
+import { SentinelServiceGrpcClient } from "./sentinel/sentinel_service";
 
-export {
-  FleetwoodServiceGrpcClient,
-  IronMaidenServiceGrpcClient,
-  QueenServiceGrpcClient,
-};
+export { PolicyServiceGrpcClient, SentinelServiceGrpcClient };

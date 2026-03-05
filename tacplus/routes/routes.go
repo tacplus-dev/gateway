@@ -8,9 +8,9 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 
-	fleetwood_gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/fleetwood"
 	identity_gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/identity"
-	queen_gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/queen"
+	policy_gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/policy"
+	sentinel_gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/sentinel"
 )
 
 // RegisterFunc is the signature of grpc-gateway's RegisterXxxHandlerFromEndpoint.
@@ -25,23 +25,23 @@ type Route struct {
 // GatewayRoutes returns the grpc-gateway routes for all annotated services.
 var GatewayRoutes = []Route{
 	{
-		RegisterFunc: fleetwood_gw.RegisterFleetwoodServiceHandlerFromEndpoint,
-		ServiceID:    "fleetwood",
-	},
-	{
 		RegisterFunc: identity_gw.RegisterIdentityServiceHandlerFromEndpoint,
 		ServiceID:    "identity",
 	},
 	{
-		RegisterFunc: queen_gw.RegisterQueenServiceHandlerFromEndpoint,
-		ServiceID:    "queen",
+		RegisterFunc: policy_gw.RegisterPolicyServiceHandlerFromEndpoint,
+		ServiceID:    "policy",
+	},
+	{
+		RegisterFunc: sentinel_gw.RegisterSentinelServiceHandlerFromEndpoint,
+		ServiceID:    "sentinel",
 	},
 }
 
 // ProxyServiceMapping maps proto package names to service IDs.
 // Used by the transparent gRPC proxy to resolve downstream targets.
 var ProxyServiceMapping = map[string]string{
-	"fleetwood": "fleetwood",
 	"identity": "identity",
-	"queen": "queen",
+	"policy": "policy",
+	"sentinel": "sentinel",
 }

@@ -430,17 +430,17 @@ export function validatePublicKey(m: PublicKey | undefined): void {
     return;
   }
 
+  // Validate id (assert_required)
+  if (!m.id) {
+    throw newErrMissingInvalidData(undefined, `field id is required`);
+  }
+
   // Validate id (assert_min_length: 1)
   if (m.id && m.id.length < 1) {
     throw newErrMissingInvalidData(
       undefined,
       `field id must have length >= 1, got: ${m.id.length}`,
     );
-  }
-
-  // Validate id (assert_required)
-  if (!m.id) {
-    throw newErrMissingInvalidData(undefined, `field id is required`);
   }
 
   // Validate base64 (assert_required)
@@ -518,6 +518,18 @@ export function validateKey(m: Key | undefined): void {
     );
   }
 
+  // Validate base64 (assert_enc_type)
+  if (m.base64) {
+    // Basic PEM format validation
+    if (!m.base64.includes("-----BEGIN") || !m.base64.includes("-----END")) {
+      throw newErrMissingInvalidData(
+        undefined,
+        `field base64 must be in PEM format`,
+      );
+    }
+    // Note: Full cryptographic validation would require crypto libraries
+  }
+
   // Validate base64 (assert_required)
   if (!m.base64) {
     throw newErrMissingInvalidData(undefined, `field base64 is required`);
@@ -532,18 +544,6 @@ export function validateKey(m: Key | undefined): void {
         `field base64 must be valid base64`,
       );
     }
-  }
-
-  // Validate base64 (assert_enc_type)
-  if (m.base64) {
-    // Basic PEM format validation
-    if (!m.base64.includes("-----BEGIN") || !m.base64.includes("-----END")) {
-      throw newErrMissingInvalidData(
-        undefined,
-        `field base64 must be in PEM format`,
-      );
-    }
-    // Note: Full cryptographic validation would require crypto libraries
   }
 
   // Validate created (assert_required)

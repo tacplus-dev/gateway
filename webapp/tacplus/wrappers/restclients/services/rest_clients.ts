@@ -11,6 +11,5 @@
 //
 // Source: rest_clients
 
-export { FleetwoodServiceRestClient } from "./fleetwood/fleetwood_service";
-export { IronMaidenServiceRestClient } from "./ironmaiden/iron_maiden_service";
-export { QueenServiceRestClient } from "./queen/queen_service";
+export { PolicyServiceRestClient } from "./policy/policy_service";
+export { SentinelServiceRestClient } from "./sentinel/sentinel_service";

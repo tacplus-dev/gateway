@@ -8,24 +8,24 @@ package config_holder;
 option go_package = "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/config_holder";
 
 import "libs/serviceconfig.proto";
-import "services/fleetwood.proto";
 import "services/gateway.proto";
 import "services/identity.proto";
 import "services/letsencrypt.proto";
-import "services/queen.proto";
+import "services/policy.proto";
+import "services/sentinel.proto";
 import "google/protobuf/empty.proto";
 
 message ConfigHolder {
-  fleetwood.Config fleetwood_config = 5;
+  sentinel.Config sentinel_config = 5;
   identity.Config identity_config = 6;
   gateway.Config gateway_config = 7;
   letsencrypt.Config letsencrypt_config = 9;
-  queen.Config queen_config = 10;
+  policy.Config policy_config = 10;
 }
 
-message FleetwoodConfigState {
+message SentinelConfigState {
 
-  fleetwood.Config config = 1;
+  sentinel.Config config = 1;
 }
 
 message IdentityConfigState {
@@ -43,9 +43,9 @@ message LetsencryptConfigState {
   letsencrypt.Config config = 1;
 }
 
-message QueenConfigState {
+message PolicyConfigState {
 
-  queen.Config config = 1;
+  policy.Config config = 1;
 }
 
 // ServiceConfigState delivers runtime configuration (OPA policy) to all services.
@@ -59,11 +59,11 @@ message ServiceConfigState {
 // Auto-generated Backend Service (tacplus)
 // ============================================================================
 
-service FleetwoodConfigStateBackendService {
+service SentinelConfigStateBackendService {
 	// Singleton: Config
-	rpc GetConfig(google.protobuf.Empty) returns (fleetwood.Config);
-	rpc SetConfig(fleetwood.Config) returns (fleetwood.Config);
-	rpc WatchConfig(google.protobuf.Empty) returns (stream fleetwood.Config);
+	rpc GetConfig(google.protobuf.Empty) returns (sentinel.Config);
+	rpc SetConfig(sentinel.Config) returns (sentinel.Config);
+	rpc WatchConfig(google.protobuf.Empty) returns (stream sentinel.Config);
 }
 
 // ============================================================================
@@ -103,11 +103,11 @@ service LetsencryptConfigStateBackendService {
 // Auto-generated Backend Service (tacplus)
 // ============================================================================
 
-service QueenConfigStateBackendService {
+service PolicyConfigStateBackendService {
 	// Singleton: Config
-	rpc GetConfig(google.protobuf.Empty) returns (queen.Config);
-	rpc SetConfig(queen.Config) returns (queen.Config);
-	rpc WatchConfig(google.protobuf.Empty) returns (stream queen.Config);
+	rpc GetConfig(google.protobuf.Empty) returns (policy.Config);
+	rpc SetConfig(policy.Config) returns (policy.Config);
+	rpc WatchConfig(google.protobuf.Empty) returns (stream policy.Config);
 }
 
 // ============================================================================

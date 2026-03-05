@@ -10,7 +10,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/fleetwood': 'https://localhost:9000',
+      '/sentinel': 'https://localhost:9000',
       '/ironmaiden': 'https://localhost:9000',
     },
   },

@@ -40653,6 +40653,139 @@ export function clusterStateDefaults(m: ClusterState): void {
     configDefaults(m.frontendConfig);
   }
 }
+// ============================================================
+// Type Undefaults
+// ============================================================
+/** Resets BootstrapConfig fields that match defaults back to zero for minimal persistence. */
+export function bootstrapConfigUndefaults(m: BootstrapConfig): void {
+  if (m.partitionCount === DEFAULT_PARTITION_COUNT) {
+    m.partitionCount = 0;
+  }
+  if (m.persistenceDir === DEFAULT_PERSISTENCE_DIR) {
+    m.persistenceDir = "";
+  }
+  if (m.raftPort === DEFAULT_RAFT_PORT) {
+    m.raftPort = 0;
+  }
+  if (m.network) {
+    networkConfigUndefaults(m.network);
+  }
+  if (m.cpSubsystem) {
+    cPSubsystemConfigUndefaults(m.cpSubsystem);
+  }
+}
+// ============================================================
+// Type Undefaults
+// ============================================================
+/** Resets NetworkConfig fields that match defaults back to zero for minimal persistence. */
+export function networkConfigUndefaults(m: NetworkConfig): void {
+  if (m.connectTimeoutSeconds === BigInt(DEFAULT_CONNECT_TIMEOUT_SECONDS)) {
+    m.connectTimeoutSeconds = 0n;
+  }
+  if (
+    m.heartbeatIntervalSeconds === BigInt(DEFAULT_HEARTBEAT_INTERVAL_SECONDS)
+  ) {
+    m.heartbeatIntervalSeconds = 0n;
+  }
+  if (m.heartbeatTimeoutSeconds === BigInt(DEFAULT_HEARTBEAT_TIMEOUT_SECONDS)) {
+    m.heartbeatTimeoutSeconds = 0n;
+  }
+}
+// ============================================================
+// Type Undefaults
+// ============================================================
+/** Resets CPSubsystemConfig fields that match defaults back to zero for minimal persistence. */
+export function cPSubsystemConfigUndefaults(m: CPSubsystemConfig): void {
+  if (m.cpMemberCount === DEFAULT_CP_MEMBER_COUNT) {
+    m.cpMemberCount = 0;
+  }
+  if (m.sessionTimeoutSeconds === BigInt(DEFAULT_SESSION_TIMEOUT_SECONDS)) {
+    m.sessionTimeoutSeconds = 0n;
+  }
+  if (
+    m.sessionHeartbeatIntervalSeconds ===
+    BigInt(DEFAULT_SESSION_HEARTBEAT_INTERVAL_SECONDS)
+  ) {
+    m.sessionHeartbeatIntervalSeconds = 0n;
+  }
+  if (
+    m.missingCpMemberAutoRemovalSeconds ===
+    BigInt(DEFAULT_MISSING_CP_MEMBER_AUTO_REMOVAL_SECONDS)
+  ) {
+    m.missingCpMemberAutoRemovalSeconds = 0n;
+  }
+}
+// ============================================================
+// Type Undefaults
+// ============================================================
+/** Resets RateLimitConfig fields that match defaults back to zero for minimal persistence. */
+export function rateLimitConfigUndefaults(m: RateLimitConfig): void {
+  if (m.pollingRate === DEFAULT_POLLING_RATE) {
+    m.pollingRate = 0;
+  }
+  if (m.unaryRate === DEFAULT_UNARY_RATE) {
+    m.unaryRate = 0;
+  }
+}
+// ============================================================
+// Type Undefaults
+// ============================================================
+/** Resets SecurityConfig fields that match defaults back to zero for minimal persistence. */
+export function securityConfigUndefaults(m: SecurityConfig): void {
+  if (m.audience === DEFAULT_AUDIENCE) {
+    m.audience = "";
+  }
+  if (m.tokenTtlSeconds === BigInt(DEFAULT_TOKEN_TTL_SECONDS)) {
+    m.tokenTtlSeconds = 0n;
+  }
+}
+// ============================================================
+// Type Undefaults
+// ============================================================
+/** Resets TokenExchangerConfig fields that match defaults back to zero for minimal persistence. */
+export function tokenExchangerConfigUndefaults(m: TokenExchangerConfig): void {
+  if (m.refreshAudience === DEFAULT_REFRESH_AUDIENCE) {
+    m.refreshAudience = "";
+  }
+  if (
+    m.keyRotationIntervalSeconds ===
+    BigInt(DEFAULT_KEY_ROTATION_INTERVAL_SECONDS)
+  ) {
+    m.keyRotationIntervalSeconds = 0n;
+  }
+  if (
+    m.defaultTokenExpirySeconds === BigInt(DEFAULT_DEFAULT_TOKEN_EXPIRY_SECONDS)
+  ) {
+    m.defaultTokenExpirySeconds = 0n;
+  }
+}
+// ============================================================
+// Type Undefaults
+// ============================================================
+/** Resets Config fields that match defaults back to zero for minimal persistence. */
+export function configUndefaults(m: Config): void {
+  if (m.rateLimit) {
+    rateLimitConfigUndefaults(m.rateLimit);
+  }
+  if (m.security) {
+    securityConfigUndefaults(m.security);
+  }
+  if (m.tokenExchanger) {
+    tokenExchangerConfigUndefaults(m.tokenExchanger);
+  }
+}
+// ============================================================
+// Type Undefaults
+// ============================================================
+/** Resets ClusterState fields that match defaults back to zero for minimal persistence. */
+export function clusterStateUndefaults(m: ClusterState): void {
+  if (m.bootstrapConfig) {
+    bootstrapConfigUndefaults(m.bootstrapConfig);
+  }
+  if (m.frontendConfig) {
+    configUndefaults(m.frontendConfig);
+  }
+}
 
 // ============================================================
 // Merge: BootstrapConfig

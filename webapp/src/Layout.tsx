@@ -17,8 +17,8 @@ const { Sider, Content } = AntLayout;
 
 const menuItems = [
   { key: '/', icon: <HomeOutlined />, label: 'Home' },
-  { key: '/fleetwood', icon: <HeartOutlined />, label: 'Health' },
-  { key: '/queen', icon: <SafetyOutlined />, label: 'API & Entitlements' },
+  { key: '/sentinel', icon: <HeartOutlined />, label: 'Health' },
+  { key: '/policy', icon: <SafetyOutlined />, label: 'API & Entitlements' },
 ];
 
 export function Layout() {

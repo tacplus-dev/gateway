@@ -11,5 +11,5 @@
 //
 // Source: rest_clients
 
-export type { RestTransport } from "./services/fleetwood/fleetwood_service";
+export type { RestTransport } from "./services/policy/policy_service";
 export * from "./services/rest_clients";

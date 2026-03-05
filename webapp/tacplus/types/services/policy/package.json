@@ -1,0 +1,27 @@
+{
+"name": "johnnycash-tacplus-services-policy",
+"version": "1.0.0",
+"description": "TypeScript types for policy proto package",
+"main": "index.ts",
+"exports": {
+".": "./index.ts",
+"./*": "./*"
+},
+"type": "module",
+"scripts": {
+"build": "tsc"
+},
+"dependencies": {
+"@bufbuild/protobuf": "^2.11.0",
+"js-yaml": "^4.1.0",
+"@iarna/toml": "^2.2.5",
+"johnnycash-tacplus-libs-spec": "*",
+"johnnycash-tacplus-libs-opa": "*",
+"johnnycash-tacplus-google-api-annotations": "*"},
+"devDependencies": {
+"typescript": "^5.3.3",
+"@types/js-yaml": "^4.0.9"},
+"keywords": ["protobuf", "typescript", "types"],
+"license": "UNLICENSED",
+"private": true
+}

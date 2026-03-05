@@ -19,7 +19,7 @@ type HealthResolver struct {
 
 // NewHealthResolver creates a HealthResolver and registers it as the default
 // resolver for the "health" scheme. Downstream connections use targets like
-// "health:///fleetwood".
+// "health:///sentinel".
 func NewHealthResolver(hw *HealthWatcher) *HealthResolver {
 	hr := &HealthResolver{
 		hw:        hw,

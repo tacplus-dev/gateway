@@ -5,8 +5,8 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { LoginPage } from './auth/LoginPage';
 import { Layout } from './Layout';
 import { HomePage } from './HomePage';
-import { FleetwoodDashboard } from './modules/fleetwood';
-import { QueenDashboard } from './modules/queen';
+import { SentinelDashboard } from './modules/sentinel';
+import { PolicyDashboard } from './modules/policy';
 
 export default function App() {
   return (
@@ -31,8 +31,8 @@ export default function App() {
               }
             >
               <Route index element={<HomePage />} />
-              <Route path="/fleetwood" element={<FleetwoodDashboard />} />
-              <Route path="/queen" element={<QueenDashboard />} />
+              <Route path="/sentinel" element={<SentinelDashboard />} />
+              <Route path="/policy" element={<PolicyDashboard />} />
             </Route>
           </Routes>
         </BrowserRouter>

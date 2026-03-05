@@ -780,9 +780,9 @@ func (x *AdminGraphInfo) GetValueType() string {
 // Keyed by composite id "service_id@node_id".
 type AdminServiceConnection struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Composite key: "service:fleetwood@node-uuid"
+	// Composite key: "service:sentinel@node-uuid"
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// Service identity from token sub claim: "service:fleetwood"
+	// Service identity from token sub claim: "service:sentinel"
 	ServiceId string `protobuf:"bytes,2,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
 	// Node this connection is on
 	NodeId string `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
@@ -2745,9 +2745,9 @@ func (x *AdminTopicSubscriber) GetLastReceivedMs() int64 {
 // Keyed by watch_id (unique per stream).
 type AdminWatchHealth struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Unique watch identifier: "service:fleetwood@node-uuid#WatchNodeMetrics#1"
+	// Unique watch identifier: "service:sentinel@node-uuid#WatchNodeMetrics#1"
 	WatchId string `protobuf:"bytes,1,opt,name=watch_id,json=watchId,proto3" json:"watch_id,omitempty"`
-	// Service that opened this watch: "service:fleetwood"
+	// Service that opened this watch: "service:sentinel"
 	ServiceId string `protobuf:"bytes,2,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
 	// Node serving this watch stream
 	NodeId string `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
@@ -2949,7 +2949,7 @@ type AdminMutationRate struct {
 	SetCount int64 `protobuf:"varint,9,opt,name=set_count,json=setCount,proto3" json:"set_count,omitempty"`
 	// Total deletes
 	DeleteCount int64 `protobuf:"varint,10,opt,name=delete_count,json=deleteCount,proto3" json:"delete_count,omitempty"`
-	// Per-service mutation counts: "service:fleetwood" -> 50
+	// Per-service mutation counts: "service:sentinel" -> 50
 	PerServiceMutations map[string]int64 `protobuf:"bytes,11,rep,name=per_service_mutations,json=perServiceMutations,proto3" json:"per_service_mutations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
 	// Node reporting
 	NodeId        string `protobuf:"bytes,12,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`

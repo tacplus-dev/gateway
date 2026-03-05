@@ -1,18 +1,18 @@
 {
-  "binary_hash": "521e8ca9ac970014b1cb7f68021e6559c36a214877e75a251cba1b2f1df32df7",
-  "config_hash": "ba4e41057a2eaf46daaffa00b760cb75ad0cfafe9f59c6f00260cfaeab220f7b",
-  "structure_hash": "0535d344e3592e301aed8a7be07bf6a1da163d43c0f6fb4a95407afd7dbed992",
+  "binary_hash": "704b28fed9fd190364231d653c561ab0edf265e9211f30301259abc59bcda46e",
+  "config_hash": "88e26159e9c1d395b371b0308abf2ad2b62658eb110617c1ad2f1e4be0d1fd97",
+  "structure_hash": "c683d06bf54314d591eb80292b56632792224816a961a80b79b40cc3b6886a37",
   "files": {
     "dependencies.yaml": "b1e3b41802693b989403f5da77d07c50392cbeb70718fbb6341421ffc1ac2442",
-    "services/elvis.proto": "b03d82a461ccfb91b0b218a01d3e8ef57d5f403f6e58399f1268b54ff7568ae3",
-    "services/fleetwood.proto": "bca2397572a2122efeda8367804b03fd90514f4feaf994bf0460708c999090d1",
-    "services/genesis.proto": "93764358c5b5ac707d5de2a9e93a4d07c2a62d95e5c9094991b4b8143447f6d3",
-    "services/ironmaiden.proto": "250310e1d225e58c7e145cc6b687a20411ccb899c3ee08467b423bef089527ca",
+    "services/elvis.proto": "ca9c64d21c527c88e0f0bc3ab96e7ca6d745b56315a3502487f4f6f6ff9362bd",
+    "services/gateway.proto": "ed2598f1c82c856c1df5c9fbb7e1cbb285075d397b4dbf7c2e919b75285fa608",
+    "services/identity.proto": "a5293157f34b54f7dcbb504ab047449350410a2956b3461e11c6ab007a7fcd89",
+    "services/letsencrypt.proto": "44366284e0532c4c00cb93f8d5a3510e56a471f503831dbbee82f0c5af815a3d",
     "services/orchestrator.proto": "2b2ff73b1942541e137b6e7013ab26c7aceb4b40c8749980e4cf24497ccce714",
-    "services/presley.proto": "345989755a66c74c28de623e4335a4c1a93ad7d93bd5c4dfb43ae4a04d131a61",
-    "services/queen.proto": "47bc0b63c566872dbad34927185f179da7247f43d5c2835dc51e03e2b4899401",
+    "services/policy.proto": "0375f1556cbf8d160143201a287683f8cc7b7878d49e17246c0578d2f7c24b3d",
+    "services/presley.proto": "0cec6a5861506e56e03e5792935115cebbe9a0e49c8f7be78c41ece7360f210a",
+    "services/sentinel.proto": "bf3ff5dfbc53ffec046383a6f80aac0c43c07fe93024e247e41b5cdd9e5cdb09",
     "services/snoopy.proto": "3ad109bdcf347d242779c738e937136ab095acf86d05a910307d56c6a84e25b9",
-    "services/springsteen.proto": "dbd8d915c9d34fa597f24e91c19704bebf1fe5ce43d7f14fb33e93a5dc2500a5",
     "services/woodstock.proto": "07da50aa11dcb6531f46b0a6bc343cc766647b52c6f42dae5b21f304262f42db"
   }
 }

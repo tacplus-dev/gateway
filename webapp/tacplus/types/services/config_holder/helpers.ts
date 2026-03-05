@@ -4,19 +4,19 @@
 // Source: services/config_holder.proto
 import {
   ConfigHolder,
-  FleetwoodConfigState,
-  IronmaidenConfigState,
-  SpringsteenConfigState,
-  GenesisConfigState,
-  QueenConfigState,
+  SentinelConfigState,
+  IdentityConfigState,
+  GatewayConfigState,
+  LetsencryptConfigState,
+  PolicyConfigState,
   ServiceConfigState,
   MapEmpty,
   ConfigHolderSchema,
-  FleetwoodConfigStateSchema,
-  IronmaidenConfigStateSchema,
-  SpringsteenConfigStateSchema,
-  GenesisConfigStateSchema,
-  QueenConfigStateSchema,
+  SentinelConfigStateSchema,
+  IdentityConfigStateSchema,
+  GatewayConfigStateSchema,
+  LetsencryptConfigStateSchema,
+  PolicyConfigStateSchema,
   ServiceConfigStateSchema,
   MapEmptySchema,
 } from "./config_holder_pb.js";
@@ -189,88 +189,88 @@ export function configHolderFromBytes(data: Uint8Array | string): ConfigHolder {
 }
 
 /**
- * Converts FleetwoodConfigState to JSON string.
+ * Converts SentinelConfigState to JSON string.
  * @param m The message to serialize
  * @param pretty If true, formats the JSON with indentation
  * @returns JSON string representation
  */
-export function fleetwoodConfigStateToJSON(
-  m: FleetwoodConfigState,
+export function sentinelConfigStateToJSON(
+  m: SentinelConfigState,
   pretty: boolean = false,
 ): string {
-  const json = toJson(FleetwoodConfigStateSchema, m);
+  const json = toJson(SentinelConfigStateSchema, m);
   return pretty ? JSON.stringify(json, null, 2) : JSON.stringify(json);
 }
 
 /**
- * Creates FleetwoodConfigState from JSON string or object.
+ * Creates SentinelConfigState from JSON string or object.
  * @param data JSON string or object
  * @returns Parsed message instance
  */
-export function fleetwoodConfigStateFromJSON(
+export function sentinelConfigStateFromJSON(
   data: string | object,
-): FleetwoodConfigState {
+): SentinelConfigState {
   const jsonObj = typeof data === "string" ? JSON.parse(data) : data;
-  return fromJson(FleetwoodConfigStateSchema, jsonObj);
+  return fromJson(SentinelConfigStateSchema, jsonObj);
 }
 
 /**
- * Converts FleetwoodConfigState to binary protobuf format.
+ * Converts SentinelConfigState to binary protobuf format.
  * @param m The message to serialize
  * @returns Uint8Array containing the binary data
  */
-export function fleetwoodConfigStateToBinary(
-  m: FleetwoodConfigState,
+export function sentinelConfigStateToBinary(
+  m: SentinelConfigState,
 ): Uint8Array {
-  return toBinary(FleetwoodConfigStateSchema, m);
+  return toBinary(SentinelConfigStateSchema, m);
 }
 
 /**
- * Creates FleetwoodConfigState from binary protobuf data.
+ * Creates SentinelConfigState from binary protobuf data.
  * @param data Binary protobuf data
  * @returns Parsed message instance
  */
-export function fleetwoodConfigStateFromBinary(
+export function sentinelConfigStateFromBinary(
   data: Uint8Array,
-): FleetwoodConfigState {
-  return fromBinary(FleetwoodConfigStateSchema, data);
+): SentinelConfigState {
+  return fromBinary(SentinelConfigStateSchema, data);
 }
 
 /**
- * Converts FleetwoodConfigState to YAML string.
+ * Converts SentinelConfigState to YAML string.
  * @param m The message to serialize
  * @returns YAML string representation
  */
-export function fleetwoodConfigStateToYAML(m: FleetwoodConfigState): string {
-  const json = toJson(FleetwoodConfigStateSchema, m);
+export function sentinelConfigStateToYAML(m: SentinelConfigState): string {
+  const json = toJson(SentinelConfigStateSchema, m);
   return yaml.dump(json);
 }
 
 /**
- * Converts FleetwoodConfigState to TOML string.
+ * Converts SentinelConfigState to TOML string.
  * @param m The message to serialize
  * @returns TOML string representation
  */
-export function fleetwoodConfigStateToTOML(m: FleetwoodConfigState): string {
-  const json = toJson(FleetwoodConfigStateSchema, m);
+export function sentinelConfigStateToTOML(m: SentinelConfigState): string {
+  const json = toJson(SentinelConfigStateSchema, m);
   return toml.stringify(json as toml.JsonMap);
 }
 
 /**
- * Creates FleetwoodConfigState from bytes, auto-detecting the format (JSON, YAML, TOML, or binary protobuf).
+ * Creates SentinelConfigState from bytes, auto-detecting the format (JSON, YAML, TOML, or binary protobuf).
  * @param data Bytes to parse
  * @returns Parsed message instance
  * @throws Error if the data cannot be parsed
  */
-export function fleetwoodConfigStateFromBytes(
+export function sentinelConfigStateFromBytes(
   data: Uint8Array | string,
-): FleetwoodConfigState {
+): SentinelConfigState {
   // If it's a string, try to detect format
   if (typeof data === "string") {
     // Try JSON first (most common)
     if (data.trimStart().startsWith("{") || data.trimStart().startsWith("[")) {
       try {
-        return fleetwoodConfigStateFromJSON(data);
+        return sentinelConfigStateFromJSON(data);
       } catch (e) {
         // Fall through to try other formats
       }
@@ -279,7 +279,7 @@ export function fleetwoodConfigStateFromBytes(
     // Try YAML
     try {
       const yamlObj = yaml.load(data) as string | object;
-      return fleetwoodConfigStateFromJSON(yamlObj);
+      return sentinelConfigStateFromJSON(yamlObj);
     } catch (e) {
       // Fall through to try TOML
     }
@@ -287,11 +287,11 @@ export function fleetwoodConfigStateFromBytes(
     // Try TOML
     try {
       const tomlObj = toml.parse(data) as string | object;
-      return fleetwoodConfigStateFromJSON(tomlObj);
+      return sentinelConfigStateFromJSON(tomlObj);
     } catch (e) {
       throw newErrMissingInvalidData(
         undefined,
-        "Failed to parse FleetwoodConfigState from string: not valid JSON, YAML, or TOML",
+        "Failed to parse SentinelConfigState from string: not valid JSON, YAML, or TOML",
       );
     }
   }
@@ -315,7 +315,7 @@ export function fleetwoodConfigStateFromBytes(
       // Looks like JSON
       try {
         const text = new TextDecoder().decode(data);
-        return fleetwoodConfigStateFromJSON(text);
+        return sentinelConfigStateFromJSON(text);
       } catch (e) {
         // Fall through to try other formats
       }
@@ -328,7 +328,7 @@ export function fleetwoodConfigStateFromBytes(
       // Try YAML
       try {
         const yamlObj = yaml.load(text) as string | object;
-        return fleetwoodConfigStateFromJSON(yamlObj);
+        return sentinelConfigStateFromJSON(yamlObj);
       } catch (e) {
         // Fall through
       }
@@ -336,7 +336,7 @@ export function fleetwoodConfigStateFromBytes(
       // Try TOML
       try {
         const tomlObj = toml.parse(text) as string | object;
-        return fleetwoodConfigStateFromJSON(tomlObj);
+        return sentinelConfigStateFromJSON(tomlObj);
       } catch (e) {
         // Fall through
       }
@@ -347,98 +347,98 @@ export function fleetwoodConfigStateFromBytes(
 
   // Try binary protobuf
   try {
-    return fleetwoodConfigStateFromBinary(data);
+    return sentinelConfigStateFromBinary(data);
   } catch (e) {
     throw newErrMissingInvalidData(
       undefined,
-      `Failed to parse FleetwoodConfigState: invalid format`,
+      `Failed to parse SentinelConfigState: invalid format`,
     );
   }
 }
 
 /**
- * Converts IronmaidenConfigState to JSON string.
+ * Converts IdentityConfigState to JSON string.
  * @param m The message to serialize
  * @param pretty If true, formats the JSON with indentation
  * @returns JSON string representation
  */
-export function ironmaidenConfigStateToJSON(
-  m: IronmaidenConfigState,
+export function identityConfigStateToJSON(
+  m: IdentityConfigState,
   pretty: boolean = false,
 ): string {
-  const json = toJson(IronmaidenConfigStateSchema, m);
+  const json = toJson(IdentityConfigStateSchema, m);
   return pretty ? JSON.stringify(json, null, 2) : JSON.stringify(json);
 }
 
 /**
- * Creates IronmaidenConfigState from JSON string or object.
+ * Creates IdentityConfigState from JSON string or object.
  * @param data JSON string or object
  * @returns Parsed message instance
  */
-export function ironmaidenConfigStateFromJSON(
+export function identityConfigStateFromJSON(
   data: string | object,
-): IronmaidenConfigState {
+): IdentityConfigState {
   const jsonObj = typeof data === "string" ? JSON.parse(data) : data;
-  return fromJson(IronmaidenConfigStateSchema, jsonObj);
+  return fromJson(IdentityConfigStateSchema, jsonObj);
 }
 
 /**
- * Converts IronmaidenConfigState to binary protobuf format.
+ * Converts IdentityConfigState to binary protobuf format.
  * @param m The message to serialize
  * @returns Uint8Array containing the binary data
  */
-export function ironmaidenConfigStateToBinary(
-  m: IronmaidenConfigState,
+export function identityConfigStateToBinary(
+  m: IdentityConfigState,
 ): Uint8Array {
-  return toBinary(IronmaidenConfigStateSchema, m);
+  return toBinary(IdentityConfigStateSchema, m);
 }
 
 /**
- * Creates IronmaidenConfigState from binary protobuf data.
+ * Creates IdentityConfigState from binary protobuf data.
  * @param data Binary protobuf data
  * @returns Parsed message instance
  */
-export function ironmaidenConfigStateFromBinary(
+export function identityConfigStateFromBinary(
   data: Uint8Array,
-): IronmaidenConfigState {
-  return fromBinary(IronmaidenConfigStateSchema, data);
+): IdentityConfigState {
+  return fromBinary(IdentityConfigStateSchema, data);
 }
 
 /**
- * Converts IronmaidenConfigState to YAML string.
+ * Converts IdentityConfigState to YAML string.
  * @param m The message to serialize
  * @returns YAML string representation
  */
-export function ironmaidenConfigStateToYAML(m: IronmaidenConfigState): string {
-  const json = toJson(IronmaidenConfigStateSchema, m);
+export function identityConfigStateToYAML(m: IdentityConfigState): string {
+  const json = toJson(IdentityConfigStateSchema, m);
   return yaml.dump(json);
 }
 
 /**
- * Converts IronmaidenConfigState to TOML string.
+ * Converts IdentityConfigState to TOML string.
  * @param m The message to serialize
  * @returns TOML string representation
  */
-export function ironmaidenConfigStateToTOML(m: IronmaidenConfigState): string {
-  const json = toJson(IronmaidenConfigStateSchema, m);
+export function identityConfigStateToTOML(m: IdentityConfigState): string {
+  const json = toJson(IdentityConfigStateSchema, m);
   return toml.stringify(json as toml.JsonMap);
 }
 
 /**
- * Creates IronmaidenConfigState from bytes, auto-detecting the format (JSON, YAML, TOML, or binary protobuf).
+ * Creates IdentityConfigState from bytes, auto-detecting the format (JSON, YAML, TOML, or binary protobuf).
  * @param data Bytes to parse
  * @returns Parsed message instance
  * @throws Error if the data cannot be parsed
  */
-export function ironmaidenConfigStateFromBytes(
+export function identityConfigStateFromBytes(
   data: Uint8Array | string,
-): IronmaidenConfigState {
+): IdentityConfigState {
   // If it's a string, try to detect format
   if (typeof data === "string") {
     // Try JSON first (most common)
     if (data.trimStart().startsWith("{") || data.trimStart().startsWith("[")) {
       try {
-        return ironmaidenConfigStateFromJSON(data);
+        return identityConfigStateFromJSON(data);
       } catch (e) {
         // Fall through to try other formats
       }
@@ -447,7 +447,7 @@ export function ironmaidenConfigStateFromBytes(
     // Try YAML
     try {
       const yamlObj = yaml.load(data) as string | object;
-      return ironmaidenConfigStateFromJSON(yamlObj);
+      return identityConfigStateFromJSON(yamlObj);
     } catch (e) {
       // Fall through to try TOML
     }
@@ -455,11 +455,11 @@ export function ironmaidenConfigStateFromBytes(
     // Try TOML
     try {
       const tomlObj = toml.parse(data) as string | object;
-      return ironmaidenConfigStateFromJSON(tomlObj);
+      return identityConfigStateFromJSON(tomlObj);
     } catch (e) {
       throw newErrMissingInvalidData(
         undefined,
-        "Failed to parse IronmaidenConfigState from string: not valid JSON, YAML, or TOML",
+        "Failed to parse IdentityConfigState from string: not valid JSON, YAML, or TOML",
       );
     }
   }
@@ -483,7 +483,7 @@ export function ironmaidenConfigStateFromBytes(
       // Looks like JSON
       try {
         const text = new TextDecoder().decode(data);
-        return ironmaidenConfigStateFromJSON(text);
+        return identityConfigStateFromJSON(text);
       } catch (e) {
         // Fall through to try other formats
       }
@@ -496,7 +496,7 @@ export function ironmaidenConfigStateFromBytes(
       // Try YAML
       try {
         const yamlObj = yaml.load(text) as string | object;
-        return ironmaidenConfigStateFromJSON(yamlObj);
+        return identityConfigStateFromJSON(yamlObj);
       } catch (e) {
         // Fall through
       }
@@ -504,7 +504,7 @@ export function ironmaidenConfigStateFromBytes(
       // Try TOML
       try {
         const tomlObj = toml.parse(text) as string | object;
-        return ironmaidenConfigStateFromJSON(tomlObj);
+        return identityConfigStateFromJSON(tomlObj);
       } catch (e) {
         // Fall through
       }
@@ -515,102 +515,268 @@ export function ironmaidenConfigStateFromBytes(
 
   // Try binary protobuf
   try {
-    return ironmaidenConfigStateFromBinary(data);
+    return identityConfigStateFromBinary(data);
   } catch (e) {
     throw newErrMissingInvalidData(
       undefined,
-      `Failed to parse IronmaidenConfigState: invalid format`,
+      `Failed to parse IdentityConfigState: invalid format`,
     );
   }
 }
 
 /**
- * Converts SpringsteenConfigState to JSON string.
+ * Converts GatewayConfigState to JSON string.
  * @param m The message to serialize
  * @param pretty If true, formats the JSON with indentation
  * @returns JSON string representation
  */
-export function springsteenConfigStateToJSON(
-  m: SpringsteenConfigState,
+export function gatewayConfigStateToJSON(
+  m: GatewayConfigState,
   pretty: boolean = false,
 ): string {
-  const json = toJson(SpringsteenConfigStateSchema, m);
+  const json = toJson(GatewayConfigStateSchema, m);
   return pretty ? JSON.stringify(json, null, 2) : JSON.stringify(json);
 }
 
 /**
- * Creates SpringsteenConfigState from JSON string or object.
+ * Creates GatewayConfigState from JSON string or object.
  * @param data JSON string or object
  * @returns Parsed message instance
  */
-export function springsteenConfigStateFromJSON(
+export function gatewayConfigStateFromJSON(
   data: string | object,
-): SpringsteenConfigState {
+): GatewayConfigState {
   const jsonObj = typeof data === "string" ? JSON.parse(data) : data;
-  return fromJson(SpringsteenConfigStateSchema, jsonObj);
+  return fromJson(GatewayConfigStateSchema, jsonObj);
 }
 
 /**
- * Converts SpringsteenConfigState to binary protobuf format.
+ * Converts GatewayConfigState to binary protobuf format.
  * @param m The message to serialize
  * @returns Uint8Array containing the binary data
  */
-export function springsteenConfigStateToBinary(
-  m: SpringsteenConfigState,
+export function gatewayConfigStateToBinary(m: GatewayConfigState): Uint8Array {
+  return toBinary(GatewayConfigStateSchema, m);
+}
+
+/**
+ * Creates GatewayConfigState from binary protobuf data.
+ * @param data Binary protobuf data
+ * @returns Parsed message instance
+ */
+export function gatewayConfigStateFromBinary(
+  data: Uint8Array,
+): GatewayConfigState {
+  return fromBinary(GatewayConfigStateSchema, data);
+}
+
+/**
+ * Converts GatewayConfigState to YAML string.
+ * @param m The message to serialize
+ * @returns YAML string representation
+ */
+export function gatewayConfigStateToYAML(m: GatewayConfigState): string {
+  const json = toJson(GatewayConfigStateSchema, m);
+  return yaml.dump(json);
+}
+
+/**
+ * Converts GatewayConfigState to TOML string.
+ * @param m The message to serialize
+ * @returns TOML string representation
+ */
+export function gatewayConfigStateToTOML(m: GatewayConfigState): string {
+  const json = toJson(GatewayConfigStateSchema, m);
+  return toml.stringify(json as toml.JsonMap);
+}
+
+/**
+ * Creates GatewayConfigState from bytes, auto-detecting the format (JSON, YAML, TOML, or binary protobuf).
+ * @param data Bytes to parse
+ * @returns Parsed message instance
+ * @throws Error if the data cannot be parsed
+ */
+export function gatewayConfigStateFromBytes(
+  data: Uint8Array | string,
+): GatewayConfigState {
+  // If it's a string, try to detect format
+  if (typeof data === "string") {
+    // Try JSON first (most common)
+    if (data.trimStart().startsWith("{") || data.trimStart().startsWith("[")) {
+      try {
+        return gatewayConfigStateFromJSON(data);
+      } catch (e) {
+        // Fall through to try other formats
+      }
+    }
+
+    // Try YAML
+    try {
+      const yamlObj = yaml.load(data) as string | object;
+      return gatewayConfigStateFromJSON(yamlObj);
+    } catch (e) {
+      // Fall through to try TOML
+    }
+
+    // Try TOML
+    try {
+      const tomlObj = toml.parse(data) as string | object;
+      return gatewayConfigStateFromJSON(tomlObj);
+    } catch (e) {
+      throw newErrMissingInvalidData(
+        undefined,
+        "Failed to parse GatewayConfigState from string: not valid JSON, YAML, or TOML",
+      );
+    }
+  }
+
+  // Try to detect format from the first byte
+  // JSON starts with '{' (0x7B) or '[' (0x5B) or whitespace
+  if (data.length > 0) {
+    const firstByte = data[0];
+    // Check for JSON markers (after trimming whitespace)
+    let i = 0;
+    while (
+      i < data.length &&
+      (data[i] === 0x20 ||
+        data[i] === 0x09 ||
+        data[i] === 0x0a ||
+        data[i] === 0x0d)
+    ) {
+      i++;
+    }
+    if (i < data.length && (data[i] === 0x7b || data[i] === 0x5b)) {
+      // Looks like JSON
+      try {
+        const text = new TextDecoder().decode(data);
+        return gatewayConfigStateFromJSON(text);
+      } catch (e) {
+        // Fall through to try other formats
+      }
+    }
+
+    // Try to decode as text and parse as YAML/TOML
+    try {
+      const text = new TextDecoder().decode(data);
+
+      // Try YAML
+      try {
+        const yamlObj = yaml.load(text) as string | object;
+        return gatewayConfigStateFromJSON(yamlObj);
+      } catch (e) {
+        // Fall through
+      }
+
+      // Try TOML
+      try {
+        const tomlObj = toml.parse(text) as string | object;
+        return gatewayConfigStateFromJSON(tomlObj);
+      } catch (e) {
+        // Fall through
+      }
+    } catch (e) {
+      // Fall through to try binary
+    }
+  }
+
+  // Try binary protobuf
+  try {
+    return gatewayConfigStateFromBinary(data);
+  } catch (e) {
+    throw newErrMissingInvalidData(
+      undefined,
+      `Failed to parse GatewayConfigState: invalid format`,
+    );
+  }
+}
+
+/**
+ * Converts LetsencryptConfigState to JSON string.
+ * @param m The message to serialize
+ * @param pretty If true, formats the JSON with indentation
+ * @returns JSON string representation
+ */
+export function letsencryptConfigStateToJSON(
+  m: LetsencryptConfigState,
+  pretty: boolean = false,
+): string {
+  const json = toJson(LetsencryptConfigStateSchema, m);
+  return pretty ? JSON.stringify(json, null, 2) : JSON.stringify(json);
+}
+
+/**
+ * Creates LetsencryptConfigState from JSON string or object.
+ * @param data JSON string or object
+ * @returns Parsed message instance
+ */
+export function letsencryptConfigStateFromJSON(
+  data: string | object,
+): LetsencryptConfigState {
+  const jsonObj = typeof data === "string" ? JSON.parse(data) : data;
+  return fromJson(LetsencryptConfigStateSchema, jsonObj);
+}
+
+/**
+ * Converts LetsencryptConfigState to binary protobuf format.
+ * @param m The message to serialize
+ * @returns Uint8Array containing the binary data
+ */
+export function letsencryptConfigStateToBinary(
+  m: LetsencryptConfigState,
 ): Uint8Array {
-  return toBinary(SpringsteenConfigStateSchema, m);
+  return toBinary(LetsencryptConfigStateSchema, m);
 }
 
 /**
- * Creates SpringsteenConfigState from binary protobuf data.
+ * Creates LetsencryptConfigState from binary protobuf data.
  * @param data Binary protobuf data
  * @returns Parsed message instance
  */
-export function springsteenConfigStateFromBinary(
+export function letsencryptConfigStateFromBinary(
   data: Uint8Array,
-): SpringsteenConfigState {
-  return fromBinary(SpringsteenConfigStateSchema, data);
+): LetsencryptConfigState {
+  return fromBinary(LetsencryptConfigStateSchema, data);
 }
 
 /**
- * Converts SpringsteenConfigState to YAML string.
+ * Converts LetsencryptConfigState to YAML string.
  * @param m The message to serialize
  * @returns YAML string representation
  */
-export function springsteenConfigStateToYAML(
-  m: SpringsteenConfigState,
+export function letsencryptConfigStateToYAML(
+  m: LetsencryptConfigState,
 ): string {
-  const json = toJson(SpringsteenConfigStateSchema, m);
+  const json = toJson(LetsencryptConfigStateSchema, m);
   return yaml.dump(json);
 }
 
 /**
- * Converts SpringsteenConfigState to TOML string.
+ * Converts LetsencryptConfigState to TOML string.
  * @param m The message to serialize
  * @returns TOML string representation
  */
-export function springsteenConfigStateToTOML(
-  m: SpringsteenConfigState,
+export function letsencryptConfigStateToTOML(
+  m: LetsencryptConfigState,
 ): string {
-  const json = toJson(SpringsteenConfigStateSchema, m);
+  const json = toJson(LetsencryptConfigStateSchema, m);
   return toml.stringify(json as toml.JsonMap);
 }
 
 /**
- * Creates SpringsteenConfigState from bytes, auto-detecting the format (JSON, YAML, TOML, or binary protobuf).
+ * Creates LetsencryptConfigState from bytes, auto-detecting the format (JSON, YAML, TOML, or binary protobuf).
  * @param data Bytes to parse
  * @returns Parsed message instance
  * @throws Error if the data cannot be parsed
  */
-export function springsteenConfigStateFromBytes(
+export function letsencryptConfigStateFromBytes(
   data: Uint8Array | string,
-): SpringsteenConfigState {
+): LetsencryptConfigState {
   // If it's a string, try to detect format
   if (typeof data === "string") {
     // Try JSON first (most common)
     if (data.trimStart().startsWith("{") || data.trimStart().startsWith("[")) {
       try {
-        return springsteenConfigStateFromJSON(data);
+        return letsencryptConfigStateFromJSON(data);
       } catch (e) {
         // Fall through to try other formats
       }
@@ -619,7 +785,7 @@ export function springsteenConfigStateFromBytes(
     // Try YAML
     try {
       const yamlObj = yaml.load(data) as string | object;
-      return springsteenConfigStateFromJSON(yamlObj);
+      return letsencryptConfigStateFromJSON(yamlObj);
     } catch (e) {
       // Fall through to try TOML
     }
@@ -627,11 +793,11 @@ export function springsteenConfigStateFromBytes(
     // Try TOML
     try {
       const tomlObj = toml.parse(data) as string | object;
-      return springsteenConfigStateFromJSON(tomlObj);
+      return letsencryptConfigStateFromJSON(tomlObj);
     } catch (e) {
       throw newErrMissingInvalidData(
         undefined,
-        "Failed to parse SpringsteenConfigState from string: not valid JSON, YAML, or TOML",
+        "Failed to parse LetsencryptConfigState from string: not valid JSON, YAML, or TOML",
       );
     }
   }
@@ -655,7 +821,7 @@ export function springsteenConfigStateFromBytes(
       // Looks like JSON
       try {
         const text = new TextDecoder().decode(data);
-        return springsteenConfigStateFromJSON(text);
+        return letsencryptConfigStateFromJSON(text);
       } catch (e) {
         // Fall through to try other formats
       }
@@ -668,7 +834,7 @@ export function springsteenConfigStateFromBytes(
       // Try YAML
       try {
         const yamlObj = yaml.load(text) as string | object;
-        return springsteenConfigStateFromJSON(yamlObj);
+        return letsencryptConfigStateFromJSON(yamlObj);
       } catch (e) {
         // Fall through
       }
@@ -676,7 +842,7 @@ export function springsteenConfigStateFromBytes(
       // Try TOML
       try {
         const tomlObj = toml.parse(text) as string | object;
-        return springsteenConfigStateFromJSON(tomlObj);
+        return letsencryptConfigStateFromJSON(tomlObj);
       } catch (e) {
         // Fall through
       }
@@ -687,96 +853,96 @@ export function springsteenConfigStateFromBytes(
 
   // Try binary protobuf
   try {
-    return springsteenConfigStateFromBinary(data);
+    return letsencryptConfigStateFromBinary(data);
   } catch (e) {
     throw newErrMissingInvalidData(
       undefined,
-      `Failed to parse SpringsteenConfigState: invalid format`,
+      `Failed to parse LetsencryptConfigState: invalid format`,
     );
   }
 }
 
 /**
- * Converts GenesisConfigState to JSON string.
+ * Converts PolicyConfigState to JSON string.
  * @param m The message to serialize
  * @param pretty If true, formats the JSON with indentation
  * @returns JSON string representation
  */
-export function genesisConfigStateToJSON(
-  m: GenesisConfigState,
+export function policyConfigStateToJSON(
+  m: PolicyConfigState,
   pretty: boolean = false,
 ): string {
-  const json = toJson(GenesisConfigStateSchema, m);
+  const json = toJson(PolicyConfigStateSchema, m);
   return pretty ? JSON.stringify(json, null, 2) : JSON.stringify(json);
 }
 
 /**
- * Creates GenesisConfigState from JSON string or object.
+ * Creates PolicyConfigState from JSON string or object.
  * @param data JSON string or object
  * @returns Parsed message instance
  */
-export function genesisConfigStateFromJSON(
+export function policyConfigStateFromJSON(
   data: string | object,
-): GenesisConfigState {
+): PolicyConfigState {
   const jsonObj = typeof data === "string" ? JSON.parse(data) : data;
-  return fromJson(GenesisConfigStateSchema, jsonObj);
+  return fromJson(PolicyConfigStateSchema, jsonObj);
 }
 
 /**
- * Converts GenesisConfigState to binary protobuf format.
+ * Converts PolicyConfigState to binary protobuf format.
  * @param m The message to serialize
  * @returns Uint8Array containing the binary data
  */
-export function genesisConfigStateToBinary(m: GenesisConfigState): Uint8Array {
-  return toBinary(GenesisConfigStateSchema, m);
+export function policyConfigStateToBinary(m: PolicyConfigState): Uint8Array {
+  return toBinary(PolicyConfigStateSchema, m);
 }
 
 /**
- * Creates GenesisConfigState from binary protobuf data.
+ * Creates PolicyConfigState from binary protobuf data.
  * @param data Binary protobuf data
  * @returns Parsed message instance
  */
-export function genesisConfigStateFromBinary(
+export function policyConfigStateFromBinary(
   data: Uint8Array,
-): GenesisConfigState {
-  return fromBinary(GenesisConfigStateSchema, data);
+): PolicyConfigState {
+  return fromBinary(PolicyConfigStateSchema, data);
 }
 
 /**
- * Converts GenesisConfigState to YAML string.
+ * Converts PolicyConfigState to YAML string.
  * @param m The message to serialize
  * @returns YAML string representation
  */
-export function genesisConfigStateToYAML(m: GenesisConfigState): string {
-  const json = toJson(GenesisConfigStateSchema, m);
+export function policyConfigStateToYAML(m: PolicyConfigState): string {
+  const json = toJson(PolicyConfigStateSchema, m);
   return yaml.dump(json);
 }
 
 /**
- * Converts GenesisConfigState to TOML string.
+ * Converts PolicyConfigState to TOML string.
  * @param m The message to serialize
  * @returns TOML string representation
  */
-export function genesisConfigStateToTOML(m: GenesisConfigState): string {
-  const json = toJson(GenesisConfigStateSchema, m);
+export function policyConfigStateToTOML(m: PolicyConfigState): string {
+  const json = toJson(PolicyConfigStateSchema, m);
   return toml.stringify(json as toml.JsonMap);
 }
 
 /**
- * Creates GenesisConfigState from bytes, auto-detecting the format (JSON, YAML, TOML, or binary protobuf).
+ * Creates PolicyConfigState from bytes, auto-detecting the format (JSON, YAML, TOML, or binary protobuf).
  * @param data Bytes to parse
  * @returns Parsed message instance
  * @throws Error if the data cannot be parsed
  */
-export function genesisConfigStateFromBytes(
+export function policyConfigStateFromBytes(
   data: Uint8Array | string,
-): GenesisConfigState {
+): PolicyConfigState {
   // If it's a string, try to detect format
   if (typeof data === "string") {
     // Try JSON first (most common)
     if (data.trimStart().startsWith("{") || data.trimStart().startsWith("[")) {
       try {
-        return genesisConfigStateFromJSON(data);
+        return policyConfigStateFromJSON(data);
       } catch (e) {
         // Fall through to try other formats
       }
@@ -785,7 +951,7 @@ export function genesisConfigStateFromBytes(
     // Try YAML
     try {
       const yamlObj = yaml.load(data) as string | object;
-      return genesisConfigStateFromJSON(yamlObj);
+      return policyConfigStateFromJSON(yamlObj);
     } catch (e) {
       // Fall through to try TOML
     }
@@ -793,11 +959,11 @@ export function genesisConfigStateFromBytes(
     // Try TOML
     try {
       const tomlObj = toml.parse(data) as string | object;
-      return genesisConfigStateFromJSON(tomlObj);
+      return policyConfigStateFromJSON(tomlObj);
     } catch (e) {
       throw newErrMissingInvalidData(
         undefined,
-        "Failed to parse GenesisConfigState from string: not valid JSON, YAML, or TOML",
+        "Failed to parse PolicyConfigState from string: not valid JSON, YAML, or TOML",
       );
     }
   }
@@ -821,7 +987,7 @@ export function genesisConfigStateFromBytes(
       // Looks like JSON
       try {
         const text = new TextDecoder().decode(data);
-        return genesisConfigStateFromJSON(text);
+        return policyConfigStateFromJSON(text);
       } catch (e) {
         // Fall through to try other formats
       }
@@ -834,7 +1000,7 @@ export function genesisConfigStateFromBytes(
       // Try YAML
       try {
         const yamlObj = yaml.load(text) as string | object;
-        return genesisConfigStateFromJSON(yamlObj);
+        return policyConfigStateFromJSON(yamlObj);
       } catch (e) {
         // Fall through
       }
@@ -842,7 +1008,7 @@ export function genesisConfigStateFromBytes(
       // Try TOML
       try {
         const tomlObj = toml.parse(text) as string | object;
-        return genesisConfigStateFromJSON(tomlObj);
+        return policyConfigStateFromJSON(tomlObj);
       } catch (e) {
         // Fall through
       }
@@ -853,175 +1019,11 @@ export function genesisConfigStateFromBytes(
 
   // Try binary protobuf
   try {
-    return genesisConfigStateFromBinary(data);
+    return policyConfigStateFromBinary(data);
   } catch (e) {
     throw newErrMissingInvalidData(
       undefined,
-      `Failed to parse GenesisConfigState: invalid format`,
-    );
-  }
-}
-
-/**
- * Converts QueenConfigState to JSON string.
- * @param m The message to serialize
- * @param pretty If true, formats the JSON with indentation
- * @returns JSON string representation
- */
-export function queenConfigStateToJSON(
-  m: QueenConfigState,
-  pretty: boolean = false,
-): string {
-  const json = toJson(QueenConfigStateSchema, m);
-  return pretty ? JSON.stringify(json, null, 2) : JSON.stringify(json);
-}
-
-/**
- * Creates QueenConfigState from JSON string or object.
- * @param data JSON string or object
- * @returns Parsed message instance
- */
-export function queenConfigStateFromJSON(
-  data: string | object,
-): QueenConfigState {
-  const jsonObj = typeof data === "string" ? JSON.parse(data) : data;
-  return fromJson(QueenConfigStateSchema, jsonObj);
-}
-
-/**
- * Converts QueenConfigState to binary protobuf format.
- * @param m The message to serialize
- * @returns Uint8Array containing the binary data
- */
-export function queenConfigStateToBinary(m: QueenConfigState): Uint8Array {
-  return toBinary(QueenConfigStateSchema, m);
-}
-
-/**
- * Creates QueenConfigState from binary protobuf data.
- * @param data Binary protobuf data
- * @returns Parsed message instance
- */
-export function queenConfigStateFromBinary(data: Uint8Array): QueenConfigState {
-  return fromBinary(QueenConfigStateSchema, data);
-}
-
-/**
- * Converts QueenConfigState to YAML string.
- * @param m The message to serialize
- * @returns YAML string representation
- */
-export function queenConfigStateToYAML(m: QueenConfigState): string {
-  const json = toJson(QueenConfigStateSchema, m);
-  return yaml.dump(json);
-}
-
-/**
- * Converts QueenConfigState to TOML string.
- * @param m The message to serialize
- * @returns TOML string representation
- */
-export function queenConfigStateToTOML(m: QueenConfigState): string {
-  const json = toJson(QueenConfigStateSchema, m);
-  return toml.stringify(json as toml.JsonMap);
-}
-
-/**
- * Creates QueenConfigState from bytes, auto-detecting the format (JSON, YAML, TOML, or binary protobuf).
- * @param data Bytes to parse
- * @returns Parsed message instance
- * @throws Error if the data cannot be parsed
- */
-export function queenConfigStateFromBytes(
-  data: Uint8Array | string,
-): QueenConfigState {
-  // If it's a string, try to detect format
-  if (typeof data === "string") {
-    // Try JSON first (most common)
-    if (data.trimStart().startsWith("{") || data.trimStart().startsWith("[")) {
-      try {
-        return queenConfigStateFromJSON(data);
-      } catch (e) {
-        // Fall through to try other formats
-      }
-    }
-
-    // Try YAML
-    try {
-      const yamlObj = yaml.load(data) as string | object;
-      return queenConfigStateFromJSON(yamlObj);
-    } catch (e) {
-      // Fall through to try TOML
-    }
-
-    // Try TOML
-    try {
-      const tomlObj = toml.parse(data) as string | object;
-      return queenConfigStateFromJSON(tomlObj);
-    } catch (e) {
-      throw newErrMissingInvalidData(
-        undefined,
-        "Failed to parse QueenConfigState from string: not valid JSON, YAML, or TOML",
-      );
-    }
-  }
-
-  // Try to detect format from the first byte
-  // JSON starts with '{' (0x7B) or '[' (0x5B) or whitespace
-  if (data.length > 0) {
-    const firstByte = data[0];
-    // Check for JSON markers (after trimming whitespace)
-    let i = 0;
-    while (
-      i < data.length &&
-      (data[i] === 0x20 ||
-        data[i] === 0x09 ||
-        data[i] === 0x0a ||
-        data[i] === 0x0d)
-    ) {
-      i++;
-    }
-    if (i < data.length && (data[i] === 0x7b || data[i] === 0x5b)) {
-      // Looks like JSON
-      try {
-        const text = new TextDecoder().decode(data);
-        return queenConfigStateFromJSON(text);
-      } catch (e) {
-        // Fall through to try other formats
-      }
-    }
-
-    // Try to decode as text and parse as YAML/TOML
-    try {
-      const text = new TextDecoder().decode(data);
-
-      // Try YAML
-      try {
-        const yamlObj = yaml.load(text) as string | object;
-        return queenConfigStateFromJSON(yamlObj);
-      } catch (e) {
-        // Fall through
-      }
-
-      // Try TOML
-      try {
-        const tomlObj = toml.parse(text) as string | object;
-        return queenConfigStateFromJSON(tomlObj);
-      } catch (e) {
-        // Fall through
-      }
-    } catch (e) {
-      // Fall through to try binary
-    }
-  }
-
-  // Try binary protobuf
-  try {
-    return queenConfigStateFromBinary(data);
-  } catch (e) {
-    throw newErrMissingInvalidData(
-      undefined,
-      `Failed to parse QueenConfigState: invalid format`,
+      `Failed to parse PolicyConfigState: invalid format`,
     );
   }
 }
@@ -1364,55 +1366,55 @@ export function validateConfigHolder(m: ConfigHolder | undefined): void {
   // No field validations defined
 }
 /**
- * Validates all fields in FleetwoodConfigState according to their annotations.
+ * Validates all fields in SentinelConfigState according to their annotations.
  * @throws {BlueErr} if validation fails
  */
-export function validateFleetwoodConfigState(
-  m: FleetwoodConfigState | undefined,
+export function validateSentinelConfigState(
+  m: SentinelConfigState | undefined,
 ): void {
   if (!m) {
     return;
   }
 }
 /**
- * Validates all fields in IronmaidenConfigState according to their annotations.
+ * Validates all fields in IdentityConfigState according to their annotations.
  * @throws {BlueErr} if validation fails
  */
-export function validateIronmaidenConfigState(
-  m: IronmaidenConfigState | undefined,
+export function validateIdentityConfigState(
+  m: IdentityConfigState | undefined,
 ): void {
   if (!m) {
     return;
   }
 }
 /**
- * Validates all fields in SpringsteenConfigState according to their annotations.
+ * Validates all fields in GatewayConfigState according to their annotations.
  * @throws {BlueErr} if validation fails
  */
-export function validateSpringsteenConfigState(
-  m: SpringsteenConfigState | undefined,
+export function validateGatewayConfigState(
+  m: GatewayConfigState | undefined,
 ): void {
   if (!m) {
     return;
   }
 }
 /**
- * Validates all fields in GenesisConfigState according to their annotations.
+ * Validates all fields in LetsencryptConfigState according to their annotations.
  * @throws {BlueErr} if validation fails
  */
-export function validateGenesisConfigState(
-  m: GenesisConfigState | undefined,
+export function validateLetsencryptConfigState(
+  m: LetsencryptConfigState | undefined,
 ): void {
   if (!m) {
     return;
   }
 }
 /**
- * Validates all fields in QueenConfigState according to their annotations.
+ * Validates all fields in PolicyConfigState according to their annotations.
  * @throws {BlueErr} if validation fails
  */
-export function validateQueenConfigState(
-  m: QueenConfigState | undefined,
+export function validatePolicyConfigState(
+  m: PolicyConfigState | undefined,
 ): void {
   if (!m) {
     return;
@@ -1446,77 +1448,77 @@ export function validateMapEmpty(m: MapEmpty | undefined): void {
 // ============================================================
 /** Fills zero-valued fields in dst from src. dst takes precedence. */
 export function mergeConfigHolder(dst: ConfigHolder, src: ConfigHolder): void {
-  if (!dst.fleetwoodConfig && src.fleetwoodConfig) {
-    dst.fleetwoodConfig = src.fleetwoodConfig;
+  if (!dst.sentinelConfig && src.sentinelConfig) {
+    dst.sentinelConfig = src.sentinelConfig;
   }
-  if (!dst.ironmaidenConfig && src.ironmaidenConfig) {
-    dst.ironmaidenConfig = src.ironmaidenConfig;
+  if (!dst.identityConfig && src.identityConfig) {
+    dst.identityConfig = src.identityConfig;
   }
-  if (!dst.springsteenConfig && src.springsteenConfig) {
-    dst.springsteenConfig = src.springsteenConfig;
+  if (!dst.gatewayConfig && src.gatewayConfig) {
+    dst.gatewayConfig = src.gatewayConfig;
   }
-  if (!dst.genesisConfig && src.genesisConfig) {
-    dst.genesisConfig = src.genesisConfig;
+  if (!dst.letsencryptConfig && src.letsencryptConfig) {
+    dst.letsencryptConfig = src.letsencryptConfig;
   }
-  if (!dst.queenConfig && src.queenConfig) {
-    dst.queenConfig = src.queenConfig;
+  if (!dst.policyConfig && src.policyConfig) {
+    dst.policyConfig = src.policyConfig;
   }
 }
 // ============================================================
-// Merge: FleetwoodConfigState
+// Merge: SentinelConfigState
 // ============================================================
 /** Fills zero-valued fields in dst from src. dst takes precedence. */
-export function mergeFleetwoodConfigState(
-  dst: FleetwoodConfigState,
-  src: FleetwoodConfigState,
+export function mergeSentinelConfigState(
+  dst: SentinelConfigState,
+  src: SentinelConfigState,
 ): void {
   if (!dst.config && src.config) {
     dst.config = src.config;
   }
 }
 // ============================================================
-// Merge: IronmaidenConfigState
+// Merge: IdentityConfigState
 // ============================================================
 /** Fills zero-valued fields in dst from src. dst takes precedence. */
-export function mergeIronmaidenConfigState(
-  dst: IronmaidenConfigState,
-  src: IronmaidenConfigState,
+export function mergeIdentityConfigState(
+  dst: IdentityConfigState,
+  src: IdentityConfigState,
 ): void {
   if (!dst.config && src.config) {
     dst.config = src.config;
   }
 }
 // ============================================================
-// Merge: SpringsteenConfigState
+// Merge: GatewayConfigState
 // ============================================================
 /** Fills zero-valued fields in dst from src. dst takes precedence. */
-export function mergeSpringsteenConfigState(
-  dst: SpringsteenConfigState,
-  src: SpringsteenConfigState,
+export function mergeGatewayConfigState(
+  dst: GatewayConfigState,
+  src: GatewayConfigState,
 ): void {
   if (!dst.config && src.config) {
     dst.config = src.config;
   }
 }
 // ============================================================
-// Merge: GenesisConfigState
+// Merge: LetsencryptConfigState
 // ============================================================
 /** Fills zero-valued fields in dst from src. dst takes precedence. */
-export function mergeGenesisConfigState(
-  dst: GenesisConfigState,
-  src: GenesisConfigState,
+export function mergeLetsencryptConfigState(
+  dst: LetsencryptConfigState,
+  src: LetsencryptConfigState,
 ): void {
   if (!dst.config && src.config) {
     dst.config = src.config;
   }
 }
 // ============================================================
-// Merge: QueenConfigState
+// Merge: PolicyConfigState
 // ============================================================
 /** Fills zero-valued fields in dst from src. dst takes precedence. */
-export function mergeQueenConfigState(
-  dst: QueenConfigState,
-  src: QueenConfigState,
+export function mergePolicyConfigState(
+  dst: PolicyConfigState,
+  src: PolicyConfigState,
 ): void {
   if (!dst.config && src.config) {
     dst.config = src.config;

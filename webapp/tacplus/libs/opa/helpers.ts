@@ -199,19 +199,19 @@ export function validateOpaPolicy(m: OpaPolicy | undefined): void {
     }
   }
 
-  // Validate created (assert_ge: 1735689600)
-  if (m.created !== undefined && m.created < 1735689600) {
-    throw newErrMissingInvalidData(
-      undefined,
-      `field created must be >= 1735689600, got: ${m.created}`,
-    );
-  }
-
   // Validate created (assert_le: 8045740800)
   if (m.created !== undefined && m.created > 8045740800) {
     throw newErrMissingInvalidData(
       undefined,
       `field created must be <= 8045740800, got: ${m.created}`,
+    );
+  }
+
+  // Validate created (assert_ge: 1735689600)
+  if (m.created !== undefined && m.created < 1735689600) {
+    throw newErrMissingInvalidData(
+      undefined,
+      `field created must be >= 1735689600, got: ${m.created}`,
     );
   }
 

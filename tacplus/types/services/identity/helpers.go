@@ -8665,14 +8665,14 @@ func ValidateCallbackResponse(m *CallbackResponse) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken is required")
 	}
 
-	// Validate AccessToken (assert_required)
-	if m.AccessToken == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
-	}
-
 	// Validate AccessToken (assert_min_length: 1)
 	if len(m.AccessToken) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
+	}
+
+	// Validate AccessToken (assert_required)
+	if m.AccessToken == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
 	}
 
 	// Validate CallbackUrl (assert_required)

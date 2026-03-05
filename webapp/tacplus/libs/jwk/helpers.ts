@@ -721,17 +721,17 @@ export function validateJwk(m: Jwk | undefined): void {
     return;
   }
 
-  // Validate alg (assert_required)
-  if (!m.alg) {
-    throw newErrMissingInvalidData(undefined, `field alg is required`);
-  }
-
   // Validate alg (assert_min_length: 1)
   if (m.alg && m.alg.length < 1) {
     throw newErrMissingInvalidData(
       undefined,
       `field alg must have length >= 1, got: ${m.alg.length}`,
     );
+  }
+
+  // Validate alg (assert_required)
+  if (!m.alg) {
+    throw newErrMissingInvalidData(undefined, `field alg is required`);
   }
 
   // Validate kid (assert_required)

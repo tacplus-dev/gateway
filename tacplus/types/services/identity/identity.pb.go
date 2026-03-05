@@ -566,7 +566,7 @@ func (x *ProviderConfig) GetAudience() string {
 }
 
 // EntitlementConfig wraps the entitlement mappings and service entitlement
-// definitions. Published by Identity from config so other services (queen)
+// definitions. Published by Identity from config so other services (policy)
 // can read them via Watch (RO) without duplicating config.
 type EntitlementConfig struct {
 	state               protoimpl.MessageState                   `protogen:"open.v1"`
@@ -623,7 +623,7 @@ func (x *EntitlementConfig) GetServiceEntitlements() []*entitlement.ServiceEntit
 // IdentityState holds public verifying keys and auth config readable by all
 // services. Each Identity instance generates its own key pair locally, keeps
 // the private key in memory, and publishes the public JWK here. OPA policies
-// and entitlement config are also published here so downstream services (queen)
+// and entitlement config are also published here so downstream services (policy)
 // can consume them without duplicating config.
 // Access: RW for identity, RO for any service that needs to verify tokens
 // or read auth config.
@@ -930,7 +930,7 @@ type AuthorizeRequest struct {
 	// provider_index selects which configured provider to use.
 	ProviderIndex int32 `protobuf:"varint,1,opt,name=provider_index,json=providerIndex,proto3" json:"provider_index,omitempty"`
 	// callback_url is where the user is sent after successful authentication.
-	// This is the originating microservice's URL (e.g. "https://fleetwood:9000/").
+	// This is the originating microservice's URL (e.g. "https://sentinel:9000/").
 	CallbackUrl   string `protobuf:"bytes,2,opt,name=callback_url,json=callbackUrl,proto3" json:"callback_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1382,7 +1382,7 @@ type ExchangeTokenRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// access_token is a generic access token (no entitlements) issued by Identity.
 	AccessToken string `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
-	// audience is the target service name (e.g. "fleetwood").
+	// audience is the target service name (e.g. "sentinel").
 	Audience      string `protobuf:"bytes,2,opt,name=audience,proto3" json:"audience,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

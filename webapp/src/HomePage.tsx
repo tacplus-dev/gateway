@@ -7,7 +7,7 @@ export function HomePage() {
     <div className="max-w-[1200px] mx-auto p-8">
       <h1 className="text-[28px] font-bold text-white mb-6">Dashboard</h1>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
-        <Link to="/fleetwood" className="no-underline">
+        <Link to="/sentinel" className="no-underline">
           <Card hoverable className="!bg-[#1e293b] !border-[#334155]">
             <div className="flex items-center gap-3 mb-2">
               <HeartOutlined className="text-xl text-sky-400" />
@@ -18,7 +18,7 @@ export function HomePage() {
             </p>
           </Card>
         </Link>
-        <Link to="/queen" className="no-underline">
+        <Link to="/policy" className="no-underline">
           <Card hoverable className="!bg-[#1e293b] !border-[#334155]">
             <div className="flex items-center gap-3 mb-2">
               <SafetyOutlined className="text-xl text-sky-400" />

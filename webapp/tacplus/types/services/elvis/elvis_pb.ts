@@ -619,7 +619,7 @@ export const TokenRequestSchema: GenMessage<TokenRequest> =
 /**
  * TokenExchangerState holds the public verifying keys for the built-in token
  * exchange service. TokenExchanger is built into elvis to solve the
- * chicken-egg problem: services like IronMaiden need a ServiceToken from
+ * chicken-egg problem: services like Identity need a ServiceToken from
  * TokenExchanger (via their CredPair) before they can register their own
  * JWKs with elvis. If TokenExchanger were external, it would need a
  * ServiceToken from itself to bootstrap.
@@ -722,16 +722,16 @@ export type Config = Message<"elvis.Config"> & {
   tokenExchanger?: TokenExchangerConfig;
 
   /**
-   * cred_pairs bind public keys to identities for the CredPair token exchange flow.
+   * cred_pairs hold public keys for the CredPair token exchange flow.
+   * Identity mapping (kid → service) is in entitlement_mappings.
    *
    * @generated from field: repeated jwk.CredPair cred_pairs = 16;
    */
   credPairs: CredPair[];
 
   /**
-   * entitlement_mappings defines static entitlements for CredPair principals.
-   * TokenExchanger uses these to encode entitlements as claims in access tokens.
-   * Each mapping's string_id must match "local:<principal>" for a CredPair.
+   * entitlement_mappings maps credential IDs (kid) to service identities.
+   * TokenExchanger uses these to resolve which service a CredPair represents.
    *
    * @generated from field: repeated entitlement.ServiceEntitlementMapping entitlement_mappings = 21;
    */
@@ -739,8 +739,8 @@ export type Config = Message<"elvis.Config"> & {
 
   /**
    * service_entitlements holds named entitlement definitions loaded from
-   * proto/security/*.json at config build time. Referenced by
-   * entitlement_mappings via entitlements_id.
+   * proto/security/*.json at config build time. Used for S2S entitlements
+   * (derived from proto descriptors) and U2S entitlements (expandWildcard).
    *
    * @generated from field: repeated entitlement.ServiceEntitlements service_entitlements = 22;
    */

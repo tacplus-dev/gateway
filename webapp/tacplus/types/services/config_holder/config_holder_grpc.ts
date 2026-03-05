@@ -8,23 +8,23 @@
 // @ts-nocheck
 
 import { Empty, MethodKind } from "@bufbuild/protobuf";
-import { Config } from "../fleetwood/fleetwood_pb.js";
-import { Config as Config$1 } from "../ironmaiden/ironmaiden_pb.js";
-import { Config as Config$2 } from "../springsteen/springsteen_pb.js";
-import { Config as Config$3 } from "../genesis/genesis_pb.js";
-import { Config as Config$4 } from "../queen/queen_pb.js";
+import { Config } from "../sentinel/sentinel_pb.js";
+import { Config as Config$1 } from "../identity/identity_pb.js";
+import { Config as Config$2 } from "../gateway/gateway_pb.js";
+import { Config as Config$3 } from "../letsencrypt/letsencrypt_pb.js";
+import { Config as Config$4 } from "../policy/policy_pb.js";
 import { Config as Config$5 } from "../../../libs/serviceconfig/serviceconfig_pb.js";
 
 /**
- * @generated from service config_holder.FleetwoodConfigStateBackendService
+ * @generated from service config_holder.SentinelConfigStateBackendService
  */
-export const FleetwoodConfigStateBackendService = {
-  typeName: "config_holder.FleetwoodConfigStateBackendService",
+export const SentinelConfigStateBackendService = {
+  typeName: "config_holder.SentinelConfigStateBackendService",
   methods: {
     /**
      * Singleton: Config
      *
-     * @generated from rpc config_holder.FleetwoodConfigStateBackendService.GetConfig
+     * @generated from rpc config_holder.SentinelConfigStateBackendService.GetConfig
      */
     getConfig: {
       name: "GetConfig",
@@ -33,7 +33,7 @@ export const FleetwoodConfigStateBackendService = {
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc config_holder.FleetwoodConfigStateBackendService.SetConfig
+     * @generated from rpc config_holder.SentinelConfigStateBackendService.SetConfig
      */
     setConfig: {
       name: "SetConfig",
@@ -42,7 +42,7 @@ export const FleetwoodConfigStateBackendService = {
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc config_holder.FleetwoodConfigStateBackendService.WatchConfig
+     * @generated from rpc config_holder.SentinelConfigStateBackendService.WatchConfig
      */
     watchConfig: {
       name: "WatchConfig",
@@ -54,15 +54,15 @@ export const FleetwoodConfigStateBackendService = {
 } as const;
 
 /**
- * @generated from service config_holder.IronmaidenConfigStateBackendService
+ * @generated from service config_holder.IdentityConfigStateBackendService
  */
-export const IronmaidenConfigStateBackendService = {
-  typeName: "config_holder.IronmaidenConfigStateBackendService",
+export const IdentityConfigStateBackendService = {
+  typeName: "config_holder.IdentityConfigStateBackendService",
   methods: {
     /**
      * Singleton: Config
      *
-     * @generated from rpc config_holder.IronmaidenConfigStateBackendService.GetConfig
+     * @generated from rpc config_holder.IdentityConfigStateBackendService.GetConfig
      */
     getConfig: {
       name: "GetConfig",
@@ -71,7 +71,7 @@ export const IronmaidenConfigStateBackendService = {
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc config_holder.IronmaidenConfigStateBackendService.SetConfig
+     * @generated from rpc config_holder.IdentityConfigStateBackendService.SetConfig
      */
     setConfig: {
       name: "SetConfig",
@@ -80,7 +80,7 @@ export const IronmaidenConfigStateBackendService = {
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc config_holder.IronmaidenConfigStateBackendService.WatchConfig
+     * @generated from rpc config_holder.IdentityConfigStateBackendService.WatchConfig
      */
     watchConfig: {
       name: "WatchConfig",
@@ -92,15 +92,15 @@ export const IronmaidenConfigStateBackendService = {
 } as const;
 
 /**
- * @generated from service config_holder.SpringsteenConfigStateBackendService
+ * @generated from service config_holder.GatewayConfigStateBackendService
  */
-export const SpringsteenConfigStateBackendService = {
-  typeName: "config_holder.SpringsteenConfigStateBackendService",
+export const GatewayConfigStateBackendService = {
+  typeName: "config_holder.GatewayConfigStateBackendService",
   methods: {
     /**
      * Singleton: Config
      *
-     * @generated from rpc config_holder.SpringsteenConfigStateBackendService.GetConfig
+     * @generated from rpc config_holder.GatewayConfigStateBackendService.GetConfig
      */
     getConfig: {
       name: "GetConfig",
@@ -109,7 +109,7 @@ export const SpringsteenConfigStateBackendService = {
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc config_holder.SpringsteenConfigStateBackendService.SetConfig
+     * @generated from rpc config_holder.GatewayConfigStateBackendService.SetConfig
      */
     setConfig: {
       name: "SetConfig",
@@ -118,7 +118,7 @@ export const SpringsteenConfigStateBackendService = {
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc config_holder.SpringsteenConfigStateBackendService.WatchConfig
+     * @generated from rpc config_holder.GatewayConfigStateBackendService.WatchConfig
      */
     watchConfig: {
       name: "WatchConfig",
@@ -130,15 +130,15 @@ export const SpringsteenConfigStateBackendService = {
 } as const;
 
 /**
- * @generated from service config_holder.GenesisConfigStateBackendService
+ * @generated from service config_holder.LetsencryptConfigStateBackendService
  */
-export const GenesisConfigStateBackendService = {
-  typeName: "config_holder.GenesisConfigStateBackendService",
+export const LetsencryptConfigStateBackendService = {
+  typeName: "config_holder.LetsencryptConfigStateBackendService",
   methods: {
     /**
      * Singleton: Config
      *
-     * @generated from rpc config_holder.GenesisConfigStateBackendService.GetConfig
+     * @generated from rpc config_holder.LetsencryptConfigStateBackendService.GetConfig
      */
     getConfig: {
       name: "GetConfig",
@@ -147,7 +147,7 @@ export const GenesisConfigStateBackendService = {
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc config_holder.GenesisConfigStateBackendService.SetConfig
+     * @generated from rpc config_holder.LetsencryptConfigStateBackendService.SetConfig
      */
     setConfig: {
       name: "SetConfig",
@@ -156,7 +156,7 @@ export const GenesisConfigStateBackendService = {
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc config_holder.GenesisConfigStateBackendService.WatchConfig
+     * @generated from rpc config_holder.LetsencryptConfigStateBackendService.WatchConfig
      */
     watchConfig: {
       name: "WatchConfig",
@@ -168,15 +168,15 @@ export const GenesisConfigStateBackendService = {
 } as const;
 
 /**
- * @generated from service config_holder.QueenConfigStateBackendService
+ * @generated from service config_holder.PolicyConfigStateBackendService
  */
-export const QueenConfigStateBackendService = {
-  typeName: "config_holder.QueenConfigStateBackendService",
+export const PolicyConfigStateBackendService = {
+  typeName: "config_holder.PolicyConfigStateBackendService",
   methods: {
     /**
      * Singleton: Config
      *
-     * @generated from rpc config_holder.QueenConfigStateBackendService.GetConfig
+     * @generated from rpc config_holder.PolicyConfigStateBackendService.GetConfig
      */
     getConfig: {
       name: "GetConfig",
@@ -185,7 +185,7 @@ export const QueenConfigStateBackendService = {
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc config_holder.QueenConfigStateBackendService.SetConfig
+     * @generated from rpc config_holder.PolicyConfigStateBackendService.SetConfig
      */
     setConfig: {
       name: "SetConfig",
@@ -194,7 +194,7 @@ export const QueenConfigStateBackendService = {
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc config_holder.QueenConfigStateBackendService.WatchConfig
+     * @generated from rpc config_holder.PolicyConfigStateBackendService.WatchConfig
      */
     watchConfig: {
       name: "WatchConfig",
