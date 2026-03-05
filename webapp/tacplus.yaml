@@ -1,6 +1,0 @@
-language: typescript
-src: /Users/jody/workspace/services/proto
-tag: latest
-frontend-clients:
-  - services/sentinel.SentinelService
-  - services/policy.PolicyService

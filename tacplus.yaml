@@ -3,7 +3,7 @@ src: /Users/jody/workspace/services/proto
 tag: latest
 pkg: gitlab.com/secondstarcavalier/controlplane/services/gateway
 backends:
-  - services/elvis.ServiceHealthState:ro
+  - services/kernel.ServiceHealthState:ro
 post-gen:
   - cmd: go
     args: ["run", "./bufgen"]

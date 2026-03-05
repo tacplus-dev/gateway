@@ -6,12 +6,12 @@ import (
 	"sync"
 
 	healthreport_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/healthreport"
-	elvis_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/elvis"
+	kernel_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/kernel"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// HealthWatcher watches ServiceHealthState.instances from elvis and maintains
+// HealthWatcher watches ServiceHealthState.instances from kernel and maintains
 // an in-memory map of healthy service instances grouped by service_id.
 type HealthWatcher struct {
 	mu        sync.RWMutex
@@ -21,7 +21,7 @@ type HealthWatcher struct {
 
 // NewHealthWatcher creates a HealthWatcher and starts watching the
 // ServiceHealthState instances collection via the WatchInstances stream.
-func NewHealthWatcher(ctx context.Context, stub elvis_pb.ServiceHealthStateBackendServiceClient) (*HealthWatcher, error) {
+func NewHealthWatcher(ctx context.Context, stub kernel_pb.ServiceHealthStateBackendServiceClient) (*HealthWatcher, error) {
 	hw := &HealthWatcher{
 		services: make(map[string][]*healthreport_pb.ServiceInstanceHealth),
 	}
@@ -60,7 +60,7 @@ func (hw *HealthWatcher) GetEndpoints(serviceID string) []string {
 }
 
 // receiveLoop reads from the WatchInstances stream and rebuilds the services map.
-func (hw *HealthWatcher) receiveLoop(stream elvis_pb.ServiceHealthStateBackendService_WatchInstancesClient) {
+func (hw *HealthWatcher) receiveLoop(stream kernel_pb.ServiceHealthStateBackendService_WatchInstancesClient) {
 	zap.L().Info("WatchInstances receive loop started")
 	for {
 		msg, err := stream.Recv()

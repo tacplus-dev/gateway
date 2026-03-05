@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -30,7 +29,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-//go:embed webapp
+//go:embed dist
 var webFS embed.FS
 
 func main() {
@@ -76,7 +75,7 @@ func run() error {
 		}
 	}
 
-	// 3. Connect to elvis via ServiceManager.
+	// 3. Connect to kernel via ServiceManager.
 	sc, err := servicemanager.NewServiceManager(ctx, bsCfg)
 	if err != nil {
 		return fmt.Errorf("servicemanager: %w", err)
@@ -114,17 +113,10 @@ func run() error {
 	// 9. Build combined HTTP handler: /api/* → gateway, everything else → SPA.
 	var webContent fs.FS
 	if webRoot := os.Getenv("WEB_ROOT"); webRoot != "" {
-		// If WEB_ROOT/dist doesn't exist, extract embedded webapp to bootstrap it
-		if _, err := os.Stat(filepath.Join(webRoot, "dist")); os.IsNotExist(err) {
-			zap.L().Info("Extracting embedded webapp to WEB_ROOT", zap.String("path", webRoot))
-			if err := extractEmbeddedWebapp(webFS, webRoot); err != nil {
-				return fmt.Errorf("extracting webapp to %s: %w", webRoot, err)
-			}
-		}
-		webContent = os.DirFS(filepath.Join(webRoot, "dist"))
-		zap.L().Info("Serving webapp from filesystem", zap.String("path", filepath.Join(webRoot, "dist")))
+		webContent = os.DirFS(webRoot)
+		zap.L().Info("Serving webapp from filesystem", zap.String("path", webRoot))
 	} else {
-		webContent, err = fs.Sub(webFS, "webapp/dist")
+		webContent, err = fs.Sub(webFS, "dist")
 		if err != nil {
 			return fmt.Errorf("embed fs: %w", err)
 		}
@@ -261,31 +253,6 @@ func resolveConfigPath() string {
 		}
 	}
 	return os.Getenv("SERVICE_CONFIG")
-}
-
-// extractEmbeddedWebapp walks the embedded webapp FS and writes all files to targetDir.
-// The embedded FS has paths like "webapp/src/App.tsx" — we strip the "webapp/" prefix.
-func extractEmbeddedWebapp(embeddedFS embed.FS, targetDir string) error {
-	return fs.WalkDir(embeddedFS, "webapp", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		relPath := strings.TrimPrefix(path, "webapp/")
-		if relPath == "" || path == "webapp" {
-			return nil
-		}
-		targetPath := filepath.Join(targetDir, relPath)
-
-		if d.IsDir() {
-			return os.MkdirAll(targetPath, 0755)
-		}
-
-		data, err := embeddedFS.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("reading embedded %s: %w", path, err)
-		}
-		return os.WriteFile(targetPath, data, 0644)
-	})
 }
 
 // buildHandler returns an HTTP handler that routes:

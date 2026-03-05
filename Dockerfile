@@ -11,7 +11,6 @@ COPY go.mod go.sum ./
 RUN --mount=type=secret,id=netrc,dst=/root/.netrc go mod download
 
 COPY . .
-RUN rm -rf webapp/node_modules
 
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /gateway .
 

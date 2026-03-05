@@ -8337,16 +8337,16 @@ func ValidateProviderConfig(m *ProviderConfig) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Name must be at least 1 characters, got: %d", len(m.Name))
 	}
 
-	// Validate Issuer (assert_required)
-	if m.Issuer == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
-	}
-
 	// Validate Issuer (assert_url: URL_SCHEME_HTTPS)
 	if m.Issuer != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.Issuer); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field Issuer URL validation failed")
 		}
+	}
+
+	// Validate Issuer (assert_required)
+	if m.Issuer == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
 	}
 
 	// Validate ClientId (assert_required)
@@ -8476,14 +8476,14 @@ func ValidateExternalJwk(m *ExternalJwk) error {
 		return nil
 	}
 
-	// Validate Kid (assert_required)
-	if m.Kid == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Kid is required")
-	}
-
 	// Validate Kid (assert_min_length: 1)
 	if len(m.Kid) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Kid must be at least 1 characters, got: %d", len(m.Kid))
+	}
+
+	// Validate Kid (assert_required)
+	if m.Kid == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Kid is required")
 	}
 
 	// Validate Key (assert_required)
@@ -8491,16 +8491,16 @@ func ValidateExternalJwk(m *ExternalJwk) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Key is required")
 	}
 
+	// Validate Issuer (assert_required)
+	if m.Issuer == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
+	}
+
 	// Validate Issuer (assert_url: URL_SCHEME_HTTPS)
 	if m.Issuer != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.Issuer); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field Issuer URL validation failed")
 		}
-	}
-
-	// Validate Issuer (assert_required)
-	if m.Issuer == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
 	}
 
 	// Validate FetchedAt (assert_gt: 0)
@@ -8655,14 +8655,14 @@ func ValidateCallbackResponse(m *CallbackResponse) error {
 		return nil
 	}
 
-	// Validate RefreshToken (assert_min_length: 1)
-	if len(m.RefreshToken) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken must be at least 1 characters, got: %d", len(m.RefreshToken))
-	}
-
 	// Validate RefreshToken (assert_required)
 	if m.RefreshToken == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken is required")
+	}
+
+	// Validate RefreshToken (assert_min_length: 1)
+	if len(m.RefreshToken) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken must be at least 1 characters, got: %d", len(m.RefreshToken))
 	}
 
 	// Validate AccessToken (assert_min_length: 1)
