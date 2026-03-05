@@ -9,9 +9,9 @@
 // If changes are needed, update the tacplus compiler at:
 // gitlab.com/secondstarcavalier/controlplane/services/tacplus
 //
-// Source: services/springsteen.proto
+// Source: services/gateway.proto
 
-package springsteen
+package gateway
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ import (
 	"strconv"
 
 	"github.com/pelletier/go-toml/v2"
-	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
+	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
@@ -166,30 +166,30 @@ func ConfigToEnvVar(v *Config) map[string]string {
 		return nil
 	}
 	result := make(map[string]string)
-	result["PROTO_SERVICES_SPRINGSTEEN_CONFIG_HEALTH_POLL_INTERVAL_SECONDS"] = strconv.FormatInt(v.HealthPollIntervalSeconds, 10)
-	result["PROTO_SERVICES_SPRINGSTEEN_CONFIG_ENABLE_TCP"] = strconv.FormatBool(v.EnableTcp)
-	result["PROTO_SERVICES_SPRINGSTEEN_CONFIG_ENABLE_QUIC"] = strconv.FormatBool(v.EnableQuic)
+	result["PROTO_SERVICES_GATEWAY_CONFIG_HEALTH_POLL_INTERVAL_SECONDS"] = strconv.FormatInt(v.HealthPollIntervalSeconds, 10)
+	result["PROTO_SERVICES_GATEWAY_CONFIG_ENABLE_TCP"] = strconv.FormatBool(v.EnableTcp)
+	result["PROTO_SERVICES_GATEWAY_CONFIG_ENABLE_QUIC"] = strconv.FormatBool(v.EnableQuic)
 	return result
 }
 
 // ConfigFromEnvVar creates Config from environment variable key-value pairs.
 func ConfigFromEnvVar(env map[string]string) (*Config, error) {
 	result := &Config{}
-	if val, ok := env["PROTO_SERVICES_SPRINGSTEEN_CONFIG_HEALTH_POLL_INTERVAL_SECONDS"]; ok && val != "" {
+	if val, ok := env["PROTO_SERVICES_GATEWAY_CONFIG_HEALTH_POLL_INTERVAL_SECONDS"]; ok && val != "" {
 		parsed, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
 			return nil, err
 		}
 		result.HealthPollIntervalSeconds = parsed
 	}
-	if val, ok := env["PROTO_SERVICES_SPRINGSTEEN_CONFIG_ENABLE_TCP"]; ok && val != "" {
+	if val, ok := env["PROTO_SERVICES_GATEWAY_CONFIG_ENABLE_TCP"]; ok && val != "" {
 		parsed, err := strconv.ParseBool(val)
 		if err != nil {
 			return nil, err
 		}
 		result.EnableTcp = parsed
 	}
-	if val, ok := env["PROTO_SERVICES_SPRINGSTEEN_CONFIG_ENABLE_QUIC"]; ok && val != "" {
+	if val, ok := env["PROTO_SERVICES_GATEWAY_CONFIG_ENABLE_QUIC"]; ok && val != "" {
 		parsed, err := strconv.ParseBool(val)
 		if err != nil {
 			return nil, err
@@ -229,11 +229,22 @@ func ConfigDefaults(v *Config) {
 	if v.HealthPollIntervalSeconds == 0 {
 		v.HealthPollIntervalSeconds = DefaultHealthPollIntervalSeconds
 	}
-	if !v.EnableTcp {
-		v.EnableTcp = DefaultEnableTcp
+}
+
+// ============================================================
+// TypeUndefaults: Config
+// ============================================================
+// ConfigUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func ConfigUndefaults(v *Config) {
+	if v.HealthPollIntervalSeconds == DefaultHealthPollIntervalSeconds {
+		v.HealthPollIntervalSeconds = 0
 	}
-	if !v.EnableQuic {
-		v.EnableQuic = DefaultEnableQuic
+	if v.EnableTcp == DefaultEnableTcp {
+		v.EnableTcp = false
+	}
+	if v.EnableQuic == DefaultEnableQuic {
+		v.EnableQuic = false
 	}
 }
 

@@ -13,17 +13,17 @@ RUN --mount=type=secret,id=netrc,dst=/root/.netrc go mod download
 COPY . .
 RUN rm -rf webapp/node_modules
 
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /springsteen .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /gateway .
 
 FROM alpine:3.21
 
 RUN apk add --no-cache ca-certificates tzdata && \
-    addgroup -S springsteen && adduser -S springsteen -G springsteen
+    addgroup -S gateway && adduser -S gateway -G gateway
 
 WORKDIR /app
 
-COPY --from=builder /springsteen /app/springsteen
+COPY --from=builder /gateway /app/gateway
 
-USER springsteen
+USER gateway
 
-ENTRYPOINT ["/app/springsteen"]
+ENTRYPOINT ["/app/gateway"]

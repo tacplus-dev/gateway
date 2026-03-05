@@ -22,7 +22,7 @@
 syntax = "proto3";
 
 package presley;
-option go_package = "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/presley";
+option go_package = "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/presley";
 
 // ============================================================================
 // Cluster Info

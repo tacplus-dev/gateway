@@ -14,7 +14,7 @@
 package presley
 
 import (
-	_ "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/spec"
+	_ "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/spec"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -3436,7 +3436,7 @@ const file_services_presley_proto_rawDesc = "" +
 	"\x1fADMIN_GRAPH_TYPE_PRIORITY_QUEUE\x10\x03\x12\x1a\n" +
 	"\x16ADMIN_GRAPH_TYPE_TOPIC\x10\x04\x12\x19\n" +
 	"\x15ADMIN_GRAPH_TYPE_VIEW\x10\x05\x12\x1c\n" +
-	"\x18ADMIN_GRAPH_TYPE_COMMAND\x10\x06B\\ZZgitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/presleyb\x06proto3"
+	"\x18ADMIN_GRAPH_TYPE_COMMAND\x10\x06BXZVgitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/presleyb\x06proto3"
 
 var (
 	file_services_presley_proto_rawDescOnce sync.Once

@@ -19,8 +19,8 @@ import (
 	"strconv"
 
 	"github.com/pelletier/go-toml/v2"
-	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
-	presley "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/presley"
+	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
+	presley "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/presley"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"

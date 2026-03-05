@@ -14,7 +14,7 @@
 package logger
 
 import (
-	_ "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/spec"
+	_ "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/spec"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -332,7 +332,7 @@ const file_libs_logger_proto_rawDesc = "" +
 	"LEVEL_INFO\x10\x03\x12\x0e\n" +
 	"\n" +
 	"LEVEL_WARN\x10\x04\x12\x0f\n" +
-	"\vLEVEL_ERROR\x10\x05BWZUgitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/loggerb\x06proto3"
+	"\vLEVEL_ERROR\x10\x05BSZQgitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/loggerb\x06proto3"
 
 var (
 	file_libs_logger_proto_rawDescOnce sync.Once

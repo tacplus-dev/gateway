@@ -17,14 +17,14 @@ import (
 	"time"
 
 	"github.com/quic-go/quic-go/http3"
-	gw "gitlab.com/secondstarcavalier/controlplane/services/springsteen/internal"
-	"gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/libs/logger"
-	"gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/libs/servicemanager"
-	x509wrapper "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/libs/x509"
-	serviceconfig_pb "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/serviceconfig"
-	springsteen_pb "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/springsteen"
-	"gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/routes"
-	"gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/wrappers/backends"
+	gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/internal"
+	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/logger"
+	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/servicemanager"
+	x509wrapper "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/x509"
+	serviceconfig_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/serviceconfig"
+	gateway_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/gateway"
+	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/routes"
+	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/wrappers/backends"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
@@ -35,7 +35,7 @@ var webFS embed.FS
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatalf("springsteen: %v", err)
+		log.Fatalf("gateway: %v", err)
 	}
 }
 
@@ -61,9 +61,9 @@ func run() error {
 		return fmt.Errorf("parsing bootstrap config %s: %w", configPath, err)
 	}
 
-	springsteenCfg, err := springsteen_pb.ConfigFromBytes(data)
+	gatewayCfg, err := gateway_pb.ConfigFromBytes(data)
 	if err != nil {
-		return fmt.Errorf("parsing springsteen config %s: %w", configPath, err)
+		return fmt.Errorf("parsing gateway config %s: %w", configPath, err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
@@ -149,13 +149,13 @@ func run() error {
 		listenAddr = ":8443"
 	}
 
-	enableTCP := springsteenCfg.GetEnableTcp()
-	enableQUIC := springsteenCfg.GetEnableQuic()
+	enableTCP := gatewayCfg.GetEnableTcp()
+	enableQUIC := gatewayCfg.GetEnableQuic()
 	if !enableTCP && !enableQUIC {
 		return fmt.Errorf("at least one of enable_tcp or enable_quic must be true")
 	}
 
-	zap.L().Info("Starting springsteen",
+	zap.L().Info("Starting gateway",
 		zap.String("addr", listenAddr),
 		zap.Bool("tcp", enableTCP),
 		zap.Bool("quic", enableQUIC))

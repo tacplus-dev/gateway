@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/jinzhu/copier"
-	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
+	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

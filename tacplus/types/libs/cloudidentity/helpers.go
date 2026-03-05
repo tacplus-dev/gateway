@@ -18,8 +18,8 @@ import (
 	"encoding/json"
 
 	"github.com/pelletier/go-toml/v2"
-	cloudvendor "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/cloudvendor"
-	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
+	cloudvendor "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/cloudvendor"
+	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"

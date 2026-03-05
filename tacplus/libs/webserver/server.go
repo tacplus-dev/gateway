@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/libs/logger"
+	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/logger"
 
 	"github.com/caddyserver/certmagic"
 	ginzap "github.com/gin-contrib/zap"
@@ -23,9 +23,9 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
-	httpProto "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/http"
-	webserverProto "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/httpserver"
-	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
+	httpProto "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/http"
+	webserverProto "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/httpserver"
+	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
 )
 
 // Server represents a web server with automatic TLS certificate management.

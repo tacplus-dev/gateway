@@ -14,8 +14,8 @@
 package queen
 
 import (
-	opa "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/opa"
-	_ "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/spec"
+	opa "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/opa"
+	_ "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/spec"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -33,7 +33,7 @@ const (
 )
 
 // Queen reads all auth config (OPA policies, entitlement mappings) from
-// IronMaidenState via Watch (RO). No config duplication needed.
+// IdentityState via Watch (RO). No config duplication needed.
 type Config struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -173,7 +173,7 @@ func (x *ServiceCatalogEntry) GetRpcs() []string {
 // GetMyEntitlementsRequest carries the caller's generic access token.
 type GetMyEntitlementsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// access_token is a generic access token (no entitlements) issued by Iron Maiden.
+	// access_token is a generic access token (no entitlements) issued by Identity.
 	AccessToken   string `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -330,8 +330,7 @@ type SimulateEntitlementsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// claims_json is JSON-encoded origin claims to simulate.
 	ClaimsJson string `protobuf:"bytes,1,opt,name=claims_json,json=claimsJson,proto3" json:"claims_json,omitempty"`
-	// principal is an optional override. If empty, the claim_mapping_policy
-	// is evaluated to resolve a principal from the claims.
+	// principal is an optional override for simulation.
 	Principal     string `protobuf:"bytes,2,opt,name=principal,proto3" json:"principal,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -523,8 +522,6 @@ type GetPoliciesResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// entitlements_policy is the OPA policy evaluated to determine entitlements.
 	EntitlementsPolicy *opa.OpaPolicy `protobuf:"bytes,1,opt,name=entitlements_policy,json=entitlementsPolicy,proto3" json:"entitlements_policy,omitempty"`
-	// claim_mapping_policy is the OPA policy that maps IDP claims to a principal.
-	ClaimMappingPolicy *opa.OpaPolicy `protobuf:"bytes,2,opt,name=claim_mapping_policy,json=claimMappingPolicy,proto3" json:"claim_mapping_policy,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -562,13 +559,6 @@ func (*GetPoliciesResponse) Descriptor() ([]byte, []int) {
 func (x *GetPoliciesResponse) GetEntitlementsPolicy() *opa.OpaPolicy {
 	if x != nil {
 		return x.EntitlementsPolicy
-	}
-	return nil
-}
-
-func (x *GetPoliciesResponse) GetClaimMappingPolicy() *opa.OpaPolicy {
-	if x != nil {
-		return x.ClaimMappingPolicy
 	}
 	return nil
 }
@@ -613,16 +603,15 @@ const file_services_queen_proto_rawDesc = "" +
 	"\vresult_json\x18\x01 \x01(\tR\n" +
 	"resultJson\x12\x18\n" +
 	"\aallowed\x18\x02 \x01(\bR\aallowed\x12\x16\n" +
-	"\x06errors\x18\x03 \x03(\tR\x06errors\"\x98\x01\n" +
+	"\x06errors\x18\x03 \x03(\tR\x06errors\"V\n" +
 	"\x13GetPoliciesResponse\x12?\n" +
-	"\x13entitlements_policy\x18\x01 \x01(\v2\x0e.opa.OpaPolicyR\x12entitlementsPolicy\x12@\n" +
-	"\x14claim_mapping_policy\x18\x02 \x01(\v2\x0e.opa.OpaPolicyR\x12claimMappingPolicy2\xe1\x04\n" +
+	"\x13entitlements_policy\x18\x01 \x01(\v2\x0e.opa.OpaPolicyR\x12entitlementsPolicy2\xe1\x04\n" +
 	"\fQueenService\x12i\n" +
 	"\x11GetServiceCatalog\x12\x16.google.protobuf.Empty\x1a\x1d.queen.ServiceCatalogResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/api/queen/v1/catalog\x12z\n" +
 	"\x11GetMyEntitlements\x12\x1f.queen.GetMyEntitlementsRequest\x1a\x1d.queen.MyEntitlementsResponse\"%\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/api/queen/v1/entitlements\x12\x89\x01\n" +
 	"\x14SimulateEntitlements\x12\".queen.SimulateEntitlementsRequest\x1a\x1d.queen.MyEntitlementsResponse\".\x82\xd3\xe4\x93\x02(:\x01*\"#/api/queen/v1/simulate-entitlements\x12p\n" +
 	"\x0eEvaluatePolicy\x12\x1c.queen.EvaluatePolicyRequest\x1a\x1d.queen.EvaluatePolicyResponse\"!\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/api/queen/v1/evaluate\x12a\n" +
-	"\vGetPolicies\x12\x16.google.protobuf.Empty\x1a\x1a.queen.GetPoliciesResponse\"\x1e\x82\xd3\xe4\x93\x02\x18\x12\x16/api/queen/v1/policies\x1a\t\xa2\x97\"\x05queenBZZXgitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/queenb\x06proto3"
+	"\vGetPolicies\x12\x16.google.protobuf.Empty\x1a\x1a.queen.GetPoliciesResponse\"\x1e\x82\xd3\xe4\x93\x02\x18\x12\x16/api/queen/v1/policies\x1a\t\xa2\x97\"\x05queenBVZTgitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/queenb\x06proto3"
 
 var (
 	file_services_queen_proto_rawDescOnce sync.Once
@@ -655,22 +644,21 @@ var file_services_queen_proto_depIdxs = []int32{
 	2,  // 0: queen.ServiceCatalogResponse.services:type_name -> queen.ServiceCatalogEntry
 	5,  // 1: queen.MyEntitlementsResponse.entitlements:type_name -> queen.ServiceEntitlementInfo
 	10, // 2: queen.GetPoliciesResponse.entitlements_policy:type_name -> opa.OpaPolicy
-	10, // 3: queen.GetPoliciesResponse.claim_mapping_policy:type_name -> opa.OpaPolicy
-	11, // 4: queen.QueenService.GetServiceCatalog:input_type -> google.protobuf.Empty
-	3,  // 5: queen.QueenService.GetMyEntitlements:input_type -> queen.GetMyEntitlementsRequest
-	6,  // 6: queen.QueenService.SimulateEntitlements:input_type -> queen.SimulateEntitlementsRequest
-	7,  // 7: queen.QueenService.EvaluatePolicy:input_type -> queen.EvaluatePolicyRequest
-	11, // 8: queen.QueenService.GetPolicies:input_type -> google.protobuf.Empty
-	1,  // 9: queen.QueenService.GetServiceCatalog:output_type -> queen.ServiceCatalogResponse
-	4,  // 10: queen.QueenService.GetMyEntitlements:output_type -> queen.MyEntitlementsResponse
-	4,  // 11: queen.QueenService.SimulateEntitlements:output_type -> queen.MyEntitlementsResponse
-	8,  // 12: queen.QueenService.EvaluatePolicy:output_type -> queen.EvaluatePolicyResponse
-	9,  // 13: queen.QueenService.GetPolicies:output_type -> queen.GetPoliciesResponse
-	9,  // [9:14] is the sub-list for method output_type
-	4,  // [4:9] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	11, // 3: queen.QueenService.GetServiceCatalog:input_type -> google.protobuf.Empty
+	3,  // 4: queen.QueenService.GetMyEntitlements:input_type -> queen.GetMyEntitlementsRequest
+	6,  // 5: queen.QueenService.SimulateEntitlements:input_type -> queen.SimulateEntitlementsRequest
+	7,  // 6: queen.QueenService.EvaluatePolicy:input_type -> queen.EvaluatePolicyRequest
+	11, // 7: queen.QueenService.GetPolicies:input_type -> google.protobuf.Empty
+	1,  // 8: queen.QueenService.GetServiceCatalog:output_type -> queen.ServiceCatalogResponse
+	4,  // 9: queen.QueenService.GetMyEntitlements:output_type -> queen.MyEntitlementsResponse
+	4,  // 10: queen.QueenService.SimulateEntitlements:output_type -> queen.MyEntitlementsResponse
+	8,  // 11: queen.QueenService.EvaluatePolicy:output_type -> queen.EvaluatePolicyResponse
+	9,  // 12: queen.QueenService.GetPolicies:output_type -> queen.GetPoliciesResponse
+	8,  // [8:13] is the sub-list for method output_type
+	3,  // [3:8] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_services_queen_proto_init() }

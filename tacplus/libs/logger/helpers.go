@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	loggerProto "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/logger"
-	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
+	loggerProto "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/logger"
+	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
 )
 
 // LoadFromEnv loads logger configuration from environment variables into the provided LoggerConfig proto message.

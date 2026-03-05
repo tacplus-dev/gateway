@@ -16,7 +16,7 @@
 syntax = "proto3";
 
 package fleetwood;
-option go_package = "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/fleetwood";
+option go_package = "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/fleetwood";
 
 import "services/presley.proto";
 import "google/protobuf/empty.proto";

@@ -1,7 +1,7 @@
 language: go
 src: /Users/jody/workspace/services/proto
 tag: latest
-pkg: gitlab.com/secondstarcavalier/controlplane/services/springsteen
+pkg: gitlab.com/secondstarcavalier/controlplane/services/gateway
 backends:
   - services/elvis.ServiceHealthState:ro
 post-gen:

@@ -16,7 +16,7 @@
 syntax = "proto3";
 
 package orchestrator;
-option go_package = "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/orchestrator";
+option go_package = "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/orchestrator";
 
 // ============================================================================
 // Backend State

@@ -9,13 +9,13 @@
 // If changes are needed, update the tacplus compiler at:
 // gitlab.com/secondstarcavalier/controlplane/services/tacplus
 //
-// Source: services/springsteen.proto
+// Source: services/gateway.proto
 
 // Copyright (c) 2024 Second Star Cavalier, LLC.
 
 syntax = "proto3";
-package springsteen;
-option go_package = "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/springsteen";
+package gateway;
+option go_package = "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/gateway";
 
 message Config {
 

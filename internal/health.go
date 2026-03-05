@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	healthreport_pb "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/healthreport"
-	elvis_pb "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/elvis"
+	healthreport_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/healthreport"
+	elvis_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/elvis"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/emptypb"
 )

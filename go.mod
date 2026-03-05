@@ -1,4 +1,4 @@
-module gitlab.com/secondstarcavalier/controlplane/services/springsteen
+module gitlab.com/secondstarcavalier/controlplane/services/gateway
 
 go 1.25.5
 

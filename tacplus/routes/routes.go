@@ -8,9 +8,9 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 
-	fleetwood_gw "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/fleetwood"
-	ironmaiden_gw "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/ironmaiden"
-	queen_gw "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/queen"
+	fleetwood_gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/fleetwood"
+	identity_gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/identity"
+	queen_gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/queen"
 )
 
 // RegisterFunc is the signature of grpc-gateway's RegisterXxxHandlerFromEndpoint.
@@ -29,8 +29,8 @@ var GatewayRoutes = []Route{
 		ServiceID:    "fleetwood",
 	},
 	{
-		RegisterFunc: ironmaiden_gw.RegisterIronMaidenServiceHandlerFromEndpoint,
-		ServiceID:    "ironmaiden",
+		RegisterFunc: identity_gw.RegisterIdentityServiceHandlerFromEndpoint,
+		ServiceID:    "identity",
 	},
 	{
 		RegisterFunc: queen_gw.RegisterQueenServiceHandlerFromEndpoint,
@@ -42,6 +42,6 @@ var GatewayRoutes = []Route{
 // Used by the transparent gRPC proxy to resolve downstream targets.
 var ProxyServiceMapping = map[string]string{
 	"fleetwood": "fleetwood",
-	"ironmaiden": "ironmaiden",
+	"identity": "identity",
 	"queen": "queen",
 }

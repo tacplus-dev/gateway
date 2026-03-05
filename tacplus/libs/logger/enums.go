@@ -3,7 +3,7 @@
 package logger
 
 import (
-	loggerProto "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/logger"
+	loggerProto "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/logger"
 )
 
 // LogLevel is an alias for the proto-generated Level enum.

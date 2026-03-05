@@ -18,16 +18,16 @@
 // Queen is the entitlements introspection and dev tools microservice. It
 // provides service catalog browsing, entitlement inspection, entitlement
 // simulation, and arbitrary OPA policy evaluation — all extracted from
-// ironmaiden so the auth gateway can focus purely on authentication.
+// identity so the auth gateway can focus purely on authentication.
 //
-// Queen reads ironmaiden's verifying_keys (via Watch RO) to verify access
+// Queen reads identity's verifying_keys (via Watch RO) to verify access
 // tokens for GetMyEntitlements. All other RPCs operate on config-provided
 // data (service_entitlements, OPA policies) and require no token validation.
 
 syntax = "proto3";
 
 package queen;
-option go_package = "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/queen";
+option go_package = "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/queen";
 
 import "libs/opa.proto";
 import "google/protobuf/empty.proto";
@@ -38,7 +38,7 @@ import "google/api/annotations.proto";
 // ============================================================================
 
 // Queen reads all auth config (OPA policies, entitlement mappings) from
-// IronMaidenState via Watch (RO). No config duplication needed.
+// IdentityState via Watch (RO). No config duplication needed.
 message Config {
 }
 
@@ -98,7 +98,7 @@ message ServiceCatalogEntry {
 
 // GetMyEntitlementsRequest carries the caller's generic access token.
 message GetMyEntitlementsRequest {
-  // access_token is a generic access token (no entitlements) issued by Iron Maiden.
+  // access_token is a generic access token (no entitlements) issued by Identity.
   string access_token = 1;
 }
 
@@ -124,8 +124,7 @@ message SimulateEntitlementsRequest {
   // claims_json is JSON-encoded origin claims to simulate.
   string claims_json = 1;
 
-  // principal is an optional override. If empty, the claim_mapping_policy
-  // is evaluated to resolve a principal from the claims.
+  // principal is an optional override for simulation.
   string principal = 2;
 }
 
@@ -160,7 +159,4 @@ message EvaluatePolicyResponse {
 message GetPoliciesResponse {
   // entitlements_policy is the OPA policy evaluated to determine entitlements.
   opa.OpaPolicy entitlements_policy = 1;
-
-  // claim_mapping_policy is the OPA policy that maps IDP claims to a principal.
-  opa.OpaPolicy claim_mapping_policy = 2;
 }

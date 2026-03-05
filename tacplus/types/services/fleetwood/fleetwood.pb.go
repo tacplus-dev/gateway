@@ -14,8 +14,8 @@
 package fleetwood
 
 import (
-	_ "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/spec"
-	presley "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/presley"
+	_ "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/spec"
+	presley "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/presley"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -655,7 +655,7 @@ const file_services_fleetwood_proto_rawDesc = "" +
 	"\vGetMapStats\x12\x16.google.protobuf.Empty\x1a\x1b.fleetwood.MapStatsResponse\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/fleetwood/v1/map-stats\x12i\n" +
 	"\fGetDashboard\x12\x16.google.protobuf.Empty\x1a\x1c.fleetwood.DashboardResponse\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/fleetwood/v1/dashboard\x12}\n" +
 	"\x0eWatchDashboard\x12 .fleetwood.WatchDashboardRequest\x1a\x1c.fleetwood.DashboardResponse\")\x82\xd3\xe4\x93\x02#\x12!/api/fleetwood/v1/dashboard/watch0\x01\x1a\r\xa2\x97\"\tfleetwood2\x1e\n" +
-	"\x1cFleetwoodStateBackendServiceB^Z\\gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/fleetwoodb\x06proto3"
+	"\x1cFleetwoodStateBackendServiceBZZXgitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/fleetwoodb\x06proto3"
 
 var (
 	file_services_fleetwood_proto_rawDescOnce sync.Once

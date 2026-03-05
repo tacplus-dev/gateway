@@ -11,9 +11,9 @@ import (
 	"context"
 	"sync"
 
-	"gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/libs/servicemanager"
-	healthreport_pb "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/healthreport"
-	types "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/elvis"
+	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/servicemanager"
+	healthreport_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/healthreport"
+	types "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/elvis"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -9,12 +9,12 @@
 // If changes are needed, update the tacplus compiler at:
 // gitlab.com/secondstarcavalier/controlplane/services/tacplus
 //
-// Source: services/springsteen.proto
+// Source: services/gateway.proto
 
-package springsteen
+package gateway
 
 import (
-	_ "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/spec"
+	_ "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/spec"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -43,7 +43,7 @@ type Config struct {
 
 func (x *Config) Reset() {
 	*x = Config{}
-	mi := &file_services_springsteen_proto_msgTypes[0]
+	mi := &file_services_gateway_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -55,7 +55,7 @@ func (x *Config) String() string {
 func (*Config) ProtoMessage() {}
 
 func (x *Config) ProtoReflect() protoreflect.Message {
-	mi := &file_services_springsteen_proto_msgTypes[0]
+	mi := &file_services_gateway_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -68,7 +68,7 @@ func (x *Config) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Config.ProtoReflect.Descriptor instead.
 func (*Config) Descriptor() ([]byte, []int) {
-	return file_services_springsteen_proto_rawDescGZIP(), []int{0}
+	return file_services_gateway_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Config) GetHealthPollIntervalSeconds() int64 {
@@ -92,36 +92,36 @@ func (x *Config) GetEnableQuic() bool {
 	return false
 }
 
-var File_services_springsteen_proto protoreflect.FileDescriptor
+var File_services_gateway_proto protoreflect.FileDescriptor
 
-const file_services_springsteen_proto_rawDesc = "" +
+const file_services_gateway_proto_rawDesc = "" +
 	"\n" +
-	"\x1aservices/springsteen.proto\x12\vspringsteen\x1a\x0flibs/spec.proto\"\xb0\x01\n" +
+	"\x16services/gateway.proto\x12\agateway\x1a\x0flibs/spec.proto\"\xac\x01\n" +
 	"\x06Config\x12E\n" +
 	"\x1chealth_poll_interval_seconds\x18\x01 \x01(\x03B\x04\x90\xa8\x1d\x05R\x19healthPollIntervalSeconds\x12#\n" +
 	"\n" +
 	"enable_tcp\x18\x02 \x01(\bB\x04\xa0\xa8\x1d\x01R\tenableTcp\x12%\n" +
 	"\venable_quic\x18\x03 \x01(\bB\x04\xa0\xa8\x1d\x01R\n" +
-	"enableQuic:\x13Ҩ\x1d\x0f\n" +
-	"\vspringsteen\x10\aB`Z^gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/springsteenb\x06proto3"
+	"enableQuic:\x0fҨ\x1d\v\n" +
+	"\agateway\x10\aBXZVgitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/gatewayb\x06proto3"
 
 var (
-	file_services_springsteen_proto_rawDescOnce sync.Once
-	file_services_springsteen_proto_rawDescData []byte
+	file_services_gateway_proto_rawDescOnce sync.Once
+	file_services_gateway_proto_rawDescData []byte
 )
 
-func file_services_springsteen_proto_rawDescGZIP() []byte {
-	file_services_springsteen_proto_rawDescOnce.Do(func() {
-		file_services_springsteen_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_services_springsteen_proto_rawDesc), len(file_services_springsteen_proto_rawDesc)))
+func file_services_gateway_proto_rawDescGZIP() []byte {
+	file_services_gateway_proto_rawDescOnce.Do(func() {
+		file_services_gateway_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_services_gateway_proto_rawDesc), len(file_services_gateway_proto_rawDesc)))
 	})
-	return file_services_springsteen_proto_rawDescData
+	return file_services_gateway_proto_rawDescData
 }
 
-var file_services_springsteen_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
-var file_services_springsteen_proto_goTypes = []any{
-	(*Config)(nil), // 0: springsteen.Config
+var file_services_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_services_gateway_proto_goTypes = []any{
+	(*Config)(nil), // 0: gateway.Config
 }
-var file_services_springsteen_proto_depIdxs = []int32{
+var file_services_gateway_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
 	0, // [0:0] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
@@ -129,26 +129,26 @@ var file_services_springsteen_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_services_springsteen_proto_init() }
-func file_services_springsteen_proto_init() {
-	if File_services_springsteen_proto != nil {
+func init() { file_services_gateway_proto_init() }
+func file_services_gateway_proto_init() {
+	if File_services_gateway_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_services_springsteen_proto_rawDesc), len(file_services_springsteen_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_services_gateway_proto_rawDesc), len(file_services_gateway_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   1,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_services_springsteen_proto_goTypes,
-		DependencyIndexes: file_services_springsteen_proto_depIdxs,
-		MessageInfos:      file_services_springsteen_proto_msgTypes,
+		GoTypes:           file_services_gateway_proto_goTypes,
+		DependencyIndexes: file_services_gateway_proto_depIdxs,
+		MessageInfos:      file_services_gateway_proto_msgTypes,
 	}.Build()
-	File_services_springsteen_proto = out.File
-	file_services_springsteen_proto_goTypes = nil
-	file_services_springsteen_proto_depIdxs = nil
+	File_services_gateway_proto = out.File
+	file_services_gateway_proto_goTypes = nil
+	file_services_gateway_proto_depIdxs = nil
 }

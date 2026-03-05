@@ -17,7 +17,7 @@ import (
 	"strconv"
 	"strings"
 
-	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
+	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
 )
 
 // ============================================================

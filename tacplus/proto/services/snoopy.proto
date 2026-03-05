@@ -14,7 +14,7 @@
 syntax = "proto3";
 
 package snoopy;
-option go_package = "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/snoopy";
+option go_package = "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/snoopy";
 
 import "google/protobuf/empty.proto";
 

@@ -20,9 +20,9 @@ import (
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
-	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
-	key "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/key"
-	utils "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/utils"
+	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
+	key "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/key"
+	utils "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/utils"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
@@ -1224,13 +1224,13 @@ func ValidateJwk(m *Jwk) error {
 		}
 	}
 
-	// Validate Created (assert_le: 8045740800)
-	if m.Created > 8045740800 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be <= 8045740800, got: %v", m.Created)
-	}
 	// Validate Created (assert_ge: 1735689600)
 	if m.Created < 1735689600 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be >= 1735689600, got: %v", m.Created)
+	}
+	// Validate Created (assert_le: 8045740800)
+	if m.Created > 8045740800 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be <= 8045740800, got: %v", m.Created)
 	}
 	// Validate Alg (default max size: 32768 bytes)
 	if len(m.Alg) > 32768 {

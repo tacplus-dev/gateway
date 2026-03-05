@@ -14,13 +14,13 @@
 package config_holder
 
 import (
-	serviceconfig "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/serviceconfig"
-	_ "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/spec"
-	fleetwood "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/fleetwood"
-	genesis "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/genesis"
-	ironmaiden "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/ironmaiden"
-	queen "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/queen"
-	springsteen "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/springsteen"
+	serviceconfig "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/serviceconfig"
+	_ "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/spec"
+	fleetwood "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/fleetwood"
+	gateway "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/gateway"
+	identity "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/identity"
+	letsencrypt "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/letsencrypt"
+	queen "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/queen"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -39,9 +39,9 @@ const (
 type ConfigHolder struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	FleetwoodConfig   *fleetwood.Config      `protobuf:"bytes,5,opt,name=fleetwood_config,json=fleetwoodConfig,proto3" json:"fleetwood_config,omitempty"`
-	IronmaidenConfig  *ironmaiden.Config     `protobuf:"bytes,6,opt,name=ironmaiden_config,json=ironmaidenConfig,proto3" json:"ironmaiden_config,omitempty"`
-	SpringsteenConfig *springsteen.Config    `protobuf:"bytes,7,opt,name=springsteen_config,json=springsteenConfig,proto3" json:"springsteen_config,omitempty"`
-	GenesisConfig     *genesis.Config        `protobuf:"bytes,9,opt,name=genesis_config,json=genesisConfig,proto3" json:"genesis_config,omitempty"`
+	IdentityConfig    *identity.Config       `protobuf:"bytes,6,opt,name=identity_config,json=identityConfig,proto3" json:"identity_config,omitempty"`
+	GatewayConfig     *gateway.Config        `protobuf:"bytes,7,opt,name=gateway_config,json=gatewayConfig,proto3" json:"gateway_config,omitempty"`
+	LetsencryptConfig *letsencrypt.Config    `protobuf:"bytes,9,opt,name=letsencrypt_config,json=letsencryptConfig,proto3" json:"letsencrypt_config,omitempty"`
 	QueenConfig       *queen.Config          `protobuf:"bytes,10,opt,name=queen_config,json=queenConfig,proto3" json:"queen_config,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
@@ -84,23 +84,23 @@ func (x *ConfigHolder) GetFleetwoodConfig() *fleetwood.Config {
 	return nil
 }
 
-func (x *ConfigHolder) GetIronmaidenConfig() *ironmaiden.Config {
+func (x *ConfigHolder) GetIdentityConfig() *identity.Config {
 	if x != nil {
-		return x.IronmaidenConfig
+		return x.IdentityConfig
 	}
 	return nil
 }
 
-func (x *ConfigHolder) GetSpringsteenConfig() *springsteen.Config {
+func (x *ConfigHolder) GetGatewayConfig() *gateway.Config {
 	if x != nil {
-		return x.SpringsteenConfig
+		return x.GatewayConfig
 	}
 	return nil
 }
 
-func (x *ConfigHolder) GetGenesisConfig() *genesis.Config {
+func (x *ConfigHolder) GetLetsencryptConfig() *letsencrypt.Config {
 	if x != nil {
-		return x.GenesisConfig
+		return x.LetsencryptConfig
 	}
 	return nil
 }
@@ -156,27 +156,27 @@ func (x *FleetwoodConfigState) GetConfig() *fleetwood.Config {
 	return nil
 }
 
-type IronmaidenConfigState struct {
+type IdentityConfigState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Config        *ironmaiden.Config     `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Config        *identity.Config       `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *IronmaidenConfigState) Reset() {
-	*x = IronmaidenConfigState{}
+func (x *IdentityConfigState) Reset() {
+	*x = IdentityConfigState{}
 	mi := &file_services_config_holder_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *IronmaidenConfigState) String() string {
+func (x *IdentityConfigState) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*IronmaidenConfigState) ProtoMessage() {}
+func (*IdentityConfigState) ProtoMessage() {}
 
-func (x *IronmaidenConfigState) ProtoReflect() protoreflect.Message {
+func (x *IdentityConfigState) ProtoReflect() protoreflect.Message {
 	mi := &file_services_config_holder_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -188,39 +188,39 @@ func (x *IronmaidenConfigState) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use IronmaidenConfigState.ProtoReflect.Descriptor instead.
-func (*IronmaidenConfigState) Descriptor() ([]byte, []int) {
+// Deprecated: Use IdentityConfigState.ProtoReflect.Descriptor instead.
+func (*IdentityConfigState) Descriptor() ([]byte, []int) {
 	return file_services_config_holder_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *IronmaidenConfigState) GetConfig() *ironmaiden.Config {
+func (x *IdentityConfigState) GetConfig() *identity.Config {
 	if x != nil {
 		return x.Config
 	}
 	return nil
 }
 
-type SpringsteenConfigState struct {
+type GatewayConfigState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Config        *springsteen.Config    `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Config        *gateway.Config        `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *SpringsteenConfigState) Reset() {
-	*x = SpringsteenConfigState{}
+func (x *GatewayConfigState) Reset() {
+	*x = GatewayConfigState{}
 	mi := &file_services_config_holder_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SpringsteenConfigState) String() string {
+func (x *GatewayConfigState) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SpringsteenConfigState) ProtoMessage() {}
+func (*GatewayConfigState) ProtoMessage() {}
 
-func (x *SpringsteenConfigState) ProtoReflect() protoreflect.Message {
+func (x *GatewayConfigState) ProtoReflect() protoreflect.Message {
 	mi := &file_services_config_holder_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -232,39 +232,39 @@ func (x *SpringsteenConfigState) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SpringsteenConfigState.ProtoReflect.Descriptor instead.
-func (*SpringsteenConfigState) Descriptor() ([]byte, []int) {
+// Deprecated: Use GatewayConfigState.ProtoReflect.Descriptor instead.
+func (*GatewayConfigState) Descriptor() ([]byte, []int) {
 	return file_services_config_holder_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *SpringsteenConfigState) GetConfig() *springsteen.Config {
+func (x *GatewayConfigState) GetConfig() *gateway.Config {
 	if x != nil {
 		return x.Config
 	}
 	return nil
 }
 
-type GenesisConfigState struct {
+type LetsencryptConfigState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Config        *genesis.Config        `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Config        *letsencrypt.Config    `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GenesisConfigState) Reset() {
-	*x = GenesisConfigState{}
+func (x *LetsencryptConfigState) Reset() {
+	*x = LetsencryptConfigState{}
 	mi := &file_services_config_holder_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GenesisConfigState) String() string {
+func (x *LetsencryptConfigState) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GenesisConfigState) ProtoMessage() {}
+func (*LetsencryptConfigState) ProtoMessage() {}
 
-func (x *GenesisConfigState) ProtoReflect() protoreflect.Message {
+func (x *LetsencryptConfigState) ProtoReflect() protoreflect.Message {
 	mi := &file_services_config_holder_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -276,12 +276,12 @@ func (x *GenesisConfigState) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GenesisConfigState.ProtoReflect.Descriptor instead.
-func (*GenesisConfigState) Descriptor() ([]byte, []int) {
+// Deprecated: Use LetsencryptConfigState.ProtoReflect.Descriptor instead.
+func (*LetsencryptConfigState) Descriptor() ([]byte, []int) {
 	return file_services_config_holder_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *GenesisConfigState) GetConfig() *genesis.Config {
+func (x *LetsencryptConfigState) GetConfig() *letsencrypt.Config {
 	if x != nil {
 		return x.Config
 	}
@@ -418,22 +418,22 @@ var File_services_config_holder_proto protoreflect.FileDescriptor
 
 const file_services_config_holder_proto_rawDesc = "" +
 	"\n" +
-	"\x1cservices/config_holder.proto\x12\rconfig_holder\x1a\x0flibs/spec.proto\x1a\x18libs/serviceconfig.proto\x1a\x18services/fleetwood.proto\x1a\x16services/genesis.proto\x1a\x19services/ironmaiden.proto\x1a\x14services/queen.proto\x1a\x1aservices/springsteen.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xbb\x02\n" +
+	"\x1cservices/config_holder.proto\x12\rconfig_holder\x1a\x0flibs/spec.proto\x1a\x18libs/serviceconfig.proto\x1a\x18services/fleetwood.proto\x1a\x16services/gateway.proto\x1a\x17services/identity.proto\x1a\x1aservices/letsencrypt.proto\x1a\x14services/queen.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xb5\x02\n" +
 	"\fConfigHolder\x12<\n" +
-	"\x10fleetwood_config\x18\x05 \x01(\v2\x11.fleetwood.ConfigR\x0ffleetwoodConfig\x12?\n" +
-	"\x11ironmaiden_config\x18\x06 \x01(\v2\x12.ironmaiden.ConfigR\x10ironmaidenConfig\x12B\n" +
-	"\x12springsteen_config\x18\a \x01(\v2\x13.springsteen.ConfigR\x11springsteenConfig\x126\n" +
-	"\x0egenesis_config\x18\t \x01(\v2\x0f.genesis.ConfigR\rgenesisConfig\x120\n" +
+	"\x10fleetwood_config\x18\x05 \x01(\v2\x11.fleetwood.ConfigR\x0ffleetwoodConfig\x129\n" +
+	"\x0fidentity_config\x18\x06 \x01(\v2\x10.identity.ConfigR\x0eidentityConfig\x126\n" +
+	"\x0egateway_config\x18\a \x01(\v2\x0f.gateway.ConfigR\rgatewayConfig\x12B\n" +
+	"\x12letsencrypt_config\x18\t \x01(\v2\x13.letsencrypt.ConfigR\x11letsencryptConfig\x120\n" +
 	"\fqueen_config\x18\n" +
 	" \x01(\v2\r.queen.ConfigR\vqueenConfig\"i\n" +
 	"\x14FleetwoodConfigState\x123\n" +
-	"\x06config\x18\x01 \x01(\v2\x11.fleetwood.ConfigB\b\xe0\xb5\x18\x02\xe0\xb6\x18\x01R\x06config:\x1c\x9a\xa8\x1d\x14FleetwoodConfigState\xa0\xa8\x1d\x02\"l\n" +
-	"\x15IronmaidenConfigState\x124\n" +
-	"\x06config\x18\x01 \x01(\v2\x12.ironmaiden.ConfigB\b\xe0\xb5\x18\x02\xe0\xb6\x18\x01R\x06config:\x1d\x9a\xa8\x1d\x15IronmaidenConfigState\xa0\xa8\x1d\x02\"o\n" +
-	"\x16SpringsteenConfigState\x125\n" +
-	"\x06config\x18\x01 \x01(\v2\x13.springsteen.ConfigB\b\xe0\xb5\x18\x02\xe0\xb6\x18\x01R\x06config:\x1e\x9a\xa8\x1d\x16SpringsteenConfigState\xa0\xa8\x1d\x02\"c\n" +
-	"\x12GenesisConfigState\x121\n" +
-	"\x06config\x18\x01 \x01(\v2\x0f.genesis.ConfigB\b\xe0\xb5\x18\x02\xe0\xb6\x18\x01R\x06config:\x1a\x9a\xa8\x1d\x12GenesisConfigState\xa0\xa8\x1d\x02\"]\n" +
+	"\x06config\x18\x01 \x01(\v2\x11.fleetwood.ConfigB\b\xe0\xb5\x18\x02\xe0\xb6\x18\x01R\x06config:\x1c\x9a\xa8\x1d\x14FleetwoodConfigState\xa0\xa8\x1d\x02\"f\n" +
+	"\x13IdentityConfigState\x122\n" +
+	"\x06config\x18\x01 \x01(\v2\x10.identity.ConfigB\b\xe0\xb5\x18\x02\xe0\xb6\x18\x01R\x06config:\x1b\x9a\xa8\x1d\x13IdentityConfigState\xa0\xa8\x1d\x02\"c\n" +
+	"\x12GatewayConfigState\x121\n" +
+	"\x06config\x18\x01 \x01(\v2\x0f.gateway.ConfigB\b\xe0\xb5\x18\x02\xe0\xb6\x18\x01R\x06config:\x1a\x9a\xa8\x1d\x12GatewayConfigState\xa0\xa8\x1d\x02\"o\n" +
+	"\x16LetsencryptConfigState\x125\n" +
+	"\x06config\x18\x01 \x01(\v2\x13.letsencrypt.ConfigB\b\xe0\xb5\x18\x02\xe0\xb6\x18\x01R\x06config:\x1e\x9a\xa8\x1d\x16LetsencryptConfigState\xa0\xa8\x1d\x02\"]\n" +
 	"\x10QueenConfigState\x12/\n" +
 	"\x06config\x18\x01 \x01(\v2\r.queen.ConfigB\b\xe0\xb5\x18\x02\xe0\xb6\x18\x01R\x06config:\x18\x9a\xa8\x1d\x10QueenConfigState\xa0\xa8\x1d\x02\"i\n" +
 	"\x12ServiceConfigState\x127\n" +
@@ -443,19 +443,19 @@ const file_services_config_holder_proto_rawDesc = "" +
 	"\"FleetwoodConfigStateBackendService\x126\n" +
 	"\tGetConfig\x12\x16.google.protobuf.Empty\x1a\x11.fleetwood.Config\x121\n" +
 	"\tSetConfig\x12\x11.fleetwood.Config\x1a\x11.fleetwood.Config\x12:\n" +
-	"\vWatchConfig\x12\x16.google.protobuf.Empty\x1a\x11.fleetwood.Config0\x012\xd0\x01\n" +
-	"#IronmaidenConfigStateBackendService\x127\n" +
-	"\tGetConfig\x12\x16.google.protobuf.Empty\x1a\x12.ironmaiden.Config\x123\n" +
-	"\tSetConfig\x12\x12.ironmaiden.Config\x1a\x12.ironmaiden.Config\x12;\n" +
-	"\vWatchConfig\x12\x16.google.protobuf.Empty\x1a\x12.ironmaiden.Config0\x012\xd5\x01\n" +
-	"$SpringsteenConfigStateBackendService\x128\n" +
-	"\tGetConfig\x12\x16.google.protobuf.Empty\x1a\x13.springsteen.Config\x125\n" +
-	"\tSetConfig\x12\x13.springsteen.Config\x1a\x13.springsteen.Config\x12<\n" +
-	"\vWatchConfig\x12\x16.google.protobuf.Empty\x1a\x13.springsteen.Config0\x012\xc1\x01\n" +
-	" GenesisConfigStateBackendService\x124\n" +
-	"\tGetConfig\x12\x16.google.protobuf.Empty\x1a\x0f.genesis.Config\x12-\n" +
-	"\tSetConfig\x12\x0f.genesis.Config\x1a\x0f.genesis.Config\x128\n" +
-	"\vWatchConfig\x12\x16.google.protobuf.Empty\x1a\x0f.genesis.Config0\x012\xb7\x01\n" +
+	"\vWatchConfig\x12\x16.google.protobuf.Empty\x1a\x11.fleetwood.Config0\x012\xc6\x01\n" +
+	"!IdentityConfigStateBackendService\x125\n" +
+	"\tGetConfig\x12\x16.google.protobuf.Empty\x1a\x10.identity.Config\x12/\n" +
+	"\tSetConfig\x12\x10.identity.Config\x1a\x10.identity.Config\x129\n" +
+	"\vWatchConfig\x12\x16.google.protobuf.Empty\x1a\x10.identity.Config0\x012\xc1\x01\n" +
+	" GatewayConfigStateBackendService\x124\n" +
+	"\tGetConfig\x12\x16.google.protobuf.Empty\x1a\x0f.gateway.Config\x12-\n" +
+	"\tSetConfig\x12\x0f.gateway.Config\x1a\x0f.gateway.Config\x128\n" +
+	"\vWatchConfig\x12\x16.google.protobuf.Empty\x1a\x0f.gateway.Config0\x012\xd5\x01\n" +
+	"$LetsencryptConfigStateBackendService\x128\n" +
+	"\tGetConfig\x12\x16.google.protobuf.Empty\x1a\x13.letsencrypt.Config\x125\n" +
+	"\tSetConfig\x12\x13.letsencrypt.Config\x1a\x13.letsencrypt.Config\x12<\n" +
+	"\vWatchConfig\x12\x16.google.protobuf.Empty\x1a\x13.letsencrypt.Config0\x012\xb7\x01\n" +
 	"\x1eQueenConfigStateBackendService\x122\n" +
 	"\tGetConfig\x12\x16.google.protobuf.Empty\x1a\r.queen.Config\x12)\n" +
 	"\tSetConfig\x12\r.queen.Config\x1a\r.queen.Config\x126\n" +
@@ -463,7 +463,7 @@ const file_services_config_holder_proto_rawDesc = "" +
 	" ServiceConfigStateBackendService\x12:\n" +
 	"\tGetConfig\x12\x16.google.protobuf.Empty\x1a\x15.serviceconfig.Config\x129\n" +
 	"\tSetConfig\x12\x15.serviceconfig.Config\x1a\x15.serviceconfig.Config\x12>\n" +
-	"\vWatchConfig\x12\x16.google.protobuf.Empty\x1a\x15.serviceconfig.Config0\x01BbZ`gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/config_holderb\x06proto3"
+	"\vWatchConfig\x12\x16.google.protobuf.Empty\x1a\x15.serviceconfig.Config0\x01B^Z\\gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/config_holderb\x06proto3"
 
 var (
 	file_services_config_holder_proto_rawDescOnce sync.Once
@@ -481,44 +481,44 @@ var file_services_config_holder_proto_msgTypes = make([]protoimpl.MessageInfo, 8
 var file_services_config_holder_proto_goTypes = []any{
 	(*ConfigHolder)(nil),           // 0: config_holder.ConfigHolder
 	(*FleetwoodConfigState)(nil),   // 1: config_holder.FleetwoodConfigState
-	(*IronmaidenConfigState)(nil),  // 2: config_holder.IronmaidenConfigState
-	(*SpringsteenConfigState)(nil), // 3: config_holder.SpringsteenConfigState
-	(*GenesisConfigState)(nil),     // 4: config_holder.GenesisConfigState
+	(*IdentityConfigState)(nil),    // 2: config_holder.IdentityConfigState
+	(*GatewayConfigState)(nil),     // 3: config_holder.GatewayConfigState
+	(*LetsencryptConfigState)(nil), // 4: config_holder.LetsencryptConfigState
 	(*QueenConfigState)(nil),       // 5: config_holder.QueenConfigState
 	(*ServiceConfigState)(nil),     // 6: config_holder.ServiceConfigState
 	(*MapEmpty)(nil),               // 7: config_holder.MapEmpty
 	(*fleetwood.Config)(nil),       // 8: fleetwood.Config
-	(*ironmaiden.Config)(nil),      // 9: ironmaiden.Config
-	(*springsteen.Config)(nil),     // 10: springsteen.Config
-	(*genesis.Config)(nil),         // 11: genesis.Config
+	(*identity.Config)(nil),        // 9: identity.Config
+	(*gateway.Config)(nil),         // 10: gateway.Config
+	(*letsencrypt.Config)(nil),     // 11: letsencrypt.Config
 	(*queen.Config)(nil),           // 12: queen.Config
 	(*serviceconfig.Config)(nil),   // 13: serviceconfig.Config
 	(*emptypb.Empty)(nil),          // 14: google.protobuf.Empty
 }
 var file_services_config_holder_proto_depIdxs = []int32{
 	8,  // 0: config_holder.ConfigHolder.fleetwood_config:type_name -> fleetwood.Config
-	9,  // 1: config_holder.ConfigHolder.ironmaiden_config:type_name -> ironmaiden.Config
-	10, // 2: config_holder.ConfigHolder.springsteen_config:type_name -> springsteen.Config
-	11, // 3: config_holder.ConfigHolder.genesis_config:type_name -> genesis.Config
+	9,  // 1: config_holder.ConfigHolder.identity_config:type_name -> identity.Config
+	10, // 2: config_holder.ConfigHolder.gateway_config:type_name -> gateway.Config
+	11, // 3: config_holder.ConfigHolder.letsencrypt_config:type_name -> letsencrypt.Config
 	12, // 4: config_holder.ConfigHolder.queen_config:type_name -> queen.Config
 	8,  // 5: config_holder.FleetwoodConfigState.config:type_name -> fleetwood.Config
-	9,  // 6: config_holder.IronmaidenConfigState.config:type_name -> ironmaiden.Config
-	10, // 7: config_holder.SpringsteenConfigState.config:type_name -> springsteen.Config
-	11, // 8: config_holder.GenesisConfigState.config:type_name -> genesis.Config
+	9,  // 6: config_holder.IdentityConfigState.config:type_name -> identity.Config
+	10, // 7: config_holder.GatewayConfigState.config:type_name -> gateway.Config
+	11, // 8: config_holder.LetsencryptConfigState.config:type_name -> letsencrypt.Config
 	12, // 9: config_holder.QueenConfigState.config:type_name -> queen.Config
 	13, // 10: config_holder.ServiceConfigState.config:type_name -> serviceconfig.Config
 	14, // 11: config_holder.FleetwoodConfigStateBackendService.GetConfig:input_type -> google.protobuf.Empty
 	8,  // 12: config_holder.FleetwoodConfigStateBackendService.SetConfig:input_type -> fleetwood.Config
 	14, // 13: config_holder.FleetwoodConfigStateBackendService.WatchConfig:input_type -> google.protobuf.Empty
-	14, // 14: config_holder.IronmaidenConfigStateBackendService.GetConfig:input_type -> google.protobuf.Empty
-	9,  // 15: config_holder.IronmaidenConfigStateBackendService.SetConfig:input_type -> ironmaiden.Config
-	14, // 16: config_holder.IronmaidenConfigStateBackendService.WatchConfig:input_type -> google.protobuf.Empty
-	14, // 17: config_holder.SpringsteenConfigStateBackendService.GetConfig:input_type -> google.protobuf.Empty
-	10, // 18: config_holder.SpringsteenConfigStateBackendService.SetConfig:input_type -> springsteen.Config
-	14, // 19: config_holder.SpringsteenConfigStateBackendService.WatchConfig:input_type -> google.protobuf.Empty
-	14, // 20: config_holder.GenesisConfigStateBackendService.GetConfig:input_type -> google.protobuf.Empty
-	11, // 21: config_holder.GenesisConfigStateBackendService.SetConfig:input_type -> genesis.Config
-	14, // 22: config_holder.GenesisConfigStateBackendService.WatchConfig:input_type -> google.protobuf.Empty
+	14, // 14: config_holder.IdentityConfigStateBackendService.GetConfig:input_type -> google.protobuf.Empty
+	9,  // 15: config_holder.IdentityConfigStateBackendService.SetConfig:input_type -> identity.Config
+	14, // 16: config_holder.IdentityConfigStateBackendService.WatchConfig:input_type -> google.protobuf.Empty
+	14, // 17: config_holder.GatewayConfigStateBackendService.GetConfig:input_type -> google.protobuf.Empty
+	10, // 18: config_holder.GatewayConfigStateBackendService.SetConfig:input_type -> gateway.Config
+	14, // 19: config_holder.GatewayConfigStateBackendService.WatchConfig:input_type -> google.protobuf.Empty
+	14, // 20: config_holder.LetsencryptConfigStateBackendService.GetConfig:input_type -> google.protobuf.Empty
+	11, // 21: config_holder.LetsencryptConfigStateBackendService.SetConfig:input_type -> letsencrypt.Config
+	14, // 22: config_holder.LetsencryptConfigStateBackendService.WatchConfig:input_type -> google.protobuf.Empty
 	14, // 23: config_holder.QueenConfigStateBackendService.GetConfig:input_type -> google.protobuf.Empty
 	12, // 24: config_holder.QueenConfigStateBackendService.SetConfig:input_type -> queen.Config
 	14, // 25: config_holder.QueenConfigStateBackendService.WatchConfig:input_type -> google.protobuf.Empty
@@ -528,15 +528,15 @@ var file_services_config_holder_proto_depIdxs = []int32{
 	8,  // 29: config_holder.FleetwoodConfigStateBackendService.GetConfig:output_type -> fleetwood.Config
 	8,  // 30: config_holder.FleetwoodConfigStateBackendService.SetConfig:output_type -> fleetwood.Config
 	8,  // 31: config_holder.FleetwoodConfigStateBackendService.WatchConfig:output_type -> fleetwood.Config
-	9,  // 32: config_holder.IronmaidenConfigStateBackendService.GetConfig:output_type -> ironmaiden.Config
-	9,  // 33: config_holder.IronmaidenConfigStateBackendService.SetConfig:output_type -> ironmaiden.Config
-	9,  // 34: config_holder.IronmaidenConfigStateBackendService.WatchConfig:output_type -> ironmaiden.Config
-	10, // 35: config_holder.SpringsteenConfigStateBackendService.GetConfig:output_type -> springsteen.Config
-	10, // 36: config_holder.SpringsteenConfigStateBackendService.SetConfig:output_type -> springsteen.Config
-	10, // 37: config_holder.SpringsteenConfigStateBackendService.WatchConfig:output_type -> springsteen.Config
-	11, // 38: config_holder.GenesisConfigStateBackendService.GetConfig:output_type -> genesis.Config
-	11, // 39: config_holder.GenesisConfigStateBackendService.SetConfig:output_type -> genesis.Config
-	11, // 40: config_holder.GenesisConfigStateBackendService.WatchConfig:output_type -> genesis.Config
+	9,  // 32: config_holder.IdentityConfigStateBackendService.GetConfig:output_type -> identity.Config
+	9,  // 33: config_holder.IdentityConfigStateBackendService.SetConfig:output_type -> identity.Config
+	9,  // 34: config_holder.IdentityConfigStateBackendService.WatchConfig:output_type -> identity.Config
+	10, // 35: config_holder.GatewayConfigStateBackendService.GetConfig:output_type -> gateway.Config
+	10, // 36: config_holder.GatewayConfigStateBackendService.SetConfig:output_type -> gateway.Config
+	10, // 37: config_holder.GatewayConfigStateBackendService.WatchConfig:output_type -> gateway.Config
+	11, // 38: config_holder.LetsencryptConfigStateBackendService.GetConfig:output_type -> letsencrypt.Config
+	11, // 39: config_holder.LetsencryptConfigStateBackendService.SetConfig:output_type -> letsencrypt.Config
+	11, // 40: config_holder.LetsencryptConfigStateBackendService.WatchConfig:output_type -> letsencrypt.Config
 	12, // 41: config_holder.QueenConfigStateBackendService.GetConfig:output_type -> queen.Config
 	12, // 42: config_holder.QueenConfigStateBackendService.SetConfig:output_type -> queen.Config
 	12, // 43: config_holder.QueenConfigStateBackendService.WatchConfig:output_type -> queen.Config

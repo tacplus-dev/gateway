@@ -58,12 +58,12 @@ import (
 	"strings"
 	"time"
 
-	keyProto "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/key"
-	tokenProto "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/token"
-	wrapperJwk "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/libs/jwk"
-	wrapperKey "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/libs/key"
-	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
-	utils "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/utils"
+	keyProto "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/key"
+	tokenProto "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/token"
+	wrapperJwk "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/jwk"
+	wrapperKey "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/key"
+	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
+	utils "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/utils"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 

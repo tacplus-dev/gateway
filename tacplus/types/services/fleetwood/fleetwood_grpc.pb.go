@@ -15,7 +15,7 @@ package fleetwood
 
 import (
 	context "context"
-	presley "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/presley"
+	presley "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/presley"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"

@@ -15,12 +15,12 @@ package config_holder
 
 import (
 	context "context"
-	serviceconfig "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/serviceconfig"
-	fleetwood "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/fleetwood"
-	genesis "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/genesis"
-	ironmaiden "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/ironmaiden"
-	queen "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/queen"
-	springsteen "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/springsteen"
+	serviceconfig "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/serviceconfig"
+	fleetwood "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/fleetwood"
+	gateway "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/gateway"
+	identity "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/identity"
+	letsencrypt "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/letsencrypt"
+	queen "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/queen"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -218,56 +218,56 @@ var FleetwoodConfigStateBackendService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	IronmaidenConfigStateBackendService_GetConfig_FullMethodName   = "/config_holder.IronmaidenConfigStateBackendService/GetConfig"
-	IronmaidenConfigStateBackendService_SetConfig_FullMethodName   = "/config_holder.IronmaidenConfigStateBackendService/SetConfig"
-	IronmaidenConfigStateBackendService_WatchConfig_FullMethodName = "/config_holder.IronmaidenConfigStateBackendService/WatchConfig"
+	IdentityConfigStateBackendService_GetConfig_FullMethodName   = "/config_holder.IdentityConfigStateBackendService/GetConfig"
+	IdentityConfigStateBackendService_SetConfig_FullMethodName   = "/config_holder.IdentityConfigStateBackendService/SetConfig"
+	IdentityConfigStateBackendService_WatchConfig_FullMethodName = "/config_holder.IdentityConfigStateBackendService/WatchConfig"
 )
 
-// IronmaidenConfigStateBackendServiceClient is the client API for IronmaidenConfigStateBackendService service.
+// IdentityConfigStateBackendServiceClient is the client API for IdentityConfigStateBackendService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type IronmaidenConfigStateBackendServiceClient interface {
+type IdentityConfigStateBackendServiceClient interface {
 	// Singleton: Config
-	GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ironmaiden.Config, error)
-	SetConfig(ctx context.Context, in *ironmaiden.Config, opts ...grpc.CallOption) (*ironmaiden.Config, error)
-	WatchConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ironmaiden.Config], error)
+	GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*identity.Config, error)
+	SetConfig(ctx context.Context, in *identity.Config, opts ...grpc.CallOption) (*identity.Config, error)
+	WatchConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[identity.Config], error)
 }
 
-type ironmaidenConfigStateBackendServiceClient struct {
+type identityConfigStateBackendServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewIronmaidenConfigStateBackendServiceClient(cc grpc.ClientConnInterface) IronmaidenConfigStateBackendServiceClient {
-	return &ironmaidenConfigStateBackendServiceClient{cc}
+func NewIdentityConfigStateBackendServiceClient(cc grpc.ClientConnInterface) IdentityConfigStateBackendServiceClient {
+	return &identityConfigStateBackendServiceClient{cc}
 }
 
-func (c *ironmaidenConfigStateBackendServiceClient) GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ironmaiden.Config, error) {
+func (c *identityConfigStateBackendServiceClient) GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*identity.Config, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ironmaiden.Config)
-	err := c.cc.Invoke(ctx, IronmaidenConfigStateBackendService_GetConfig_FullMethodName, in, out, cOpts...)
+	out := new(identity.Config)
+	err := c.cc.Invoke(ctx, IdentityConfigStateBackendService_GetConfig_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *ironmaidenConfigStateBackendServiceClient) SetConfig(ctx context.Context, in *ironmaiden.Config, opts ...grpc.CallOption) (*ironmaiden.Config, error) {
+func (c *identityConfigStateBackendServiceClient) SetConfig(ctx context.Context, in *identity.Config, opts ...grpc.CallOption) (*identity.Config, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ironmaiden.Config)
-	err := c.cc.Invoke(ctx, IronmaidenConfigStateBackendService_SetConfig_FullMethodName, in, out, cOpts...)
+	out := new(identity.Config)
+	err := c.cc.Invoke(ctx, IdentityConfigStateBackendService_SetConfig_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *ironmaidenConfigStateBackendServiceClient) WatchConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ironmaiden.Config], error) {
+func (c *identityConfigStateBackendServiceClient) WatchConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[identity.Config], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &IronmaidenConfigStateBackendService_ServiceDesc.Streams[0], IronmaidenConfigStateBackendService_WatchConfig_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &IdentityConfigStateBackendService_ServiceDesc.Streams[0], IdentityConfigStateBackendService_WatchConfig_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[emptypb.Empty, ironmaiden.Config]{ClientStream: stream}
+	x := &grpc.GenericClientStream[emptypb.Empty, identity.Config]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -278,124 +278,124 @@ func (c *ironmaidenConfigStateBackendServiceClient) WatchConfig(ctx context.Cont
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type IronmaidenConfigStateBackendService_WatchConfigClient = grpc.ServerStreamingClient[ironmaiden.Config]
+type IdentityConfigStateBackendService_WatchConfigClient = grpc.ServerStreamingClient[identity.Config]
 
-// IronmaidenConfigStateBackendServiceServer is the server API for IronmaidenConfigStateBackendService service.
-// All implementations must embed UnimplementedIronmaidenConfigStateBackendServiceServer
+// IdentityConfigStateBackendServiceServer is the server API for IdentityConfigStateBackendService service.
+// All implementations must embed UnimplementedIdentityConfigStateBackendServiceServer
 // for forward compatibility.
-type IronmaidenConfigStateBackendServiceServer interface {
+type IdentityConfigStateBackendServiceServer interface {
 	// Singleton: Config
-	GetConfig(context.Context, *emptypb.Empty) (*ironmaiden.Config, error)
-	SetConfig(context.Context, *ironmaiden.Config) (*ironmaiden.Config, error)
-	WatchConfig(*emptypb.Empty, grpc.ServerStreamingServer[ironmaiden.Config]) error
-	mustEmbedUnimplementedIronmaidenConfigStateBackendServiceServer()
+	GetConfig(context.Context, *emptypb.Empty) (*identity.Config, error)
+	SetConfig(context.Context, *identity.Config) (*identity.Config, error)
+	WatchConfig(*emptypb.Empty, grpc.ServerStreamingServer[identity.Config]) error
+	mustEmbedUnimplementedIdentityConfigStateBackendServiceServer()
 }
 
-// UnimplementedIronmaidenConfigStateBackendServiceServer must be embedded to have
+// UnimplementedIdentityConfigStateBackendServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedIronmaidenConfigStateBackendServiceServer struct{}
+type UnimplementedIdentityConfigStateBackendServiceServer struct{}
 
-func (UnimplementedIronmaidenConfigStateBackendServiceServer) GetConfig(context.Context, *emptypb.Empty) (*ironmaiden.Config, error) {
+func (UnimplementedIdentityConfigStateBackendServiceServer) GetConfig(context.Context, *emptypb.Empty) (*identity.Config, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetConfig not implemented")
 }
-func (UnimplementedIronmaidenConfigStateBackendServiceServer) SetConfig(context.Context, *ironmaiden.Config) (*ironmaiden.Config, error) {
+func (UnimplementedIdentityConfigStateBackendServiceServer) SetConfig(context.Context, *identity.Config) (*identity.Config, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetConfig not implemented")
 }
-func (UnimplementedIronmaidenConfigStateBackendServiceServer) WatchConfig(*emptypb.Empty, grpc.ServerStreamingServer[ironmaiden.Config]) error {
+func (UnimplementedIdentityConfigStateBackendServiceServer) WatchConfig(*emptypb.Empty, grpc.ServerStreamingServer[identity.Config]) error {
 	return status.Error(codes.Unimplemented, "method WatchConfig not implemented")
 }
-func (UnimplementedIronmaidenConfigStateBackendServiceServer) mustEmbedUnimplementedIronmaidenConfigStateBackendServiceServer() {
+func (UnimplementedIdentityConfigStateBackendServiceServer) mustEmbedUnimplementedIdentityConfigStateBackendServiceServer() {
 }
-func (UnimplementedIronmaidenConfigStateBackendServiceServer) testEmbeddedByValue() {}
+func (UnimplementedIdentityConfigStateBackendServiceServer) testEmbeddedByValue() {}
 
-// UnsafeIronmaidenConfigStateBackendServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to IronmaidenConfigStateBackendServiceServer will
+// UnsafeIdentityConfigStateBackendServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to IdentityConfigStateBackendServiceServer will
 // result in compilation errors.
-type UnsafeIronmaidenConfigStateBackendServiceServer interface {
-	mustEmbedUnimplementedIronmaidenConfigStateBackendServiceServer()
+type UnsafeIdentityConfigStateBackendServiceServer interface {
+	mustEmbedUnimplementedIdentityConfigStateBackendServiceServer()
 }
 
-func RegisterIronmaidenConfigStateBackendServiceServer(s grpc.ServiceRegistrar, srv IronmaidenConfigStateBackendServiceServer) {
-	// If the following call panics, it indicates UnimplementedIronmaidenConfigStateBackendServiceServer was
+func RegisterIdentityConfigStateBackendServiceServer(s grpc.ServiceRegistrar, srv IdentityConfigStateBackendServiceServer) {
+	// If the following call panics, it indicates UnimplementedIdentityConfigStateBackendServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&IronmaidenConfigStateBackendService_ServiceDesc, srv)
+	s.RegisterService(&IdentityConfigStateBackendService_ServiceDesc, srv)
 }
 
-func _IronmaidenConfigStateBackendService_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _IdentityConfigStateBackendService_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(IronmaidenConfigStateBackendServiceServer).GetConfig(ctx, in)
+		return srv.(IdentityConfigStateBackendServiceServer).GetConfig(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: IronmaidenConfigStateBackendService_GetConfig_FullMethodName,
+		FullMethod: IdentityConfigStateBackendService_GetConfig_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IronmaidenConfigStateBackendServiceServer).GetConfig(ctx, req.(*emptypb.Empty))
+		return srv.(IdentityConfigStateBackendServiceServer).GetConfig(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _IronmaidenConfigStateBackendService_SetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ironmaiden.Config)
+func _IdentityConfigStateBackendService_SetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(identity.Config)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(IronmaidenConfigStateBackendServiceServer).SetConfig(ctx, in)
+		return srv.(IdentityConfigStateBackendServiceServer).SetConfig(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: IronmaidenConfigStateBackendService_SetConfig_FullMethodName,
+		FullMethod: IdentityConfigStateBackendService_SetConfig_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IronmaidenConfigStateBackendServiceServer).SetConfig(ctx, req.(*ironmaiden.Config))
+		return srv.(IdentityConfigStateBackendServiceServer).SetConfig(ctx, req.(*identity.Config))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _IronmaidenConfigStateBackendService_WatchConfig_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _IdentityConfigStateBackendService_WatchConfig_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(emptypb.Empty)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(IronmaidenConfigStateBackendServiceServer).WatchConfig(m, &grpc.GenericServerStream[emptypb.Empty, ironmaiden.Config]{ServerStream: stream})
+	return srv.(IdentityConfigStateBackendServiceServer).WatchConfig(m, &grpc.GenericServerStream[emptypb.Empty, identity.Config]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type IronmaidenConfigStateBackendService_WatchConfigServer = grpc.ServerStreamingServer[ironmaiden.Config]
+type IdentityConfigStateBackendService_WatchConfigServer = grpc.ServerStreamingServer[identity.Config]
 
-// IronmaidenConfigStateBackendService_ServiceDesc is the grpc.ServiceDesc for IronmaidenConfigStateBackendService service.
+// IdentityConfigStateBackendService_ServiceDesc is the grpc.ServiceDesc for IdentityConfigStateBackendService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var IronmaidenConfigStateBackendService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "config_holder.IronmaidenConfigStateBackendService",
-	HandlerType: (*IronmaidenConfigStateBackendServiceServer)(nil),
+var IdentityConfigStateBackendService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "config_holder.IdentityConfigStateBackendService",
+	HandlerType: (*IdentityConfigStateBackendServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetConfig",
-			Handler:    _IronmaidenConfigStateBackendService_GetConfig_Handler,
+			Handler:    _IdentityConfigStateBackendService_GetConfig_Handler,
 		},
 		{
 			MethodName: "SetConfig",
-			Handler:    _IronmaidenConfigStateBackendService_SetConfig_Handler,
+			Handler:    _IdentityConfigStateBackendService_SetConfig_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "WatchConfig",
-			Handler:       _IronmaidenConfigStateBackendService_WatchConfig_Handler,
+			Handler:       _IdentityConfigStateBackendService_WatchConfig_Handler,
 			ServerStreams: true,
 		},
 	},
@@ -403,56 +403,56 @@ var IronmaidenConfigStateBackendService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	SpringsteenConfigStateBackendService_GetConfig_FullMethodName   = "/config_holder.SpringsteenConfigStateBackendService/GetConfig"
-	SpringsteenConfigStateBackendService_SetConfig_FullMethodName   = "/config_holder.SpringsteenConfigStateBackendService/SetConfig"
-	SpringsteenConfigStateBackendService_WatchConfig_FullMethodName = "/config_holder.SpringsteenConfigStateBackendService/WatchConfig"
+	GatewayConfigStateBackendService_GetConfig_FullMethodName   = "/config_holder.GatewayConfigStateBackendService/GetConfig"
+	GatewayConfigStateBackendService_SetConfig_FullMethodName   = "/config_holder.GatewayConfigStateBackendService/SetConfig"
+	GatewayConfigStateBackendService_WatchConfig_FullMethodName = "/config_holder.GatewayConfigStateBackendService/WatchConfig"
 )
 
-// SpringsteenConfigStateBackendServiceClient is the client API for SpringsteenConfigStateBackendService service.
+// GatewayConfigStateBackendServiceClient is the client API for GatewayConfigStateBackendService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type SpringsteenConfigStateBackendServiceClient interface {
+type GatewayConfigStateBackendServiceClient interface {
 	// Singleton: Config
-	GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*springsteen.Config, error)
-	SetConfig(ctx context.Context, in *springsteen.Config, opts ...grpc.CallOption) (*springsteen.Config, error)
-	WatchConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[springsteen.Config], error)
+	GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*gateway.Config, error)
+	SetConfig(ctx context.Context, in *gateway.Config, opts ...grpc.CallOption) (*gateway.Config, error)
+	WatchConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[gateway.Config], error)
 }
 
-type springsteenConfigStateBackendServiceClient struct {
+type gatewayConfigStateBackendServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewSpringsteenConfigStateBackendServiceClient(cc grpc.ClientConnInterface) SpringsteenConfigStateBackendServiceClient {
-	return &springsteenConfigStateBackendServiceClient{cc}
+func NewGatewayConfigStateBackendServiceClient(cc grpc.ClientConnInterface) GatewayConfigStateBackendServiceClient {
+	return &gatewayConfigStateBackendServiceClient{cc}
 }
 
-func (c *springsteenConfigStateBackendServiceClient) GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*springsteen.Config, error) {
+func (c *gatewayConfigStateBackendServiceClient) GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*gateway.Config, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(springsteen.Config)
-	err := c.cc.Invoke(ctx, SpringsteenConfigStateBackendService_GetConfig_FullMethodName, in, out, cOpts...)
+	out := new(gateway.Config)
+	err := c.cc.Invoke(ctx, GatewayConfigStateBackendService_GetConfig_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *springsteenConfigStateBackendServiceClient) SetConfig(ctx context.Context, in *springsteen.Config, opts ...grpc.CallOption) (*springsteen.Config, error) {
+func (c *gatewayConfigStateBackendServiceClient) SetConfig(ctx context.Context, in *gateway.Config, opts ...grpc.CallOption) (*gateway.Config, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(springsteen.Config)
-	err := c.cc.Invoke(ctx, SpringsteenConfigStateBackendService_SetConfig_FullMethodName, in, out, cOpts...)
+	out := new(gateway.Config)
+	err := c.cc.Invoke(ctx, GatewayConfigStateBackendService_SetConfig_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *springsteenConfigStateBackendServiceClient) WatchConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[springsteen.Config], error) {
+func (c *gatewayConfigStateBackendServiceClient) WatchConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[gateway.Config], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &SpringsteenConfigStateBackendService_ServiceDesc.Streams[0], SpringsteenConfigStateBackendService_WatchConfig_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &GatewayConfigStateBackendService_ServiceDesc.Streams[0], GatewayConfigStateBackendService_WatchConfig_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[emptypb.Empty, springsteen.Config]{ClientStream: stream}
+	x := &grpc.GenericClientStream[emptypb.Empty, gateway.Config]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -463,124 +463,124 @@ func (c *springsteenConfigStateBackendServiceClient) WatchConfig(ctx context.Con
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type SpringsteenConfigStateBackendService_WatchConfigClient = grpc.ServerStreamingClient[springsteen.Config]
+type GatewayConfigStateBackendService_WatchConfigClient = grpc.ServerStreamingClient[gateway.Config]
 
-// SpringsteenConfigStateBackendServiceServer is the server API for SpringsteenConfigStateBackendService service.
-// All implementations must embed UnimplementedSpringsteenConfigStateBackendServiceServer
+// GatewayConfigStateBackendServiceServer is the server API for GatewayConfigStateBackendService service.
+// All implementations must embed UnimplementedGatewayConfigStateBackendServiceServer
 // for forward compatibility.
-type SpringsteenConfigStateBackendServiceServer interface {
+type GatewayConfigStateBackendServiceServer interface {
 	// Singleton: Config
-	GetConfig(context.Context, *emptypb.Empty) (*springsteen.Config, error)
-	SetConfig(context.Context, *springsteen.Config) (*springsteen.Config, error)
-	WatchConfig(*emptypb.Empty, grpc.ServerStreamingServer[springsteen.Config]) error
-	mustEmbedUnimplementedSpringsteenConfigStateBackendServiceServer()
+	GetConfig(context.Context, *emptypb.Empty) (*gateway.Config, error)
+	SetConfig(context.Context, *gateway.Config) (*gateway.Config, error)
+	WatchConfig(*emptypb.Empty, grpc.ServerStreamingServer[gateway.Config]) error
+	mustEmbedUnimplementedGatewayConfigStateBackendServiceServer()
 }
 
-// UnimplementedSpringsteenConfigStateBackendServiceServer must be embedded to have
+// UnimplementedGatewayConfigStateBackendServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedSpringsteenConfigStateBackendServiceServer struct{}
+type UnimplementedGatewayConfigStateBackendServiceServer struct{}
 
-func (UnimplementedSpringsteenConfigStateBackendServiceServer) GetConfig(context.Context, *emptypb.Empty) (*springsteen.Config, error) {
+func (UnimplementedGatewayConfigStateBackendServiceServer) GetConfig(context.Context, *emptypb.Empty) (*gateway.Config, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetConfig not implemented")
 }
-func (UnimplementedSpringsteenConfigStateBackendServiceServer) SetConfig(context.Context, *springsteen.Config) (*springsteen.Config, error) {
+func (UnimplementedGatewayConfigStateBackendServiceServer) SetConfig(context.Context, *gateway.Config) (*gateway.Config, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetConfig not implemented")
 }
-func (UnimplementedSpringsteenConfigStateBackendServiceServer) WatchConfig(*emptypb.Empty, grpc.ServerStreamingServer[springsteen.Config]) error {
+func (UnimplementedGatewayConfigStateBackendServiceServer) WatchConfig(*emptypb.Empty, grpc.ServerStreamingServer[gateway.Config]) error {
 	return status.Error(codes.Unimplemented, "method WatchConfig not implemented")
 }
-func (UnimplementedSpringsteenConfigStateBackendServiceServer) mustEmbedUnimplementedSpringsteenConfigStateBackendServiceServer() {
+func (UnimplementedGatewayConfigStateBackendServiceServer) mustEmbedUnimplementedGatewayConfigStateBackendServiceServer() {
 }
-func (UnimplementedSpringsteenConfigStateBackendServiceServer) testEmbeddedByValue() {}
+func (UnimplementedGatewayConfigStateBackendServiceServer) testEmbeddedByValue() {}
 
-// UnsafeSpringsteenConfigStateBackendServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to SpringsteenConfigStateBackendServiceServer will
+// UnsafeGatewayConfigStateBackendServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to GatewayConfigStateBackendServiceServer will
 // result in compilation errors.
-type UnsafeSpringsteenConfigStateBackendServiceServer interface {
-	mustEmbedUnimplementedSpringsteenConfigStateBackendServiceServer()
+type UnsafeGatewayConfigStateBackendServiceServer interface {
+	mustEmbedUnimplementedGatewayConfigStateBackendServiceServer()
 }
 
-func RegisterSpringsteenConfigStateBackendServiceServer(s grpc.ServiceRegistrar, srv SpringsteenConfigStateBackendServiceServer) {
-	// If the following call panics, it indicates UnimplementedSpringsteenConfigStateBackendServiceServer was
+func RegisterGatewayConfigStateBackendServiceServer(s grpc.ServiceRegistrar, srv GatewayConfigStateBackendServiceServer) {
+	// If the following call panics, it indicates UnimplementedGatewayConfigStateBackendServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&SpringsteenConfigStateBackendService_ServiceDesc, srv)
+	s.RegisterService(&GatewayConfigStateBackendService_ServiceDesc, srv)
 }
 
-func _SpringsteenConfigStateBackendService_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _GatewayConfigStateBackendService_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SpringsteenConfigStateBackendServiceServer).GetConfig(ctx, in)
+		return srv.(GatewayConfigStateBackendServiceServer).GetConfig(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SpringsteenConfigStateBackendService_GetConfig_FullMethodName,
+		FullMethod: GatewayConfigStateBackendService_GetConfig_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SpringsteenConfigStateBackendServiceServer).GetConfig(ctx, req.(*emptypb.Empty))
+		return srv.(GatewayConfigStateBackendServiceServer).GetConfig(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SpringsteenConfigStateBackendService_SetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(springsteen.Config)
+func _GatewayConfigStateBackendService_SetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(gateway.Config)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SpringsteenConfigStateBackendServiceServer).SetConfig(ctx, in)
+		return srv.(GatewayConfigStateBackendServiceServer).SetConfig(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SpringsteenConfigStateBackendService_SetConfig_FullMethodName,
+		FullMethod: GatewayConfigStateBackendService_SetConfig_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SpringsteenConfigStateBackendServiceServer).SetConfig(ctx, req.(*springsteen.Config))
+		return srv.(GatewayConfigStateBackendServiceServer).SetConfig(ctx, req.(*gateway.Config))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SpringsteenConfigStateBackendService_WatchConfig_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _GatewayConfigStateBackendService_WatchConfig_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(emptypb.Empty)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(SpringsteenConfigStateBackendServiceServer).WatchConfig(m, &grpc.GenericServerStream[emptypb.Empty, springsteen.Config]{ServerStream: stream})
+	return srv.(GatewayConfigStateBackendServiceServer).WatchConfig(m, &grpc.GenericServerStream[emptypb.Empty, gateway.Config]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type SpringsteenConfigStateBackendService_WatchConfigServer = grpc.ServerStreamingServer[springsteen.Config]
+type GatewayConfigStateBackendService_WatchConfigServer = grpc.ServerStreamingServer[gateway.Config]
 
-// SpringsteenConfigStateBackendService_ServiceDesc is the grpc.ServiceDesc for SpringsteenConfigStateBackendService service.
+// GatewayConfigStateBackendService_ServiceDesc is the grpc.ServiceDesc for GatewayConfigStateBackendService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var SpringsteenConfigStateBackendService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "config_holder.SpringsteenConfigStateBackendService",
-	HandlerType: (*SpringsteenConfigStateBackendServiceServer)(nil),
+var GatewayConfigStateBackendService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "config_holder.GatewayConfigStateBackendService",
+	HandlerType: (*GatewayConfigStateBackendServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetConfig",
-			Handler:    _SpringsteenConfigStateBackendService_GetConfig_Handler,
+			Handler:    _GatewayConfigStateBackendService_GetConfig_Handler,
 		},
 		{
 			MethodName: "SetConfig",
-			Handler:    _SpringsteenConfigStateBackendService_SetConfig_Handler,
+			Handler:    _GatewayConfigStateBackendService_SetConfig_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "WatchConfig",
-			Handler:       _SpringsteenConfigStateBackendService_WatchConfig_Handler,
+			Handler:       _GatewayConfigStateBackendService_WatchConfig_Handler,
 			ServerStreams: true,
 		},
 	},
@@ -588,56 +588,56 @@ var SpringsteenConfigStateBackendService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	GenesisConfigStateBackendService_GetConfig_FullMethodName   = "/config_holder.GenesisConfigStateBackendService/GetConfig"
-	GenesisConfigStateBackendService_SetConfig_FullMethodName   = "/config_holder.GenesisConfigStateBackendService/SetConfig"
-	GenesisConfigStateBackendService_WatchConfig_FullMethodName = "/config_holder.GenesisConfigStateBackendService/WatchConfig"
+	LetsencryptConfigStateBackendService_GetConfig_FullMethodName   = "/config_holder.LetsencryptConfigStateBackendService/GetConfig"
+	LetsencryptConfigStateBackendService_SetConfig_FullMethodName   = "/config_holder.LetsencryptConfigStateBackendService/SetConfig"
+	LetsencryptConfigStateBackendService_WatchConfig_FullMethodName = "/config_holder.LetsencryptConfigStateBackendService/WatchConfig"
 )
 
-// GenesisConfigStateBackendServiceClient is the client API for GenesisConfigStateBackendService service.
+// LetsencryptConfigStateBackendServiceClient is the client API for LetsencryptConfigStateBackendService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type GenesisConfigStateBackendServiceClient interface {
+type LetsencryptConfigStateBackendServiceClient interface {
 	// Singleton: Config
-	GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*genesis.Config, error)
-	SetConfig(ctx context.Context, in *genesis.Config, opts ...grpc.CallOption) (*genesis.Config, error)
-	WatchConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[genesis.Config], error)
+	GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*letsencrypt.Config, error)
+	SetConfig(ctx context.Context, in *letsencrypt.Config, opts ...grpc.CallOption) (*letsencrypt.Config, error)
+	WatchConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[letsencrypt.Config], error)
 }
 
-type genesisConfigStateBackendServiceClient struct {
+type letsencryptConfigStateBackendServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewGenesisConfigStateBackendServiceClient(cc grpc.ClientConnInterface) GenesisConfigStateBackendServiceClient {
-	return &genesisConfigStateBackendServiceClient{cc}
+func NewLetsencryptConfigStateBackendServiceClient(cc grpc.ClientConnInterface) LetsencryptConfigStateBackendServiceClient {
+	return &letsencryptConfigStateBackendServiceClient{cc}
 }
 
-func (c *genesisConfigStateBackendServiceClient) GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*genesis.Config, error) {
+func (c *letsencryptConfigStateBackendServiceClient) GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*letsencrypt.Config, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(genesis.Config)
-	err := c.cc.Invoke(ctx, GenesisConfigStateBackendService_GetConfig_FullMethodName, in, out, cOpts...)
+	out := new(letsencrypt.Config)
+	err := c.cc.Invoke(ctx, LetsencryptConfigStateBackendService_GetConfig_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *genesisConfigStateBackendServiceClient) SetConfig(ctx context.Context, in *genesis.Config, opts ...grpc.CallOption) (*genesis.Config, error) {
+func (c *letsencryptConfigStateBackendServiceClient) SetConfig(ctx context.Context, in *letsencrypt.Config, opts ...grpc.CallOption) (*letsencrypt.Config, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(genesis.Config)
-	err := c.cc.Invoke(ctx, GenesisConfigStateBackendService_SetConfig_FullMethodName, in, out, cOpts...)
+	out := new(letsencrypt.Config)
+	err := c.cc.Invoke(ctx, LetsencryptConfigStateBackendService_SetConfig_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *genesisConfigStateBackendServiceClient) WatchConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[genesis.Config], error) {
+func (c *letsencryptConfigStateBackendServiceClient) WatchConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[letsencrypt.Config], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &GenesisConfigStateBackendService_ServiceDesc.Streams[0], GenesisConfigStateBackendService_WatchConfig_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &LetsencryptConfigStateBackendService_ServiceDesc.Streams[0], LetsencryptConfigStateBackendService_WatchConfig_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[emptypb.Empty, genesis.Config]{ClientStream: stream}
+	x := &grpc.GenericClientStream[emptypb.Empty, letsencrypt.Config]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -648,124 +648,124 @@ func (c *genesisConfigStateBackendServiceClient) WatchConfig(ctx context.Context
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type GenesisConfigStateBackendService_WatchConfigClient = grpc.ServerStreamingClient[genesis.Config]
+type LetsencryptConfigStateBackendService_WatchConfigClient = grpc.ServerStreamingClient[letsencrypt.Config]
 
-// GenesisConfigStateBackendServiceServer is the server API for GenesisConfigStateBackendService service.
-// All implementations must embed UnimplementedGenesisConfigStateBackendServiceServer
+// LetsencryptConfigStateBackendServiceServer is the server API for LetsencryptConfigStateBackendService service.
+// All implementations must embed UnimplementedLetsencryptConfigStateBackendServiceServer
 // for forward compatibility.
-type GenesisConfigStateBackendServiceServer interface {
+type LetsencryptConfigStateBackendServiceServer interface {
 	// Singleton: Config
-	GetConfig(context.Context, *emptypb.Empty) (*genesis.Config, error)
-	SetConfig(context.Context, *genesis.Config) (*genesis.Config, error)
-	WatchConfig(*emptypb.Empty, grpc.ServerStreamingServer[genesis.Config]) error
-	mustEmbedUnimplementedGenesisConfigStateBackendServiceServer()
+	GetConfig(context.Context, *emptypb.Empty) (*letsencrypt.Config, error)
+	SetConfig(context.Context, *letsencrypt.Config) (*letsencrypt.Config, error)
+	WatchConfig(*emptypb.Empty, grpc.ServerStreamingServer[letsencrypt.Config]) error
+	mustEmbedUnimplementedLetsencryptConfigStateBackendServiceServer()
 }
 
-// UnimplementedGenesisConfigStateBackendServiceServer must be embedded to have
+// UnimplementedLetsencryptConfigStateBackendServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedGenesisConfigStateBackendServiceServer struct{}
+type UnimplementedLetsencryptConfigStateBackendServiceServer struct{}
 
-func (UnimplementedGenesisConfigStateBackendServiceServer) GetConfig(context.Context, *emptypb.Empty) (*genesis.Config, error) {
+func (UnimplementedLetsencryptConfigStateBackendServiceServer) GetConfig(context.Context, *emptypb.Empty) (*letsencrypt.Config, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetConfig not implemented")
 }
-func (UnimplementedGenesisConfigStateBackendServiceServer) SetConfig(context.Context, *genesis.Config) (*genesis.Config, error) {
+func (UnimplementedLetsencryptConfigStateBackendServiceServer) SetConfig(context.Context, *letsencrypt.Config) (*letsencrypt.Config, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetConfig not implemented")
 }
-func (UnimplementedGenesisConfigStateBackendServiceServer) WatchConfig(*emptypb.Empty, grpc.ServerStreamingServer[genesis.Config]) error {
+func (UnimplementedLetsencryptConfigStateBackendServiceServer) WatchConfig(*emptypb.Empty, grpc.ServerStreamingServer[letsencrypt.Config]) error {
 	return status.Error(codes.Unimplemented, "method WatchConfig not implemented")
 }
-func (UnimplementedGenesisConfigStateBackendServiceServer) mustEmbedUnimplementedGenesisConfigStateBackendServiceServer() {
+func (UnimplementedLetsencryptConfigStateBackendServiceServer) mustEmbedUnimplementedLetsencryptConfigStateBackendServiceServer() {
 }
-func (UnimplementedGenesisConfigStateBackendServiceServer) testEmbeddedByValue() {}
+func (UnimplementedLetsencryptConfigStateBackendServiceServer) testEmbeddedByValue() {}
 
-// UnsafeGenesisConfigStateBackendServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to GenesisConfigStateBackendServiceServer will
+// UnsafeLetsencryptConfigStateBackendServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to LetsencryptConfigStateBackendServiceServer will
 // result in compilation errors.
-type UnsafeGenesisConfigStateBackendServiceServer interface {
-	mustEmbedUnimplementedGenesisConfigStateBackendServiceServer()
+type UnsafeLetsencryptConfigStateBackendServiceServer interface {
+	mustEmbedUnimplementedLetsencryptConfigStateBackendServiceServer()
 }
 
-func RegisterGenesisConfigStateBackendServiceServer(s grpc.ServiceRegistrar, srv GenesisConfigStateBackendServiceServer) {
-	// If the following call panics, it indicates UnimplementedGenesisConfigStateBackendServiceServer was
+func RegisterLetsencryptConfigStateBackendServiceServer(s grpc.ServiceRegistrar, srv LetsencryptConfigStateBackendServiceServer) {
+	// If the following call panics, it indicates UnimplementedLetsencryptConfigStateBackendServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&GenesisConfigStateBackendService_ServiceDesc, srv)
+	s.RegisterService(&LetsencryptConfigStateBackendService_ServiceDesc, srv)
 }
 
-func _GenesisConfigStateBackendService_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _LetsencryptConfigStateBackendService_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GenesisConfigStateBackendServiceServer).GetConfig(ctx, in)
+		return srv.(LetsencryptConfigStateBackendServiceServer).GetConfig(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: GenesisConfigStateBackendService_GetConfig_FullMethodName,
+		FullMethod: LetsencryptConfigStateBackendService_GetConfig_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GenesisConfigStateBackendServiceServer).GetConfig(ctx, req.(*emptypb.Empty))
+		return srv.(LetsencryptConfigStateBackendServiceServer).GetConfig(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _GenesisConfigStateBackendService_SetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(genesis.Config)
+func _LetsencryptConfigStateBackendService_SetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(letsencrypt.Config)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GenesisConfigStateBackendServiceServer).SetConfig(ctx, in)
+		return srv.(LetsencryptConfigStateBackendServiceServer).SetConfig(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: GenesisConfigStateBackendService_SetConfig_FullMethodName,
+		FullMethod: LetsencryptConfigStateBackendService_SetConfig_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GenesisConfigStateBackendServiceServer).SetConfig(ctx, req.(*genesis.Config))
+		return srv.(LetsencryptConfigStateBackendServiceServer).SetConfig(ctx, req.(*letsencrypt.Config))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _GenesisConfigStateBackendService_WatchConfig_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _LetsencryptConfigStateBackendService_WatchConfig_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(emptypb.Empty)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(GenesisConfigStateBackendServiceServer).WatchConfig(m, &grpc.GenericServerStream[emptypb.Empty, genesis.Config]{ServerStream: stream})
+	return srv.(LetsencryptConfigStateBackendServiceServer).WatchConfig(m, &grpc.GenericServerStream[emptypb.Empty, letsencrypt.Config]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type GenesisConfigStateBackendService_WatchConfigServer = grpc.ServerStreamingServer[genesis.Config]
+type LetsencryptConfigStateBackendService_WatchConfigServer = grpc.ServerStreamingServer[letsencrypt.Config]
 
-// GenesisConfigStateBackendService_ServiceDesc is the grpc.ServiceDesc for GenesisConfigStateBackendService service.
+// LetsencryptConfigStateBackendService_ServiceDesc is the grpc.ServiceDesc for LetsencryptConfigStateBackendService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var GenesisConfigStateBackendService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "config_holder.GenesisConfigStateBackendService",
-	HandlerType: (*GenesisConfigStateBackendServiceServer)(nil),
+var LetsencryptConfigStateBackendService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "config_holder.LetsencryptConfigStateBackendService",
+	HandlerType: (*LetsencryptConfigStateBackendServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetConfig",
-			Handler:    _GenesisConfigStateBackendService_GetConfig_Handler,
+			Handler:    _LetsencryptConfigStateBackendService_GetConfig_Handler,
 		},
 		{
 			MethodName: "SetConfig",
-			Handler:    _GenesisConfigStateBackendService_SetConfig_Handler,
+			Handler:    _LetsencryptConfigStateBackendService_SetConfig_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "WatchConfig",
-			Handler:       _GenesisConfigStateBackendService_WatchConfig_Handler,
+			Handler:       _LetsencryptConfigStateBackendService_WatchConfig_Handler,
 			ServerStreams: true,
 		},
 	},

@@ -20,8 +20,8 @@ import (
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
-	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
-	opa "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/opa"
+	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
+	opa "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/opa"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
@@ -1195,7 +1195,6 @@ func EvaluatePolicyResponseToTOML(v *EvaluatePolicyResponse) ([]byte, error) {
 // MARKER: JSON helper struct generated from serial.go
 type getpoliciesresponseJSON struct {
 	EntitlementsPolicy json.RawMessage `json:"entitlements_policy,omitempty"`
-	ClaimMappingPolicy json.RawMessage `json:"claim_mapping_policy,omitempty"`
 }
 
 // GetPoliciesResponseToJSON converts GetPoliciesResponse to JSON bytes.
@@ -1211,13 +1210,6 @@ func GetPoliciesResponseToJSON(v *GetPoliciesResponse) ([]byte, error) {
 				return nil
 			}
 			data, _ := opa.OpaPolicyToJSON(v.EntitlementsPolicy)
-			return data
-		}(),
-		ClaimMappingPolicy: func() json.RawMessage {
-			if v.ClaimMappingPolicy == nil {
-				return nil
-			}
-			data, _ := opa.OpaPolicyToJSON(v.ClaimMappingPolicy)
 			return data
 		}(),
 	}
@@ -1289,13 +1281,6 @@ func GetPoliciesResponseFromJSON(data []byte) (*GetPoliciesResponse, error) {
 		parsed, err := opa.OpaPolicyFromJSON(raw.EntitlementsPolicy)
 		if err == nil {
 			result.EntitlementsPolicy = parsed
-		}
-	}
-	// Parse message field: ClaimMappingPolicy
-	if len(raw.ClaimMappingPolicy) > 0 {
-		parsed, err := opa.OpaPolicyFromJSON(raw.ClaimMappingPolicy)
-		if err == nil {
-			result.ClaimMappingPolicy = parsed
 		}
 	}
 	return result, nil
@@ -1563,11 +1548,6 @@ func GetPoliciesResponseToEnvVar(v *GetPoliciesResponse) map[string]string {
 			result[k] = val
 		}
 	}
-	if v.ClaimMappingPolicy != nil {
-		for k, val := range opa.OpaPolicyToEnvVar(v.ClaimMappingPolicy) {
-			result[k] = val
-		}
-	}
 	return result
 }
 
@@ -1578,11 +1558,6 @@ func GetPoliciesResponseFromEnvVar(env map[string]string) (*GetPoliciesResponse,
 		return nil, err
 	} else if sub != nil {
 		result.EntitlementsPolicy = sub
-	}
-	if sub, err := opa.OpaPolicyFromEnvVar(env); err != nil {
-		return nil, err
-	} else if sub != nil {
-		result.ClaimMappingPolicy = sub
 	}
 	return result, nil
 }
@@ -1715,24 +1690,24 @@ func ValidateEvaluatePolicyRequest(m *EvaluatePolicyRequest) error {
 		return nil
 	}
 
-	// Validate RegoSource (assert_max_length: 65536)
-	if len(m.RegoSource) > 65536 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field RegoSource must be at most 65536 characters, got: %d", len(m.RegoSource))
-	}
-
 	// Validate RegoSource (assert_required)
 	if m.RegoSource == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RegoSource is required")
 	}
 
-	// Validate InputJson (assert_max_length: 65536)
-	if len(m.InputJson) > 65536 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field InputJson must be at most 65536 characters, got: %d", len(m.InputJson))
+	// Validate RegoSource (assert_max_length: 65536)
+	if len(m.RegoSource) > 65536 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field RegoSource must be at most 65536 characters, got: %d", len(m.RegoSource))
 	}
 
 	// Validate InputJson (assert_required)
 	if m.InputJson == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field InputJson is required")
+	}
+
+	// Validate InputJson (assert_max_length: 65536)
+	if len(m.InputJson) > 65536 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field InputJson must be at most 65536 characters, got: %d", len(m.InputJson))
 	}
 
 	// Validate Query (assert_max_length: 1024)
@@ -1924,8 +1899,5 @@ func MergeEvaluatePolicyResponse(dst, src *EvaluatePolicyResponse) {
 func MergeGetPoliciesResponse(dst, src *GetPoliciesResponse) {
 	if dst.EntitlementsPolicy == nil {
 		dst.EntitlementsPolicy = src.EntitlementsPolicy
-	}
-	if dst.ClaimMappingPolicy == nil {
-		dst.ClaimMappingPolicy = src.ClaimMappingPolicy
 	}
 }

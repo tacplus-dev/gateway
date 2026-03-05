@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/routes"
+	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/routes"
 )
 
 // NewGateway creates a grpc-gateway ServeMux and registers all downstream

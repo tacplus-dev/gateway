@@ -19,8 +19,8 @@ package jwkview
 import (
 	"sync"
 
-	wrapperJwk "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/libs/jwk"
-	jwkpb "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/jwk"
+	wrapperJwk "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/jwk"
+	jwkpb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/jwk"
 	"go.uber.org/zap"
 )
 

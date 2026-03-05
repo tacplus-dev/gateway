@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/routes"
+	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/routes"
 )
 
 // TransparentHandler returns a grpc.StreamHandler that forwards all unknown
@@ -20,7 +20,7 @@ import (
 // service_id from the method name and uses the health resolver to find healthy
 // backend endpoints.
 //
-// Auth metadata is passed through as-is — springsteen does not inspect tokens.
+// Auth metadata is passed through as-is — gateway does not inspect tokens.
 func TransparentHandler(hr *HealthResolver) grpc.StreamHandler {
 	return func(srv interface{}, serverStream grpc.ServerStream) error {
 		fullMethod, ok := grpc.MethodFromServerStream(serverStream)

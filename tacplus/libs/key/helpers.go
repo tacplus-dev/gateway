@@ -41,8 +41,8 @@ import (
 	"encoding/pem"
 	"time"
 
-	protoKey "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/key"
-	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
+	protoKey "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/key"
+	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
 )
 
 // NewPublicKey creates a new PublicKey from a public cryptographic key.
