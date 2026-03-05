@@ -8337,6 +8337,11 @@ func ValidateProviderConfig(m *ProviderConfig) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Name must be at least 1 characters, got: %d", len(m.Name))
 	}
 
+	// Validate Issuer (assert_required)
+	if m.Issuer == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
+	}
+
 	// Validate Issuer (assert_url: URL_SCHEME_HTTPS)
 	if m.Issuer != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.Issuer); err != nil {
@@ -8344,19 +8349,14 @@ func ValidateProviderConfig(m *ProviderConfig) error {
 		}
 	}
 
-	// Validate Issuer (assert_required)
-	if m.Issuer == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
+	// Validate ClientId (assert_min_length: 1)
+	if len(m.ClientId) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field ClientId must be at least 1 characters, got: %d", len(m.ClientId))
 	}
 
 	// Validate ClientId (assert_required)
 	if m.ClientId == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ClientId is required")
-	}
-
-	// Validate ClientId (assert_min_length: 1)
-	if len(m.ClientId) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field ClientId must be at least 1 characters, got: %d", len(m.ClientId))
 	}
 
 	// Validate ClientSecret (assert_required)
@@ -8665,14 +8665,14 @@ func ValidateCallbackResponse(m *CallbackResponse) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken must be at least 1 characters, got: %d", len(m.RefreshToken))
 	}
 
-	// Validate AccessToken (assert_min_length: 1)
-	if len(m.AccessToken) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
-	}
-
 	// Validate AccessToken (assert_required)
 	if m.AccessToken == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
+	}
+
+	// Validate AccessToken (assert_min_length: 1)
+	if len(m.AccessToken) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
 	}
 
 	// Validate CallbackUrl (assert_required)

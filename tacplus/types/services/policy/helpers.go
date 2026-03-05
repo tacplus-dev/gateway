@@ -1700,14 +1700,14 @@ func ValidateEvaluatePolicyRequest(m *EvaluatePolicyRequest) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RegoSource is required")
 	}
 
-	// Validate InputJson (assert_required)
-	if m.InputJson == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field InputJson is required")
-	}
-
 	// Validate InputJson (assert_max_length: 65536)
 	if len(m.InputJson) > 65536 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field InputJson must be at most 65536 characters, got: %d", len(m.InputJson))
+	}
+
+	// Validate InputJson (assert_required)
+	if m.InputJson == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field InputJson is required")
 	}
 
 	// Validate Query (assert_max_length: 1024)

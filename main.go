@@ -18,6 +18,7 @@ import (
 	"github.com/quic-go/quic-go/http3"
 	gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/internal"
 	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/logger"
+	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/serviceconfig"
 	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/servicemanager"
 	x509wrapper "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/x509"
 	serviceconfig_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/serviceconfig"
@@ -39,31 +40,27 @@ func main() {
 }
 
 func run() error {
-	// 1. Load serviceconfig (both Config and BootstrapConfig from the same YAML).
-	configPath := resolveConfigPath()
-	if configPath == "" {
-		return fmt.Errorf("no config: use --config flag or set SERVICE_CONFIG env var")
+	// 1. Load serviceconfig via generated loaders (-c/--config flag or BOOTSTRAP_CONFIG env var).
+	bsCfg, err := serviceconfig.LoadBootstrapConfig()
+	if err != nil {
+		return fmt.Errorf("bootstrap config: %w", err)
 	}
 
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("reading config %s: %w", configPath, err)
+	cfg, _ := serviceconfig.LoadLocalConfig()
+	if cfg == nil {
+		cfg = &serviceconfig_pb.Config{}
 	}
+	serviceconfig_pb.ConfigDefaults(cfg)
 
-	cfg, err := serviceconfig_pb.ConfigFromBytes(data)
-	if err != nil {
-		return fmt.Errorf("parsing config %s: %w", configPath, err)
+	configData, _ := readConfigFile()
+	gatewayCfg := &gateway_pb.Config{}
+	if configData != nil {
+		gatewayCfg, err = gateway_pb.ConfigFromBytes(configData)
+		if err != nil {
+			return fmt.Errorf("gateway config: %w", err)
+		}
 	}
-
-	bsCfg, err := serviceconfig_pb.BootstrapConfigFromBytes(data)
-	if err != nil {
-		return fmt.Errorf("parsing bootstrap config %s: %w", configPath, err)
-	}
-
-	gatewayCfg, err := gateway_pb.ConfigFromBytes(data)
-	if err != nil {
-		return fmt.Errorf("parsing gateway config %s: %w", configPath, err)
-	}
+	gateway_pb.ConfigDefaults(gatewayCfg)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
@@ -219,8 +216,8 @@ func run() error {
 		zap.L().Info("Shutdown signal received")
 
 		shutdownTimeout := 30 * time.Second
-		if cfg.ShutdownTimeoutSeconds > 0 {
-			shutdownTimeout = time.Duration(cfg.ShutdownTimeoutSeconds) * time.Second
+		if cfg.GetShutdownTimeoutSeconds() > 0 {
+			shutdownTimeout = time.Duration(cfg.GetShutdownTimeoutSeconds()) * time.Second
 		}
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
@@ -245,14 +242,22 @@ func run() error {
 	return g.Wait()
 }
 
-// resolveConfigPath finds the config file path from -c/--config flag or SERVICE_CONFIG env var.
-func resolveConfigPath() string {
+// readConfigFile reads the config file from -c/--config flag or BOOTSTRAP_CONFIG env var.
+func readConfigFile() ([]byte, error) {
+	path := ""
 	for i := 1; i < len(os.Args)-1; i++ {
 		if os.Args[i] == "-c" || os.Args[i] == "--config" {
-			return os.Args[i+1]
+			path = os.Args[i+1]
+			break
 		}
 	}
-	return os.Getenv("SERVICE_CONFIG")
+	if path == "" {
+		path = os.Getenv("BOOTSTRAP_CONFIG")
+	}
+	if path == "" {
+		return nil, nil
+	}
+	return os.ReadFile(path)
 }
 
 // buildHandler returns an HTTP handler that routes:
