@@ -23,6 +23,7 @@ import (
 	entitlement "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/entitlement"
 	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
 	jwk "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/jwk"
+	opa "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/opa"
 	utils "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/utils"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -945,10 +946,185 @@ func ProviderConfigToTOML(v *ProviderConfig) ([]byte, error) {
 	return toml.Marshal(obj)
 }
 
+// EntitlementConfigJSON represents EntitlementConfig in external JSON format (with string enums)
+// MARKER: JSON helper struct generated from serial.go
+type entitlementconfigJSON struct {
+	EntitlementMappings []json.RawMessage `json:"entitlement_mappings,omitempty"`
+	ServiceEntitlements []json.RawMessage `json:"service_entitlements,omitempty"`
+}
+
+// EntitlementConfigToJSON converts EntitlementConfig to JSON bytes.
+// Uses custom JSON helper for friendly enum strings and proper int64 handling.
+func EntitlementConfigToJSON(v *EntitlementConfig) ([]byte, error) {
+	if v == nil {
+		return nil, protoerrors.NewErrMissingInvalidData(nil, "entitlementconfig is nil")
+	}
+	// Convert to JSON helper struct with string enums
+	helper := entitlementconfigJSON{
+		EntitlementMappings: func() []json.RawMessage {
+			if len(v.EntitlementMappings) == 0 {
+				return nil
+			}
+			result := make([]json.RawMessage, 0, len(v.EntitlementMappings))
+			for _, item := range v.EntitlementMappings {
+				if item != nil {
+					if data, err := entitlement.ServiceEntitlementMappingToJSON(item); err == nil {
+						result = append(result, data)
+					}
+				}
+			}
+			return result
+		}(),
+		ServiceEntitlements: func() []json.RawMessage {
+			if len(v.ServiceEntitlements) == 0 {
+				return nil
+			}
+			result := make([]json.RawMessage, 0, len(v.ServiceEntitlements))
+			for _, item := range v.ServiceEntitlements {
+				if item != nil {
+					if data, err := entitlement.ServiceEntitlementsToJSON(item); err == nil {
+						result = append(result, data)
+					}
+				}
+			}
+			return result
+		}(),
+	}
+	return json.Marshal(helper)
+}
+
+// EntitlementConfigFromBytes creates EntitlementConfig from bytes, auto-detecting the format.
+// Supports JSON, YAML, TOML, and binary protobuf formats.
+func EntitlementConfigFromBytes(data []byte) (*EntitlementConfig, error) {
+	// Trim leading whitespace to check format
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 {
+		return nil, protoerrors.NewErrMissingInvalidData(nil, "empty data")
+	}
+	// Try JSON first (most common, starts with { or [)
+	if trimmed[0] == '{' || trimmed[0] == '[' {
+		if result, err := EntitlementConfigFromJSON(data); err == nil {
+			return result, nil
+		}
+	}
+	// Try TOML (try before YAML since YAML is more permissive)
+	var tomlObj any
+	if err := toml.Unmarshal(data, &tomlObj); err == nil {
+		// Convert TOML to JSON, then parse
+		jsonData, err := json.Marshal(tomlObj)
+		if err == nil {
+			if result, err := EntitlementConfigFromJSON(jsonData); err == nil {
+				return result, nil
+			}
+		}
+	}
+	// Try YAML
+	var yamlObj any
+	if err := yaml.Unmarshal(data, &yamlObj); err == nil {
+		// Convert YAML to JSON, then parse
+		jsonData, err := json.Marshal(yamlObj)
+		if err == nil {
+			if result, err := EntitlementConfigFromJSON(jsonData); err == nil {
+				return result, nil
+			}
+		}
+	}
+	// Try binary protobuf
+	v := &EntitlementConfig{}
+	if err := proto.Unmarshal(data, v); err == nil {
+		return v, nil
+	}
+	return nil, protoerrors.NewErrMissingInvalidData(nil, "failed to parse EntitlementConfig: unsupported format or invalid data")
+}
+
+// EntitlementConfigFromJSON creates EntitlementConfig from JSON bytes.
+// Uses standard encoding/json and custom enum parsers for external JSON compatibility.
+func EntitlementConfigFromJSON(data []byte) (*EntitlementConfig, error) {
+	// Unmarshal into helper struct with string enums
+	var raw entitlementconfigJSON
+	if err := json.Unmarshal(data, &raw); err != nil {
+		// Fall back to protojson which handles proto3 JSON conventions
+		// (string-encoded int64/uint64, standard enum names, etc.)
+		v := &EntitlementConfig{}
+		if pErr := protojson.Unmarshal(data, v); pErr != nil {
+			return nil, err
+		}
+		return v, nil
+	}
+	// Build result with parsed enums
+	result := &EntitlementConfig{}
+	// Parse repeated message field: EntitlementMappings
+	if len(raw.EntitlementMappings) > 0 {
+		result.EntitlementMappings = make([]*entitlement.ServiceEntitlementMapping, 0, len(raw.EntitlementMappings))
+		for _, itemJSON := range raw.EntitlementMappings {
+			if len(itemJSON) > 0 {
+				parsed, err := entitlement.ServiceEntitlementMappingFromJSON(itemJSON)
+				if err == nil {
+					result.EntitlementMappings = append(result.EntitlementMappings, parsed)
+				}
+			}
+		}
+	}
+	// Parse repeated message field: ServiceEntitlements
+	if len(raw.ServiceEntitlements) > 0 {
+		result.ServiceEntitlements = make([]*entitlement.ServiceEntitlements, 0, len(raw.ServiceEntitlements))
+		for _, itemJSON := range raw.ServiceEntitlements {
+			if len(itemJSON) > 0 {
+				parsed, err := entitlement.ServiceEntitlementsFromJSON(itemJSON)
+				if err == nil {
+					result.ServiceEntitlements = append(result.ServiceEntitlements, parsed)
+				}
+			}
+		}
+	}
+	return result, nil
+}
+
+// EntitlementConfigToYAML converts EntitlementConfig to YAML bytes.
+// Converts to JSON first, then to YAML for proper protobuf handling.
+func EntitlementConfigToYAML(v *EntitlementConfig) ([]byte, error) {
+	if v == nil {
+		return nil, protoerrors.NewErrMissingInvalidData(nil, "entitlementconfig is nil")
+	}
+	// Convert to JSON first
+	jsonData, err := EntitlementConfigToJSON(v)
+	if err != nil {
+		return nil, err
+	}
+	// Convert JSON to YAML
+	var obj any
+	if err := json.Unmarshal(jsonData, &obj); err != nil {
+		return nil, err
+	}
+	return yaml.Marshal(obj)
+}
+
+// EntitlementConfigToTOML converts EntitlementConfig to TOML bytes.
+// Converts to JSON first, then to TOML for proper protobuf handling.
+func EntitlementConfigToTOML(v *EntitlementConfig) ([]byte, error) {
+	if v == nil {
+		return nil, protoerrors.NewErrMissingInvalidData(nil, "entitlementconfig is nil")
+	}
+	// Convert to JSON first
+	jsonData, err := EntitlementConfigToJSON(v)
+	if err != nil {
+		return nil, err
+	}
+	// Convert JSON to TOML
+	var obj any
+	if err := json.Unmarshal(jsonData, &obj); err != nil {
+		return nil, err
+	}
+	return toml.Marshal(obj)
+}
+
 // IronMaidenStateJSON represents IronMaidenState in external JSON format (with string enums)
 // MARKER: JSON helper struct generated from serial.go
 type ironmaidenstateJSON struct {
-	VerifyingKeys []json.RawMessage `json:"verifying_keys,omitempty"`
+	VerifyingKeys      []json.RawMessage `json:"verifying_keys,omitempty"`
+	EntitlementsPolicy json.RawMessage   `json:"entitlements_policy,omitempty"`
+	ClaimMappingPolicy json.RawMessage   `json:"claim_mapping_policy,omitempty"`
+	EntitlementConfig  json.RawMessage   `json:"entitlement_config,omitempty"`
 }
 
 // IronMaidenStateToJSON converts IronMaidenState to JSON bytes.
@@ -972,6 +1148,27 @@ func IronMaidenStateToJSON(v *IronMaidenState) ([]byte, error) {
 				}
 			}
 			return result
+		}(),
+		EntitlementsPolicy: func() json.RawMessage {
+			if v.EntitlementsPolicy == nil {
+				return nil
+			}
+			data, _ := opa.OpaPolicyToJSON(v.EntitlementsPolicy)
+			return data
+		}(),
+		ClaimMappingPolicy: func() json.RawMessage {
+			if v.ClaimMappingPolicy == nil {
+				return nil
+			}
+			data, _ := opa.OpaPolicyToJSON(v.ClaimMappingPolicy)
+			return data
+		}(),
+		EntitlementConfig: func() json.RawMessage {
+			if v.EntitlementConfig == nil {
+				return nil
+			}
+			data, _ := EntitlementConfigToJSON(v.EntitlementConfig)
+			return data
 		}(),
 	}
 	return json.Marshal(helper)
@@ -1047,6 +1244,27 @@ func IronMaidenStateFromJSON(data []byte) (*IronMaidenState, error) {
 					result.VerifyingKeys = append(result.VerifyingKeys, parsed)
 				}
 			}
+		}
+	}
+	// Parse message field: EntitlementsPolicy
+	if len(raw.EntitlementsPolicy) > 0 {
+		parsed, err := opa.OpaPolicyFromJSON(raw.EntitlementsPolicy)
+		if err == nil {
+			result.EntitlementsPolicy = parsed
+		}
+	}
+	// Parse message field: ClaimMappingPolicy
+	if len(raw.ClaimMappingPolicy) > 0 {
+		parsed, err := opa.OpaPolicyFromJSON(raw.ClaimMappingPolicy)
+		if err == nil {
+			result.ClaimMappingPolicy = parsed
+		}
+	}
+	// Parse message field: EntitlementConfig
+	if len(raw.EntitlementConfig) > 0 {
+		parsed, err := EntitlementConfigFromJSON(raw.EntitlementConfig)
+		if err == nil {
+			result.EntitlementConfig = parsed
 		}
 	}
 	return result, nil
@@ -6961,8 +7179,8 @@ func ProviderConfigFromEnvVar(env map[string]string) (*ProviderConfig, error) {
 	return result, nil
 }
 
-// IronMaidenStateToEnvVar converts IronMaidenState to environment variable key-value pairs.
-func IronMaidenStateToEnvVar(v *IronMaidenState) map[string]string {
+// EntitlementConfigToEnvVar converts EntitlementConfig to environment variable key-value pairs.
+func EntitlementConfigToEnvVar(v *EntitlementConfig) map[string]string {
 	if v == nil {
 		return nil
 	}
@@ -6970,9 +7188,54 @@ func IronMaidenStateToEnvVar(v *IronMaidenState) map[string]string {
 	return result
 }
 
+// EntitlementConfigFromEnvVar creates EntitlementConfig from environment variable key-value pairs.
+func EntitlementConfigFromEnvVar(env map[string]string) (*EntitlementConfig, error) {
+	result := &EntitlementConfig{}
+	return result, nil
+}
+
+// IronMaidenStateToEnvVar converts IronMaidenState to environment variable key-value pairs.
+func IronMaidenStateToEnvVar(v *IronMaidenState) map[string]string {
+	if v == nil {
+		return nil
+	}
+	result := make(map[string]string)
+	if v.EntitlementsPolicy != nil {
+		for k, val := range opa.OpaPolicyToEnvVar(v.EntitlementsPolicy) {
+			result[k] = val
+		}
+	}
+	if v.ClaimMappingPolicy != nil {
+		for k, val := range opa.OpaPolicyToEnvVar(v.ClaimMappingPolicy) {
+			result[k] = val
+		}
+	}
+	if v.EntitlementConfig != nil {
+		for k, val := range EntitlementConfigToEnvVar(v.EntitlementConfig) {
+			result[k] = val
+		}
+	}
+	return result
+}
+
 // IronMaidenStateFromEnvVar creates IronMaidenState from environment variable key-value pairs.
 func IronMaidenStateFromEnvVar(env map[string]string) (*IronMaidenState, error) {
 	result := &IronMaidenState{}
+	if sub, err := opa.OpaPolicyFromEnvVar(env); err != nil {
+		return nil, err
+	} else if sub != nil {
+		result.EntitlementsPolicy = sub
+	}
+	if sub, err := opa.OpaPolicyFromEnvVar(env); err != nil {
+		return nil, err
+	} else if sub != nil {
+		result.ClaimMappingPolicy = sub
+	}
+	if sub, err := EntitlementConfigFromEnvVar(env); err != nil {
+		return nil, err
+	} else if sub != nil {
+		result.EntitlementConfig = sub
+	}
 	return result, nil
 }
 
@@ -8212,6 +8475,17 @@ func ValidateProviderConfig(m *ProviderConfig) error {
 	return nil
 }
 
+// ValidateEntitlementConfig validates all fields in EntitlementConfig according to their annotations.
+// Returns a BlueErr if validation fails, or nil if all validations pass.
+func ValidateEntitlementConfig(m *EntitlementConfig) error {
+	if m == nil {
+		return nil
+	}
+
+	// No field validations defined
+	return nil
+}
+
 // ValidateIronMaidenState validates all fields in IronMaidenState according to their annotations.
 // Returns a BlueErr if validation fails, or nil if all validations pass.
 func ValidateIronMaidenState(m *IronMaidenState) error {
@@ -8418,14 +8692,14 @@ func ValidateCallbackResponse(m *CallbackResponse) error {
 		return nil
 	}
 
-	// Validate RefreshToken (assert_min_length: 1)
-	if len(m.RefreshToken) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken must be at least 1 characters, got: %d", len(m.RefreshToken))
-	}
-
 	// Validate RefreshToken (assert_required)
 	if m.RefreshToken == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken is required")
+	}
+
+	// Validate RefreshToken (assert_min_length: 1)
+	if len(m.RefreshToken) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken must be at least 1 characters, got: %d", len(m.RefreshToken))
 	}
 
 	// Validate AccessToken (assert_required)
@@ -8508,14 +8782,14 @@ func ValidateRefreshTokenResponse(m *RefreshTokenResponse) error {
 		return nil
 	}
 
-	// Validate AccessToken (assert_min_length: 1)
-	if len(m.AccessToken) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
-	}
-
 	// Validate AccessToken (assert_required)
 	if m.AccessToken == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
+	}
+
+	// Validate AccessToken (assert_min_length: 1)
+	if len(m.AccessToken) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
 	}
 
 	// Validate ExpiresIn (assert_gt: 0)
@@ -8591,14 +8865,14 @@ func ValidateExchangeTokenRequest(m *ExchangeTokenRequest) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
 	}
 
-	// Validate Audience (assert_min_length: 1)
-	if len(m.Audience) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Audience must be at least 1 characters, got: %d", len(m.Audience))
-	}
-
 	// Validate Audience (assert_required)
 	if m.Audience == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Audience is required")
+	}
+
+	// Validate Audience (assert_min_length: 1)
+	if len(m.Audience) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Audience must be at least 1 characters, got: %d", len(m.Audience))
 	}
 
 	// Validate AccessToken (default max size: 32768 bytes)
@@ -9190,12 +9464,36 @@ func MergeProviderConfig(dst, src *ProviderConfig) {
 }
 
 // ============================================================
+// Merge: EntitlementConfig
+// ============================================================
+// MergeEntitlementConfig fills zero-valued fields in dst from src.
+func MergeEntitlementConfig(dst, src *EntitlementConfig) {
+	if len(dst.EntitlementMappings) == 0 {
+		dst.EntitlementMappings = src.EntitlementMappings
+	}
+	if len(dst.ServiceEntitlements) == 0 {
+		dst.ServiceEntitlements = src.ServiceEntitlements
+	}
+}
+
+// ============================================================
 // Merge: IronMaidenState
 // ============================================================
 // MergeIronMaidenState fills zero-valued fields in dst from src.
 func MergeIronMaidenState(dst, src *IronMaidenState) {
 	if len(dst.VerifyingKeys) == 0 {
 		dst.VerifyingKeys = src.VerifyingKeys
+	}
+	if dst.EntitlementsPolicy == nil {
+		dst.EntitlementsPolicy = src.EntitlementsPolicy
+	}
+	if dst.ClaimMappingPolicy == nil {
+		dst.ClaimMappingPolicy = src.ClaimMappingPolicy
+	}
+	if dst.EntitlementConfig == nil {
+		dst.EntitlementConfig = src.EntitlementConfig
+	} else if src.EntitlementConfig != nil {
+		MergeEntitlementConfig(dst.EntitlementConfig, src.EntitlementConfig)
 	}
 }
 

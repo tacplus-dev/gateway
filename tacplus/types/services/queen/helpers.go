@@ -20,8 +20,8 @@ import (
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
-	entitlement "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/entitlement"
 	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/errors"
+	opa "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/opa"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
@@ -34,10 +34,6 @@ import (
 // ConfigJSON represents Config in external JSON format (with string enums)
 // MARKER: JSON helper struct generated from serial.go
 type configJSON struct {
-	ClaimMappingPolicy  string            `json:"claim_mapping_policy,omitempty"`
-	EntitlementsPolicy  string            `json:"entitlements_policy,omitempty"`
-	EntitlementMappings []json.RawMessage `json:"entitlement_mappings,omitempty"`
-	ServiceEntitlements []json.RawMessage `json:"service_entitlements,omitempty"`
 }
 
 // ConfigToJSON converts Config to JSON bytes.
@@ -47,38 +43,7 @@ func ConfigToJSON(v *Config) ([]byte, error) {
 		return nil, protoerrors.NewErrMissingInvalidData(nil, "config is nil")
 	}
 	// Convert to JSON helper struct with string enums
-	helper := configJSON{
-		ClaimMappingPolicy: v.ClaimMappingPolicy,
-		EntitlementsPolicy: v.EntitlementsPolicy,
-		EntitlementMappings: func() []json.RawMessage {
-			if len(v.EntitlementMappings) == 0 {
-				return nil
-			}
-			result := make([]json.RawMessage, 0, len(v.EntitlementMappings))
-			for _, item := range v.EntitlementMappings {
-				if item != nil {
-					if data, err := entitlement.ServiceEntitlementMappingToJSON(item); err == nil {
-						result = append(result, data)
-					}
-				}
-			}
-			return result
-		}(),
-		ServiceEntitlements: func() []json.RawMessage {
-			if len(v.ServiceEntitlements) == 0 {
-				return nil
-			}
-			result := make([]json.RawMessage, 0, len(v.ServiceEntitlements))
-			for _, item := range v.ServiceEntitlements {
-				if item != nil {
-					if data, err := entitlement.ServiceEntitlementsToJSON(item); err == nil {
-						result = append(result, data)
-					}
-				}
-			}
-			return result
-		}(),
-	}
+	helper := configJSON{}
 	return json.Marshal(helper)
 }
 
@@ -142,32 +107,6 @@ func ConfigFromJSON(data []byte) (*Config, error) {
 	}
 	// Build result with parsed enums
 	result := &Config{}
-	result.ClaimMappingPolicy = raw.ClaimMappingPolicy
-	result.EntitlementsPolicy = raw.EntitlementsPolicy
-	// Parse repeated message field: EntitlementMappings
-	if len(raw.EntitlementMappings) > 0 {
-		result.EntitlementMappings = make([]*entitlement.ServiceEntitlementMapping, 0, len(raw.EntitlementMappings))
-		for _, itemJSON := range raw.EntitlementMappings {
-			if len(itemJSON) > 0 {
-				parsed, err := entitlement.ServiceEntitlementMappingFromJSON(itemJSON)
-				if err == nil {
-					result.EntitlementMappings = append(result.EntitlementMappings, parsed)
-				}
-			}
-		}
-	}
-	// Parse repeated message field: ServiceEntitlements
-	if len(raw.ServiceEntitlements) > 0 {
-		result.ServiceEntitlements = make([]*entitlement.ServiceEntitlements, 0, len(raw.ServiceEntitlements))
-		for _, itemJSON := range raw.ServiceEntitlements {
-			if len(itemJSON) > 0 {
-				parsed, err := entitlement.ServiceEntitlementsFromJSON(itemJSON)
-				if err == nil {
-					result.ServiceEntitlements = append(result.ServiceEntitlements, parsed)
-				}
-			}
-		}
-	}
 	return result, nil
 }
 
@@ -1255,8 +1194,8 @@ func EvaluatePolicyResponseToTOML(v *EvaluatePolicyResponse) ([]byte, error) {
 // GetPoliciesResponseJSON represents GetPoliciesResponse in external JSON format (with string enums)
 // MARKER: JSON helper struct generated from serial.go
 type getpoliciesresponseJSON struct {
-	ClaimMappingPolicy string `json:"claim_mapping_policy,omitempty"`
-	EntitlementsPolicy string `json:"entitlements_policy,omitempty"`
+	EntitlementsPolicy json.RawMessage `json:"entitlements_policy,omitempty"`
+	ClaimMappingPolicy json.RawMessage `json:"claim_mapping_policy,omitempty"`
 }
 
 // GetPoliciesResponseToJSON converts GetPoliciesResponse to JSON bytes.
@@ -1267,8 +1206,20 @@ func GetPoliciesResponseToJSON(v *GetPoliciesResponse) ([]byte, error) {
 	}
 	// Convert to JSON helper struct with string enums
 	helper := getpoliciesresponseJSON{
-		ClaimMappingPolicy: v.ClaimMappingPolicy,
-		EntitlementsPolicy: v.EntitlementsPolicy,
+		EntitlementsPolicy: func() json.RawMessage {
+			if v.EntitlementsPolicy == nil {
+				return nil
+			}
+			data, _ := opa.OpaPolicyToJSON(v.EntitlementsPolicy)
+			return data
+		}(),
+		ClaimMappingPolicy: func() json.RawMessage {
+			if v.ClaimMappingPolicy == nil {
+				return nil
+			}
+			data, _ := opa.OpaPolicyToJSON(v.ClaimMappingPolicy)
+			return data
+		}(),
 	}
 	return json.Marshal(helper)
 }
@@ -1333,8 +1284,20 @@ func GetPoliciesResponseFromJSON(data []byte) (*GetPoliciesResponse, error) {
 	}
 	// Build result with parsed enums
 	result := &GetPoliciesResponse{}
-	result.ClaimMappingPolicy = raw.ClaimMappingPolicy
-	result.EntitlementsPolicy = raw.EntitlementsPolicy
+	// Parse message field: EntitlementsPolicy
+	if len(raw.EntitlementsPolicy) > 0 {
+		parsed, err := opa.OpaPolicyFromJSON(raw.EntitlementsPolicy)
+		if err == nil {
+			result.EntitlementsPolicy = parsed
+		}
+	}
+	// Parse message field: ClaimMappingPolicy
+	if len(raw.ClaimMappingPolicy) > 0 {
+		parsed, err := opa.OpaPolicyFromJSON(raw.ClaimMappingPolicy)
+		if err == nil {
+			result.ClaimMappingPolicy = parsed
+		}
+	}
 	return result, nil
 }
 
@@ -1386,20 +1349,12 @@ func ConfigToEnvVar(v *Config) map[string]string {
 		return nil
 	}
 	result := make(map[string]string)
-	result["PROTO_SERVICES_QUEEN_CONFIG_CLAIM_MAPPING_POLICY"] = v.ClaimMappingPolicy
-	result["PROTO_SERVICES_QUEEN_CONFIG_ENTITLEMENTS_POLICY"] = v.EntitlementsPolicy
 	return result
 }
 
 // ConfigFromEnvVar creates Config from environment variable key-value pairs.
 func ConfigFromEnvVar(env map[string]string) (*Config, error) {
 	result := &Config{}
-	if val, ok := env["PROTO_SERVICES_QUEEN_CONFIG_CLAIM_MAPPING_POLICY"]; ok && val != "" {
-		result.ClaimMappingPolicy = val
-	}
-	if val, ok := env["PROTO_SERVICES_QUEEN_CONFIG_ENTITLEMENTS_POLICY"]; ok && val != "" {
-		result.EntitlementsPolicy = val
-	}
 	return result, nil
 }
 
@@ -1603,19 +1558,31 @@ func GetPoliciesResponseToEnvVar(v *GetPoliciesResponse) map[string]string {
 		return nil
 	}
 	result := make(map[string]string)
-	result["PROTO_SERVICES_QUEEN_GET_POLICIES_RESPONSE_CLAIM_MAPPING_POLICY"] = v.ClaimMappingPolicy
-	result["PROTO_SERVICES_QUEEN_GET_POLICIES_RESPONSE_ENTITLEMENTS_POLICY"] = v.EntitlementsPolicy
+	if v.EntitlementsPolicy != nil {
+		for k, val := range opa.OpaPolicyToEnvVar(v.EntitlementsPolicy) {
+			result[k] = val
+		}
+	}
+	if v.ClaimMappingPolicy != nil {
+		for k, val := range opa.OpaPolicyToEnvVar(v.ClaimMappingPolicy) {
+			result[k] = val
+		}
+	}
 	return result
 }
 
 // GetPoliciesResponseFromEnvVar creates GetPoliciesResponse from environment variable key-value pairs.
 func GetPoliciesResponseFromEnvVar(env map[string]string) (*GetPoliciesResponse, error) {
 	result := &GetPoliciesResponse{}
-	if val, ok := env["PROTO_SERVICES_QUEEN_GET_POLICIES_RESPONSE_CLAIM_MAPPING_POLICY"]; ok && val != "" {
-		result.ClaimMappingPolicy = val
+	if sub, err := opa.OpaPolicyFromEnvVar(env); err != nil {
+		return nil, err
+	} else if sub != nil {
+		result.EntitlementsPolicy = sub
 	}
-	if val, ok := env["PROTO_SERVICES_QUEEN_GET_POLICIES_RESPONSE_ENTITLEMENTS_POLICY"]; ok && val != "" {
-		result.EntitlementsPolicy = val
+	if sub, err := opa.OpaPolicyFromEnvVar(env); err != nil {
+		return nil, err
+	} else if sub != nil {
+		result.ClaimMappingPolicy = sub
 	}
 	return result, nil
 }
@@ -1630,16 +1597,7 @@ func ValidateConfig(m *Config) error {
 		return nil
 	}
 
-	// Validate ClaimMappingPolicy (default max size: 32768 bytes)
-	if len(m.ClaimMappingPolicy) > 32768 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field ClaimMappingPolicy exceeds max size of 32768 bytes, got: %d", len(m.ClaimMappingPolicy))
-	}
-
-	// Validate EntitlementsPolicy (default max size: 32768 bytes)
-	if len(m.EntitlementsPolicy) > 32768 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field EntitlementsPolicy exceeds max size of 32768 bytes, got: %d", len(m.EntitlementsPolicy))
-	}
-
+	// No field validations defined
 	return nil
 }
 
@@ -1757,14 +1715,14 @@ func ValidateEvaluatePolicyRequest(m *EvaluatePolicyRequest) error {
 		return nil
 	}
 
-	// Validate RegoSource (assert_required)
-	if m.RegoSource == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field RegoSource is required")
-	}
-
 	// Validate RegoSource (assert_max_length: 65536)
 	if len(m.RegoSource) > 65536 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RegoSource must be at most 65536 characters, got: %d", len(m.RegoSource))
+	}
+
+	// Validate RegoSource (assert_required)
+	if m.RegoSource == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field RegoSource is required")
 	}
 
 	// Validate InputJson (assert_max_length: 65536)
@@ -1832,16 +1790,7 @@ func ValidateGetPoliciesResponse(m *GetPoliciesResponse) error {
 		return nil
 	}
 
-	// Validate ClaimMappingPolicy (default max size: 32768 bytes)
-	if len(m.ClaimMappingPolicy) > 32768 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field ClaimMappingPolicy exceeds max size of 32768 bytes, got: %d", len(m.ClaimMappingPolicy))
-	}
-
-	// Validate EntitlementsPolicy (default max size: 32768 bytes)
-	if len(m.EntitlementsPolicy) > 32768 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field EntitlementsPolicy exceeds max size of 32768 bytes, got: %d", len(m.EntitlementsPolicy))
-	}
-
+	// No field validations defined
 	return nil
 }
 
@@ -1849,8 +1798,6 @@ func ValidateGetPoliciesResponse(m *GetPoliciesResponse) error {
 // Capacity Constants (for utilization monitoring)
 // ============================================================
 const (
-	MaxSizeConfigClaimMappingPolicy              int = 32768
-	MaxSizeConfigEntitlementsPolicy              int = 32768
 	MaxSizeServicecatalogentryServiceName        int = 32768
 	MaxSizeGetmyentitlementsrequestAccessToken   int = 32768
 	MaxSizeServiceentitlementinfoServiceName     int = 32768
@@ -1861,28 +1808,7 @@ const (
 	MaxSizeEvaluatepolicyrequestQuery            int = 32768
 	MaxSizeEvaluatepolicyrequestDataJson         int = 32768
 	MaxSizeEvaluatepolicyresponseResultJson      int = 32768
-	MaxSizeGetpoliciesresponseClaimMappingPolicy int = 32768
-	MaxSizeGetpoliciesresponseEntitlementsPolicy int = 32768
 )
-
-// ============================================================
-// Merge: Config
-// ============================================================
-// MergeConfig fills zero-valued fields in dst from src.
-func MergeConfig(dst, src *Config) {
-	if dst.ClaimMappingPolicy == "" {
-		dst.ClaimMappingPolicy = src.ClaimMappingPolicy
-	}
-	if dst.EntitlementsPolicy == "" {
-		dst.EntitlementsPolicy = src.EntitlementsPolicy
-	}
-	if len(dst.EntitlementMappings) == 0 {
-		dst.EntitlementMappings = src.EntitlementMappings
-	}
-	if len(dst.ServiceEntitlements) == 0 {
-		dst.ServiceEntitlements = src.ServiceEntitlements
-	}
-}
 
 // ============================================================
 // Merge: ServiceCatalogResponse
@@ -1996,10 +1922,10 @@ func MergeEvaluatePolicyResponse(dst, src *EvaluatePolicyResponse) {
 // ============================================================
 // MergeGetPoliciesResponse fills zero-valued fields in dst from src.
 func MergeGetPoliciesResponse(dst, src *GetPoliciesResponse) {
-	if dst.ClaimMappingPolicy == "" {
-		dst.ClaimMappingPolicy = src.ClaimMappingPolicy
-	}
-	if dst.EntitlementsPolicy == "" {
+	if dst.EntitlementsPolicy == nil {
 		dst.EntitlementsPolicy = src.EntitlementsPolicy
+	}
+	if dst.ClaimMappingPolicy == nil {
+		dst.ClaimMappingPolicy = src.ClaimMappingPolicy
 	}
 }

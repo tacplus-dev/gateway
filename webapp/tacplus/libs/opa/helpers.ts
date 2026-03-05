@@ -180,22 +180,12 @@ export function validateOpaPolicy(m: OpaPolicy | undefined): void {
     return;
   }
 
-  // Validate entryPoint (assert_required)
-  if (!m.entryPoint) {
-    throw newErrMissingInvalidData(undefined, `field entryPoint is required`);
-  }
-
   // Validate entryPoint (assert_min_length: 1)
   if (m.entryPoint && m.entryPoint.length < 1) {
     throw newErrMissingInvalidData(
       undefined,
       `field entryPoint must have length >= 1, got: ${m.entryPoint.length}`,
     );
-  }
-
-  // Validate bundle (assert_required)
-  if (!m.bundle) {
-    throw newErrMissingInvalidData(undefined, `field bundle is required`);
   }
 
   // Validate bundle (assert_base64)

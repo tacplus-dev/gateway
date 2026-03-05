@@ -1737,27 +1737,7 @@ export function validateConfig(m: Config | undefined): void {
     return;
   }
 
-  // Validate claimMappingPolicy (default max size: 32768 bytes)
-  if (
-    m.claimMappingPolicy &&
-    new TextEncoder().encode(m.claimMappingPolicy).length > 32768
-  ) {
-    throw newErrMissingInvalidData(
-      undefined,
-      `field claimMappingPolicy exceeds max size of 32768 bytes, got: ${new TextEncoder().encode(m.claimMappingPolicy).length}`,
-    );
-  }
-
-  // Validate entitlementsPolicy (default max size: 32768 bytes)
-  if (
-    m.entitlementsPolicy &&
-    new TextEncoder().encode(m.entitlementsPolicy).length > 32768
-  ) {
-    throw newErrMissingInvalidData(
-      undefined,
-      `field entitlementsPolicy exceeds max size of 32768 bytes, got: ${new TextEncoder().encode(m.entitlementsPolicy).length}`,
-    );
-  }
+  // No field validations defined
 }
 /**
  * Validates all fields in ServiceCatalogResponse according to their annotations.
@@ -1916,17 +1896,17 @@ export function validateEvaluatePolicyRequest(
     );
   }
 
+  // Validate inputJson (assert_required)
+  if (!m.inputJson) {
+    throw newErrMissingInvalidData(undefined, `field inputJson is required`);
+  }
+
   // Validate inputJson (assert_max_length: 65536)
   if (m.inputJson && m.inputJson.length > 65536) {
     throw newErrMissingInvalidData(
       undefined,
       `field inputJson must have length <= 65536, got: ${m.inputJson.length}`,
     );
-  }
-
-  // Validate inputJson (assert_required)
-  if (!m.inputJson) {
-    throw newErrMissingInvalidData(undefined, `field inputJson is required`);
   }
 
   // Validate query (assert_max_length: 1024)
@@ -2007,36 +1987,9 @@ export function validateGetPoliciesResponse(
     return;
   }
 
-  // Validate entitlementsPolicy (default max size: 32768 bytes)
-  if (
-    m.entitlementsPolicy &&
-    new TextEncoder().encode(m.entitlementsPolicy).length > 32768
-  ) {
-    throw newErrMissingInvalidData(
-      undefined,
-      `field entitlementsPolicy exceeds max size of 32768 bytes, got: ${new TextEncoder().encode(m.entitlementsPolicy).length}`,
-    );
-  }
+  // No field validations defined
 }
 
-// ============================================================
-// Merge: Config
-// ============================================================
-/** Fills zero-valued fields in dst from src. dst takes precedence. */
-export function mergeConfig(dst: Config, src: Config): void {
-  if (dst.claimMappingPolicy === "") {
-    dst.claimMappingPolicy = src.claimMappingPolicy;
-  }
-  if (dst.entitlementsPolicy === "") {
-    dst.entitlementsPolicy = src.entitlementsPolicy;
-  }
-  if (dst.entitlementMappings.length === 0) {
-    dst.entitlementMappings = src.entitlementMappings;
-  }
-  if (dst.serviceEntitlements.length === 0) {
-    dst.serviceEntitlements = src.serviceEntitlements;
-  }
-}
 // ============================================================
 // Merge: ServiceCatalogResponse
 // ============================================================
@@ -2168,7 +2121,10 @@ export function mergeGetPoliciesResponse(
   dst: GetPoliciesResponse,
   src: GetPoliciesResponse,
 ): void {
-  if (dst.entitlementsPolicy === "") {
+  if (!dst.entitlementsPolicy && src.entitlementsPolicy) {
     dst.entitlementsPolicy = src.entitlementsPolicy;
+  }
+  if (!dst.claimMappingPolicy && src.claimMappingPolicy) {
+    dst.claimMappingPolicy = src.claimMappingPolicy;
   }
 }

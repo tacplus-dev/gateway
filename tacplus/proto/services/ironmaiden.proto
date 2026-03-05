@@ -53,6 +53,7 @@ option go_package = "gitlab.com/secondstarcavalier/controlplane/services/springs
 
 import "libs/entitlement.proto";
 import "libs/jwk.proto";
+import "libs/opa.proto";
 import "google/protobuf/empty.proto";
 import "google/api/annotations.proto";
 // ============================================================================
@@ -179,18 +180,37 @@ message ProviderConfig {
 // Backend State (stored in elvis)
 // ============================================================================
 
-// IronMaidenState holds public verifying keys readable by all services.
-// Each Iron Maiden instance generates its own key pair locally, keeps the private
-// key in memory, and publishes the public JWK here. Other services subscribe
-// via Watch (RO) and receive new keys immediately to verify access tokens.
-// Access: RW for ironmaiden, RO for any service that needs to verify tokens.
+// EntitlementConfig wraps the entitlement mappings and service entitlement
+// definitions. Published by Iron Maiden from config so other services (queen)
+// can read them via Watch (RO) without duplicating config.
+message EntitlementConfig {
+  repeated entitlement.ServiceEntitlementMapping entitlement_mappings = 1;
+  repeated entitlement.ServiceEntitlements service_entitlements = 2;
+}
+
+// IronMaidenState holds public verifying keys and auth config readable by all
+// services. Each Iron Maiden instance generates its own key pair locally, keeps
+// the private key in memory, and publishes the public JWK here. OPA policies
+// and entitlement config are also published here so downstream services (queen)
+// can consume them without duplicating config.
+// Access: RW for ironmaiden, RO for any service that needs to verify tokens
+// or read auth config.
 message IronMaidenState {
 
   // verifying_keys are the public JWKs published by all Iron Maiden instances.
-  // Each instance publishes its own JWK (keyed by kid). Other services subscribe
-  // via Watch (RO) to verify access tokens signed by any Iron Maiden instance.
-  // Old keys are removed after the access token lifetime elapses post-rotation.
   repeated jwk.Jwk verifying_keys = 1;
+
+  // entitlements_policy is the OPA policy for determining entitlements at token
+  // exchange time. Published by ironmaiden from config.
+  opa.OpaPolicy entitlements_policy = 2;
+
+  // claim_mapping_policy is the OPA policy for mapping IDP claims to a principal
+  // at login time. Published by ironmaiden from config.
+  opa.OpaPolicy claim_mapping_policy = 3;
+
+  // entitlement_config holds the entitlement mappings and service entitlement
+  // definitions, published from ironmaiden's config.
+  EntitlementConfig entitlement_config = 4;
 }
 
 // IronMaidenStateInternal holds private state used only by Iron Maiden instances.
@@ -423,6 +443,18 @@ message CollectionQuery { PredicateGroup where = 1; repeated SortField order_by 
 // ============================================================================
 
 service IronMaidenStateBackendService {
+	// Singleton: EntitlementsPolicy
+	rpc GetEntitlementsPolicy(google.protobuf.Empty) returns (opa.OpaPolicy);
+	rpc SetEntitlementsPolicy(opa.OpaPolicy) returns (opa.OpaPolicy);
+	rpc WatchEntitlementsPolicy(google.protobuf.Empty) returns (stream opa.OpaPolicy);
+	// Singleton: ClaimMappingPolicy
+	rpc GetClaimMappingPolicy(google.protobuf.Empty) returns (opa.OpaPolicy);
+	rpc SetClaimMappingPolicy(opa.OpaPolicy) returns (opa.OpaPolicy);
+	rpc WatchClaimMappingPolicy(google.protobuf.Empty) returns (stream opa.OpaPolicy);
+	// Singleton: EntitlementConfig
+	rpc GetEntitlementConfig(google.protobuf.Empty) returns (EntitlementConfig);
+	rpc SetEntitlementConfig(EntitlementConfig) returns (EntitlementConfig);
+	rpc WatchEntitlementConfig(google.protobuf.Empty) returns (stream EntitlementConfig);
 	// Collection: VerifyingKeys
 	rpc GetVerifyingKeys(VerifyingKeysGetRequest) returns (VerifyingKeysValueResponse);
 	rpc PutVerifyingKeys(VerifyingKeysPutRequest) returns (VerifyingKeysValueResponse);

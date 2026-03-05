@@ -16,7 +16,7 @@
 "js-yaml": "^4.1.0",
 "@iarna/toml": "^2.2.5",
 "johnnycash-tacplus-libs-spec": "*",
-"johnnycash-tacplus-libs-entitlement": "*",
+"johnnycash-tacplus-libs-opa": "*",
 "johnnycash-tacplus-google-api-annotations": "*"},
 "devDependencies": {
 "typescript": "^5.3.3",

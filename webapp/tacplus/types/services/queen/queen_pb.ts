@@ -26,11 +26,8 @@ import {
   serviceDesc,
 } from "@bufbuild/protobuf/codegenv2";
 import { file_libs_spec } from "../../../libs/spec/spec_pb.js";
-import type {
-  ServiceEntitlementMapping,
-  ServiceEntitlements,
-} from "../../../libs/entitlement/entitlement_pb.js";
-import { file_libs_entitlement } from "../../../libs/entitlement/entitlement_pb.js";
+import type { OpaPolicy } from "../../../libs/opa/opa_pb.js";
+import { file_libs_opa } from "../../../libs/opa/opa_pb.js";
 import type { EmptySchema } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_empty } from "@bufbuild/protobuf/wkt";
 import { file_google_api_annotations } from "../../google/api/annotations/annotations_pb.js";
@@ -42,50 +39,22 @@ import type { Message } from "@bufbuild/protobuf";
 export const file_services_queen: GenFile =
   /*@__PURE__*/
   fileDesc(
-    "ChRzZXJ2aWNlcy9xdWVlbi5wcm90bxIFcXVlZW4i2AEKBkNvbmZpZxIcChRjbGFpbV9tYXBwaW5nX3BvbGljeRgBIAEoCRIbChNlbnRpdGxlbWVudHNfcG9saWN5GAIgASgJEkQKFGVudGl0bGVtZW50X21hcHBpbmdzGAMgAygLMiYuZW50aXRsZW1lbnQuU2VydmljZUVudGl0bGVtZW50TWFwcGluZxI+ChRzZXJ2aWNlX2VudGl0bGVtZW50cxgEIAMoCzIgLmVudGl0bGVtZW50LlNlcnZpY2VFbnRpdGxlbWVudHM6DdKoHQkKBXF1ZWVuEAoiRgoWU2VydmljZUNhdGFsb2dSZXNwb25zZRIsCghzZXJ2aWNlcxgBIAMoCzIaLnF1ZWVuLlNlcnZpY2VDYXRhbG9nRW50cnkiPwoTU2VydmljZUNhdGFsb2dFbnRyeRIaCgxzZXJ2aWNlX25hbWUYASABKAlCBIimHQESDAoEcnBjcxgCIAMoCSI2ChhHZXRNeUVudGl0bGVtZW50c1JlcXVlc3QSGgoMYWNjZXNzX3Rva2VuGAEgASgJQgSIph0BIk0KFk15RW50aXRsZW1lbnRzUmVzcG9uc2USMwoMZW50aXRsZW1lbnRzGAEgAygLMh0ucXVlZW4uU2VydmljZUVudGl0bGVtZW50SW5mbyJQChZTZXJ2aWNlRW50aXRsZW1lbnRJbmZvEhQKDHNlcnZpY2VfbmFtZRgBIAEoCRIMCgRycGNzGAIgAygJEhIKCnRvdGFsX3JwY3MYAyABKAUiUQobU2ltdWxhdGVFbnRpdGxlbWVudHNSZXF1ZXN0Eh8KC2NsYWltc19qc29uGAEgASgJQgqIph0BkKcdgIAEEhEKCXByaW5jaXBhbBgCIAEoCSKJAQoVRXZhbHVhdGVQb2xpY3lSZXF1ZXN0Eh8KC3JlZ29fc291cmNlGAEgASgJQgqIph0BkKcdgIAEEh4KCmlucHV0X2pzb24YAiABKAlCCoimHQGQpx2AgAQSFAoFcXVlcnkYAyABKAlCBZCnHYAIEhkKCWRhdGFfanNvbhgEIAEoCUIGkKcdgIAEIk4KFkV2YWx1YXRlUG9saWN5UmVzcG9uc2USEwoLcmVzdWx0X2pzb24YASABKAkSDwoHYWxsb3dlZBgCIAEoCBIOCgZlcnJvcnMYAyADKAkiMgoTR2V0UG9saWNpZXNSZXNwb25zZRIbChNlbnRpdGxlbWVudHNfcG9saWN5GAEgASgJMuEECgxRdWVlblNlcnZpY2USaQoRR2V0U2VydmljZUNhdGFsb2cSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaHS5xdWVlbi5TZXJ2aWNlQ2F0YWxvZ1Jlc3BvbnNlIh2C0+STAhcSFS9hcGkvcXVlZW4vdjEvY2F0YWxvZxJ6ChFHZXRNeUVudGl0bGVtZW50cxIfLnF1ZWVuLkdldE15RW50aXRsZW1lbnRzUmVxdWVzdBodLnF1ZWVuLk15RW50aXRsZW1lbnRzUmVzcG9uc2UiJYLT5JMCHyIaL2FwaS9xdWVlbi92MS9lbnRpdGxlbWVudHM6ASoSiQEKFFNpbXVsYXRlRW50aXRsZW1lbnRzEiIucXVlZW4uU2ltdWxhdGVFbnRpdGxlbWVudHNSZXF1ZXN0Gh0ucXVlZW4uTXlFbnRpdGxlbWVudHNSZXNwb25zZSIugtPkkwIoIiMvYXBpL3F1ZWVuL3YxL3NpbXVsYXRlLWVudGl0bGVtZW50czoBKhJwCg5FdmFsdWF0ZVBvbGljeRIcLnF1ZWVuLkV2YWx1YXRlUG9saWN5UmVxdWVzdBodLnF1ZWVuLkV2YWx1YXRlUG9saWN5UmVzcG9uc2UiIYLT5JMCGyIWL2FwaS9xdWVlbi92MS9ldmFsdWF0ZToBKhJhCgtHZXRQb2xpY2llcxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRoaLnF1ZWVuLkdldFBvbGljaWVzUmVzcG9uc2UiHoLT5JMCGBIWL2FwaS9xdWVlbi92MS9wb2xpY2llcxoJopciBXF1ZWVuYgZwcm90bzM",
+    "ChRzZXJ2aWNlcy9xdWVlbi5wcm90bxIFcXVlZW4iFwoGQ29uZmlnOg3SqB0JCgVxdWVlbhAKIkYKFlNlcnZpY2VDYXRhbG9nUmVzcG9uc2USLAoIc2VydmljZXMYASADKAsyGi5xdWVlbi5TZXJ2aWNlQ2F0YWxvZ0VudHJ5Ij8KE1NlcnZpY2VDYXRhbG9nRW50cnkSGgoMc2VydmljZV9uYW1lGAEgASgJQgSIph0BEgwKBHJwY3MYAiADKAkiNgoYR2V0TXlFbnRpdGxlbWVudHNSZXF1ZXN0EhoKDGFjY2Vzc190b2tlbhgBIAEoCUIEiKYdASJNChZNeUVudGl0bGVtZW50c1Jlc3BvbnNlEjMKDGVudGl0bGVtZW50cxgBIAMoCzIdLnF1ZWVuLlNlcnZpY2VFbnRpdGxlbWVudEluZm8iUAoWU2VydmljZUVudGl0bGVtZW50SW5mbxIUCgxzZXJ2aWNlX25hbWUYASABKAkSDAoEcnBjcxgCIAMoCRISCgp0b3RhbF9ycGNzGAMgASgFIlEKG1NpbXVsYXRlRW50aXRsZW1lbnRzUmVxdWVzdBIfCgtjbGFpbXNfanNvbhgBIAEoCUIKiKYdAZCnHYCABBIRCglwcmluY2lwYWwYAiABKAkiiQEKFUV2YWx1YXRlUG9saWN5UmVxdWVzdBIfCgtyZWdvX3NvdXJjZRgBIAEoCUIKiKYdAZCnHYCABBIeCgppbnB1dF9qc29uGAIgASgJQgqIph0BkKcdgIAEEhQKBXF1ZXJ5GAMgASgJQgWQpx2ACBIZCglkYXRhX2pzb24YBCABKAlCBpCnHYCABCJOChZFdmFsdWF0ZVBvbGljeVJlc3BvbnNlEhMKC3Jlc3VsdF9qc29uGAEgASgJEg8KB2FsbG93ZWQYAiABKAgSDgoGZXJyb3JzGAMgAygJInAKE0dldFBvbGljaWVzUmVzcG9uc2USKwoTZW50aXRsZW1lbnRzX3BvbGljeRgBIAEoCzIOLm9wYS5PcGFQb2xpY3kSLAoUY2xhaW1fbWFwcGluZ19wb2xpY3kYAiABKAsyDi5vcGEuT3BhUG9saWN5MuEECgxRdWVlblNlcnZpY2USaQoRR2V0U2VydmljZUNhdGFsb2cSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaHS5xdWVlbi5TZXJ2aWNlQ2F0YWxvZ1Jlc3BvbnNlIh2C0+STAhcSFS9hcGkvcXVlZW4vdjEvY2F0YWxvZxJ6ChFHZXRNeUVudGl0bGVtZW50cxIfLnF1ZWVuLkdldE15RW50aXRsZW1lbnRzUmVxdWVzdBodLnF1ZWVuLk15RW50aXRsZW1lbnRzUmVzcG9uc2UiJYLT5JMCHyIaL2FwaS9xdWVlbi92MS9lbnRpdGxlbWVudHM6ASoSiQEKFFNpbXVsYXRlRW50aXRsZW1lbnRzEiIucXVlZW4uU2ltdWxhdGVFbnRpdGxlbWVudHNSZXF1ZXN0Gh0ucXVlZW4uTXlFbnRpdGxlbWVudHNSZXNwb25zZSIugtPkkwIoIiMvYXBpL3F1ZWVuL3YxL3NpbXVsYXRlLWVudGl0bGVtZW50czoBKhJwCg5FdmFsdWF0ZVBvbGljeRIcLnF1ZWVuLkV2YWx1YXRlUG9saWN5UmVxdWVzdBodLnF1ZWVuLkV2YWx1YXRlUG9saWN5UmVzcG9uc2UiIYLT5JMCGyIWL2FwaS9xdWVlbi92MS9ldmFsdWF0ZToBKhJhCgtHZXRQb2xpY2llcxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRoaLnF1ZWVuLkdldFBvbGljaWVzUmVzcG9uc2UiHoLT5JMCGBIWL2FwaS9xdWVlbi92MS9wb2xpY2llcxoJopciBXF1ZWVuYgZwcm90bzM",
     [
       file_libs_spec,
-      file_libs_entitlement,
+      file_libs_opa,
       file_google_protobuf_empty,
       file_google_api_annotations,
     ],
   );
 
 /**
+ * Queen reads all auth config (OPA policies, entitlement mappings) from
+ * IronMaidenState via Watch (RO). No config duplication needed.
+ *
  * @generated from message queen.Config
  */
-export type Config = Message<"queen.Config"> & {
-  /**
-   * claim_mapping_policy is a Rego policy that maps IDP claims to a principal.
-   * Deployed with the same value as ironmaiden's claim_mapping_policy.
-   *
-   * @generated from field: string claim_mapping_policy = 1;
-   */
-  claimMappingPolicy: string;
-
-  /**
-   * entitlements_policy is a Rego policy evaluated to determine entitlements.
-   * Deployed with the same value as ironmaiden's entitlements_policy.
-   *
-   * @generated from field: string entitlements_policy = 2;
-   */
-  entitlementsPolicy: string;
-
-  /**
-   * entitlement_mappings maps OPA-resolved principals to entitlement definitions.
-   *
-   * @generated from field: repeated entitlement.ServiceEntitlementMapping entitlement_mappings = 3;
-   */
-  entitlementMappings: ServiceEntitlementMapping[];
-
-  /**
-   * service_entitlements holds named entitlement definitions loaded from
-   * proto/security/*.json at config build time.
-   *
-   * @generated from field: repeated entitlement.ServiceEntitlements service_entitlements = 4;
-   */
-  serviceEntitlements: ServiceEntitlements[];
-};
+export type Config = Message<"queen.Config"> & {};
 
 /**
  * Describes the message queen.Config.
@@ -334,18 +303,24 @@ export const EvaluatePolicyResponseSchema: GenMessage<EvaluatePolicyResponse> =
   messageDesc(file_services_queen, 8);
 
 /**
- * GetPoliciesResponse returns the deployed OPA Rego policies.
+ * GetPoliciesResponse returns the deployed OPA policies as full OpaPolicy objects.
  *
  * @generated from message queen.GetPoliciesResponse
  */
 export type GetPoliciesResponse = Message<"queen.GetPoliciesResponse"> & {
   /**
-   * entitlements_policy is the Rego policy evaluated to determine entitlements.
-   * Read from IronMaidenState (published by ironmaiden from its config).
+   * entitlements_policy is the OPA policy evaluated to determine entitlements.
    *
-   * @generated from field: string entitlements_policy = 1;
+   * @generated from field: opa.OpaPolicy entitlements_policy = 1;
    */
-  entitlementsPolicy: string;
+  entitlementsPolicy?: OpaPolicy;
+
+  /**
+   * claim_mapping_policy is the OPA policy that maps IDP claims to a principal.
+   *
+   * @generated from field: opa.OpaPolicy claim_mapping_policy = 2;
+   */
+  claimMappingPolicy?: OpaPolicy;
 };
 
 /**

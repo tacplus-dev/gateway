@@ -7,6 +7,7 @@ import type {
   ServiceCatalogEntry,
   ServiceEntitlementInfo,
 } from '../../../../tacplus/types/services/queen/queen_pb.ts';
+import type { OpaPolicy } from '../../../../tacplus/libs/opa/opa_pb.ts';
 import { AuthContext } from '../../../auth/AuthContext';
 import { fetchTransport } from '../../../auth/fetchTransport';
 import { getStoredToken } from '../../../auth/tokenUtils';
@@ -56,9 +57,10 @@ export function Dashboard() {
   const defaultPayloadRef = useRef(initialParts?.payload || '{}');
 
   // Policy editor state
-  const [entitlementsPolicy, setEntitlementsPolicy] = useState('');
+  const [entitlementsPolicy, setEntitlementsPolicy] = useState<OpaPolicy | null>(null);
+  const [claimMappingPolicy, setClaimMappingPolicy] = useState<OpaPolicy | null>(null);
   const [policiesLoading, setPoliciesLoading] = useState(true);
-  const defaultEntitlementsPolicyRef = useRef('');
+  const [policiesError, setPoliciesError] = useState<string | null>(null);
 
   // Debounce timer
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -108,10 +110,10 @@ export function Dashboard() {
     queen
       .getPolicies()
       .then((data) => {
-        setEntitlementsPolicy(data.entitlementsPolicy);
-        defaultEntitlementsPolicyRef.current = data.entitlementsPolicy;
+        setEntitlementsPolicy(data.entitlementsPolicy ?? null);
+        setClaimMappingPolicy(data.claimMappingPolicy ?? null);
       })
-      .catch(() => {})
+      .catch((err) => setPoliciesError(err instanceof Error ? err.message : 'Failed to load policies'))
       .finally(() => setPoliciesLoading(false));
 
     // Initial simulation with real token payload
@@ -141,19 +143,6 @@ export function Dashboard() {
     }
   }, [runSimulation]);
 
-  const handlePolicyChange = useCallback(
-    (value: string) => {
-      setEntitlementsPolicy(value);
-      debouncedSimulate(payloadJson);
-    },
-    [debouncedSimulate, payloadJson],
-  );
-
-  const handlePolicyReset = useCallback(() => {
-    setEntitlementsPolicy(defaultEntitlementsPolicyRef.current);
-    runSimulation(payloadJson);
-  }, [runSimulation, payloadJson]);
-
   if (catalogLoading) {
     return (
       <div className="max-w-[1400px] mx-auto px-6 py-4">
@@ -169,7 +158,8 @@ export function Dashboard() {
         {simLoading && <Spin size="small" />}
       </header>
 
-      {catalogError && <Alert type="error" message={`Catalog error: ${catalogError}`} showIcon className="mb-4" />}
+      {catalogError && <Alert type="error" message={`Catalog: ${catalogError}`} showIcon className="mb-4" />}
+      {policiesError && <Alert type="error" message={`Policy: ${policiesError}`} showIcon className="mb-4" />}
       {simError && <Alert type="warning" message={`Simulation: ${simError}`} showIcon closable className="mb-4" />}
 
       <Tabs
@@ -199,10 +189,9 @@ export function Dashboard() {
             label: 'Policy',
             children: (
               <PolicyEditor
-                policy={entitlementsPolicy}
+                entitlementsPolicy={entitlementsPolicy}
+                claimMappingPolicy={claimMappingPolicy}
                 loading={policiesLoading}
-                onChange={handlePolicyChange}
-                onReset={handlePolicyReset}
               />
             ),
           },

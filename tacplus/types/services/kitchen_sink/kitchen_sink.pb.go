@@ -16,6 +16,7 @@ package kitchen_sink
 import (
 	healthreport "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/healthreport"
 	jwk "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/jwk"
+	opa "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/opa"
 	serviceconfig "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/serviceconfig"
 	x509 "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/x509"
 	elvis "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/services/elvis"
@@ -148,8 +149,10 @@ type KitchenSink struct {
 	//	*KitchenSink_GenesisGenesisCertData
 	//	*KitchenSink_HealthreportServiceInstanceHealth
 	//	*KitchenSink_IronmaidenConfig
+	//	*KitchenSink_IronmaidenEntitlementConfig
 	//	*KitchenSink_IronmaidenExternalJwk
 	//	*KitchenSink_JwkJwk
+	//	*KitchenSink_OpaOpaPolicy
 	//	*KitchenSink_PresleyAdminClusterHealth
 	//	*KitchenSink_PresleyAdminClusterInfo
 	//	*KitchenSink_PresleyAdminGraphInfo
@@ -306,6 +309,15 @@ func (x *KitchenSink) GetIronmaidenConfig() *ironmaiden.Config {
 	return nil
 }
 
+func (x *KitchenSink) GetIronmaidenEntitlementConfig() *ironmaiden.EntitlementConfig {
+	if x != nil {
+		if x, ok := x.Payload.(*KitchenSink_IronmaidenEntitlementConfig); ok {
+			return x.IronmaidenEntitlementConfig
+		}
+	}
+	return nil
+}
+
 func (x *KitchenSink) GetIronmaidenExternalJwk() *ironmaiden.ExternalJwk {
 	if x != nil {
 		if x, ok := x.Payload.(*KitchenSink_IronmaidenExternalJwk); ok {
@@ -319,6 +331,15 @@ func (x *KitchenSink) GetJwkJwk() *jwk.Jwk {
 	if x != nil {
 		if x, ok := x.Payload.(*KitchenSink_JwkJwk); ok {
 			return x.JwkJwk
+		}
+	}
+	return nil
+}
+
+func (x *KitchenSink) GetOpaOpaPolicy() *opa.OpaPolicy {
+	if x != nil {
+		if x, ok := x.Payload.(*KitchenSink_OpaOpaPolicy); ok {
+			return x.OpaOpaPolicy
 		}
 	}
 	return nil
@@ -577,112 +598,120 @@ type KitchenSink_IronmaidenConfig struct {
 	IronmaidenConfig *ironmaiden.Config `protobuf:"bytes,105,opt,name=ironmaiden_config,json=ironmaidenConfig,proto3,oneof"`
 }
 
+type KitchenSink_IronmaidenEntitlementConfig struct {
+	IronmaidenEntitlementConfig *ironmaiden.EntitlementConfig `protobuf:"bytes,106,opt,name=ironmaiden_entitlement_config,json=ironmaidenEntitlementConfig,proto3,oneof"`
+}
+
 type KitchenSink_IronmaidenExternalJwk struct {
-	IronmaidenExternalJwk *ironmaiden.ExternalJwk `protobuf:"bytes,106,opt,name=ironmaiden_external_jwk,json=ironmaidenExternalJwk,proto3,oneof"`
+	IronmaidenExternalJwk *ironmaiden.ExternalJwk `protobuf:"bytes,107,opt,name=ironmaiden_external_jwk,json=ironmaidenExternalJwk,proto3,oneof"`
 }
 
 type KitchenSink_JwkJwk struct {
-	JwkJwk *jwk.Jwk `protobuf:"bytes,107,opt,name=jwk_jwk,json=jwkJwk,proto3,oneof"`
+	JwkJwk *jwk.Jwk `protobuf:"bytes,108,opt,name=jwk_jwk,json=jwkJwk,proto3,oneof"`
+}
+
+type KitchenSink_OpaOpaPolicy struct {
+	OpaOpaPolicy *opa.OpaPolicy `protobuf:"bytes,109,opt,name=opa_opa_policy,json=opaOpaPolicy,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminClusterHealth struct {
-	PresleyAdminClusterHealth *presley.AdminClusterHealth `protobuf:"bytes,108,opt,name=presley_admin_cluster_health,json=presleyAdminClusterHealth,proto3,oneof"`
+	PresleyAdminClusterHealth *presley.AdminClusterHealth `protobuf:"bytes,110,opt,name=presley_admin_cluster_health,json=presleyAdminClusterHealth,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminClusterInfo struct {
-	PresleyAdminClusterInfo *presley.AdminClusterInfo `protobuf:"bytes,109,opt,name=presley_admin_cluster_info,json=presleyAdminClusterInfo,proto3,oneof"`
+	PresleyAdminClusterInfo *presley.AdminClusterInfo `protobuf:"bytes,111,opt,name=presley_admin_cluster_info,json=presleyAdminClusterInfo,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminGraphInfo struct {
-	PresleyAdminGraphInfo *presley.AdminGraphInfo `protobuf:"bytes,110,opt,name=presley_admin_graph_info,json=presleyAdminGraphInfo,proto3,oneof"`
+	PresleyAdminGraphInfo *presley.AdminGraphInfo `protobuf:"bytes,112,opt,name=presley_admin_graph_info,json=presleyAdminGraphInfo,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminGrpcStats struct {
-	PresleyAdminGrpcStats *presley.AdminGrpcStats `protobuf:"bytes,111,opt,name=presley_admin_grpc_stats,json=presleyAdminGrpcStats,proto3,oneof"`
+	PresleyAdminGrpcStats *presley.AdminGrpcStats `protobuf:"bytes,113,opt,name=presley_admin_grpc_stats,json=presleyAdminGrpcStats,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminMapStats struct {
-	PresleyAdminMapStats *presley.AdminMapStats `protobuf:"bytes,112,opt,name=presley_admin_map_stats,json=presleyAdminMapStats,proto3,oneof"`
+	PresleyAdminMapStats *presley.AdminMapStats `protobuf:"bytes,114,opt,name=presley_admin_map_stats,json=presleyAdminMapStats,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminMutationRate struct {
-	PresleyAdminMutationRate *presley.AdminMutationRate `protobuf:"bytes,113,opt,name=presley_admin_mutation_rate,json=presleyAdminMutationRate,proto3,oneof"`
+	PresleyAdminMutationRate *presley.AdminMutationRate `protobuf:"bytes,115,opt,name=presley_admin_mutation_rate,json=presleyAdminMutationRate,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminNetworkStats struct {
-	PresleyAdminNetworkStats *presley.AdminNetworkStats `protobuf:"bytes,114,opt,name=presley_admin_network_stats,json=presleyAdminNetworkStats,proto3,oneof"`
+	PresleyAdminNetworkStats *presley.AdminNetworkStats `protobuf:"bytes,116,opt,name=presley_admin_network_stats,json=presleyAdminNetworkStats,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminNodeMetrics struct {
-	PresleyAdminNodeMetrics *presley.AdminNodeMetrics `protobuf:"bytes,115,opt,name=presley_admin_node_metrics,json=presleyAdminNodeMetrics,proto3,oneof"`
+	PresleyAdminNodeMetrics *presley.AdminNodeMetrics `protobuf:"bytes,117,opt,name=presley_admin_node_metrics,json=presleyAdminNodeMetrics,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminPersistenceStatus struct {
-	PresleyAdminPersistenceStatus *presley.AdminPersistenceStatus `protobuf:"bytes,116,opt,name=presley_admin_persistence_status,json=presleyAdminPersistenceStatus,proto3,oneof"`
+	PresleyAdminPersistenceStatus *presley.AdminPersistenceStatus `protobuf:"bytes,118,opt,name=presley_admin_persistence_status,json=presleyAdminPersistenceStatus,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminQueueStats struct {
-	PresleyAdminQueueStats *presley.AdminQueueStats `protobuf:"bytes,117,opt,name=presley_admin_queue_stats,json=presleyAdminQueueStats,proto3,oneof"`
+	PresleyAdminQueueStats *presley.AdminQueueStats `protobuf:"bytes,119,opt,name=presley_admin_queue_stats,json=presleyAdminQueueStats,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminServiceConnection struct {
-	PresleyAdminServiceConnection *presley.AdminServiceConnection `protobuf:"bytes,118,opt,name=presley_admin_service_connection,json=presleyAdminServiceConnection,proto3,oneof"`
+	PresleyAdminServiceConnection *presley.AdminServiceConnection `protobuf:"bytes,120,opt,name=presley_admin_service_connection,json=presleyAdminServiceConnection,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminThreadInfo struct {
-	PresleyAdminThreadInfo *presley.AdminThreadInfo `protobuf:"bytes,119,opt,name=presley_admin_thread_info,json=presleyAdminThreadInfo,proto3,oneof"`
+	PresleyAdminThreadInfo *presley.AdminThreadInfo `protobuf:"bytes,121,opt,name=presley_admin_thread_info,json=presleyAdminThreadInfo,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminTokenCacheStats struct {
-	PresleyAdminTokenCacheStats *presley.AdminTokenCacheStats `protobuf:"bytes,120,opt,name=presley_admin_token_cache_stats,json=presleyAdminTokenCacheStats,proto3,oneof"`
+	PresleyAdminTokenCacheStats *presley.AdminTokenCacheStats `protobuf:"bytes,122,opt,name=presley_admin_token_cache_stats,json=presleyAdminTokenCacheStats,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminTopicStats struct {
-	PresleyAdminTopicStats *presley.AdminTopicStats `protobuf:"bytes,121,opt,name=presley_admin_topic_stats,json=presleyAdminTopicStats,proto3,oneof"`
+	PresleyAdminTopicStats *presley.AdminTopicStats `protobuf:"bytes,123,opt,name=presley_admin_topic_stats,json=presleyAdminTopicStats,proto3,oneof"`
 }
 
 type KitchenSink_PresleyAdminWatchHealth struct {
-	PresleyAdminWatchHealth *presley.AdminWatchHealth `protobuf:"bytes,122,opt,name=presley_admin_watch_health,json=presleyAdminWatchHealth,proto3,oneof"`
+	PresleyAdminWatchHealth *presley.AdminWatchHealth `protobuf:"bytes,124,opt,name=presley_admin_watch_health,json=presleyAdminWatchHealth,proto3,oneof"`
 }
 
 type KitchenSink_QueenConfig struct {
-	QueenConfig *queen.Config `protobuf:"bytes,123,opt,name=queen_config,json=queenConfig,proto3,oneof"`
+	QueenConfig *queen.Config `protobuf:"bytes,125,opt,name=queen_config,json=queenConfig,proto3,oneof"`
 }
 
 type KitchenSink_ServiceconfigConfig struct {
-	ServiceconfigConfig *serviceconfig.Config `protobuf:"bytes,124,opt,name=serviceconfig_config,json=serviceconfigConfig,proto3,oneof"`
+	ServiceconfigConfig *serviceconfig.Config `protobuf:"bytes,126,opt,name=serviceconfig_config,json=serviceconfigConfig,proto3,oneof"`
 }
 
 type KitchenSink_SnoopyEventData struct {
-	SnoopyEventData *snoopy.EventData `protobuf:"bytes,125,opt,name=snoopy_event_data,json=snoopyEventData,proto3,oneof"`
+	SnoopyEventData *snoopy.EventData `protobuf:"bytes,127,opt,name=snoopy_event_data,json=snoopyEventData,proto3,oneof"`
 }
 
 type KitchenSink_SnoopyServiceStatus struct {
-	SnoopyServiceStatus *snoopy.ServiceStatus `protobuf:"bytes,126,opt,name=snoopy_service_status,json=snoopyServiceStatus,proto3,oneof"`
+	SnoopyServiceStatus *snoopy.ServiceStatus `protobuf:"bytes,128,opt,name=snoopy_service_status,json=snoopyServiceStatus,proto3,oneof"`
 }
 
 type KitchenSink_SnoopyTaskItem struct {
-	SnoopyTaskItem *snoopy.TaskItem `protobuf:"bytes,127,opt,name=snoopy_task_item,json=snoopyTaskItem,proto3,oneof"`
+	SnoopyTaskItem *snoopy.TaskItem `protobuf:"bytes,129,opt,name=snoopy_task_item,json=snoopyTaskItem,proto3,oneof"`
 }
 
 type KitchenSink_SpringsteenConfig struct {
-	SpringsteenConfig *springsteen.Config `protobuf:"bytes,128,opt,name=springsteen_config,json=springsteenConfig,proto3,oneof"`
+	SpringsteenConfig *springsteen.Config `protobuf:"bytes,130,opt,name=springsteen_config,json=springsteenConfig,proto3,oneof"`
 }
 
 type KitchenSink_WoodstockEventData struct {
-	WoodstockEventData *woodstock.EventData `protobuf:"bytes,129,opt,name=woodstock_event_data,json=woodstockEventData,proto3,oneof"`
+	WoodstockEventData *woodstock.EventData `protobuf:"bytes,131,opt,name=woodstock_event_data,json=woodstockEventData,proto3,oneof"`
 }
 
 type KitchenSink_WoodstockServiceStatus struct {
-	WoodstockServiceStatus *woodstock.ServiceStatus `protobuf:"bytes,130,opt,name=woodstock_service_status,json=woodstockServiceStatus,proto3,oneof"`
+	WoodstockServiceStatus *woodstock.ServiceStatus `protobuf:"bytes,132,opt,name=woodstock_service_status,json=woodstockServiceStatus,proto3,oneof"`
 }
 
 type KitchenSink_WoodstockTaskItem struct {
-	WoodstockTaskItem *woodstock.TaskItem `protobuf:"bytes,131,opt,name=woodstock_task_item,json=woodstockTaskItem,proto3,oneof"`
+	WoodstockTaskItem *woodstock.TaskItem `protobuf:"bytes,133,opt,name=woodstock_task_item,json=woodstockTaskItem,proto3,oneof"`
 }
 
 type KitchenSink_X509X509Cert struct {
-	X509X509Cert *x509.X509Cert `protobuf:"bytes,132,opt,name=x509_x509_cert,json=x509X509Cert,proto3,oneof"`
+	X509X509Cert *x509.X509Cert `protobuf:"bytes,134,opt,name=x509_x509_cert,json=x509X509Cert,proto3,oneof"`
 }
 
 func (*KitchenSink_ElvisConfig) isKitchenSink_Payload() {}
@@ -697,9 +726,13 @@ func (*KitchenSink_HealthreportServiceInstanceHealth) isKitchenSink_Payload() {}
 
 func (*KitchenSink_IronmaidenConfig) isKitchenSink_Payload() {}
 
+func (*KitchenSink_IronmaidenEntitlementConfig) isKitchenSink_Payload() {}
+
 func (*KitchenSink_IronmaidenExternalJwk) isKitchenSink_Payload() {}
 
 func (*KitchenSink_JwkJwk) isKitchenSink_Payload() {}
+
+func (*KitchenSink_OpaOpaPolicy) isKitchenSink_Payload() {}
 
 func (*KitchenSink_PresleyAdminClusterHealth) isKitchenSink_Payload() {}
 
@@ -823,7 +856,7 @@ var File_services_kitchen_sink_proto protoreflect.FileDescriptor
 
 const file_services_kitchen_sink_proto_rawDesc = "" +
 	"\n" +
-	"\x1bservices/kitchen_sink.proto\x12\fkitchen_sink\x1a\x17libs/healthreport.proto\x1a\x0elibs/jwk.proto\x1a\x18libs/serviceconfig.proto\x1a\x0flibs/x509.proto\x1a\x14services/elvis.proto\x1a\x18services/fleetwood.proto\x1a\x16services/genesis.proto\x1a\x19services/ironmaiden.proto\x1a\x16services/presley.proto\x1a\x14services/queen.proto\x1a\x15services/snoopy.proto\x1a\x1aservices/springsteen.proto\x1a\x18services/woodstock.proto\"\xa2\x16\n" +
+	"\x1bservices/kitchen_sink.proto\x12\fkitchen_sink\x1a\x17libs/healthreport.proto\x1a\x0elibs/jwk.proto\x1a\x0elibs/opa.proto\x1a\x18libs/serviceconfig.proto\x1a\x0flibs/x509.proto\x1a\x14services/elvis.proto\x1a\x18services/fleetwood.proto\x1a\x16services/genesis.proto\x1a\x19services/ironmaiden.proto\x1a\x16services/presley.proto\x1a\x14services/queen.proto\x1a\x15services/snoopy.proto\x1a\x1aservices/springsteen.proto\x1a\x18services/woodstock.proto\"\xc1\x17\n" +
 	"\vKitchenSink\x12\x19\n" +
 	"\bmap_name\x18\x01 \x01(\tR\amapName\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12$\n" +
@@ -835,34 +868,36 @@ const file_services_kitchen_sink_proto_rawDesc = "" +
 	"\x0egenesis_config\x18f \x01(\v2\x0f.genesis.ConfigH\x00R\rgenesisConfig\x12U\n" +
 	"\x19genesis_genesis_cert_data\x18g \x01(\v2\x18.genesis.GenesisCertDataH\x00R\x16genesisGenesisCertData\x12v\n" +
 	"$healthreport_service_instance_health\x18h \x01(\v2#.healthreport.ServiceInstanceHealthH\x00R!healthreportServiceInstanceHealth\x12A\n" +
-	"\x11ironmaiden_config\x18i \x01(\v2\x12.ironmaiden.ConfigH\x00R\x10ironmaidenConfig\x12Q\n" +
-	"\x17ironmaiden_external_jwk\x18j \x01(\v2\x17.ironmaiden.ExternalJwkH\x00R\x15ironmaidenExternalJwk\x12#\n" +
-	"\ajwk_jwk\x18k \x01(\v2\b.jwk.JwkH\x00R\x06jwkJwk\x12^\n" +
-	"\x1cpresley_admin_cluster_health\x18l \x01(\v2\x1b.presley.AdminClusterHealthH\x00R\x19presleyAdminClusterHealth\x12X\n" +
-	"\x1apresley_admin_cluster_info\x18m \x01(\v2\x19.presley.AdminClusterInfoH\x00R\x17presleyAdminClusterInfo\x12R\n" +
-	"\x18presley_admin_graph_info\x18n \x01(\v2\x17.presley.AdminGraphInfoH\x00R\x15presleyAdminGraphInfo\x12R\n" +
-	"\x18presley_admin_grpc_stats\x18o \x01(\v2\x17.presley.AdminGrpcStatsH\x00R\x15presleyAdminGrpcStats\x12O\n" +
-	"\x17presley_admin_map_stats\x18p \x01(\v2\x16.presley.AdminMapStatsH\x00R\x14presleyAdminMapStats\x12[\n" +
-	"\x1bpresley_admin_mutation_rate\x18q \x01(\v2\x1a.presley.AdminMutationRateH\x00R\x18presleyAdminMutationRate\x12[\n" +
-	"\x1bpresley_admin_network_stats\x18r \x01(\v2\x1a.presley.AdminNetworkStatsH\x00R\x18presleyAdminNetworkStats\x12X\n" +
-	"\x1apresley_admin_node_metrics\x18s \x01(\v2\x19.presley.AdminNodeMetricsH\x00R\x17presleyAdminNodeMetrics\x12j\n" +
-	" presley_admin_persistence_status\x18t \x01(\v2\x1f.presley.AdminPersistenceStatusH\x00R\x1dpresleyAdminPersistenceStatus\x12U\n" +
-	"\x19presley_admin_queue_stats\x18u \x01(\v2\x18.presley.AdminQueueStatsH\x00R\x16presleyAdminQueueStats\x12j\n" +
-	" presley_admin_service_connection\x18v \x01(\v2\x1f.presley.AdminServiceConnectionH\x00R\x1dpresleyAdminServiceConnection\x12U\n" +
-	"\x19presley_admin_thread_info\x18w \x01(\v2\x18.presley.AdminThreadInfoH\x00R\x16presleyAdminThreadInfo\x12e\n" +
-	"\x1fpresley_admin_token_cache_stats\x18x \x01(\v2\x1d.presley.AdminTokenCacheStatsH\x00R\x1bpresleyAdminTokenCacheStats\x12U\n" +
-	"\x19presley_admin_topic_stats\x18y \x01(\v2\x18.presley.AdminTopicStatsH\x00R\x16presleyAdminTopicStats\x12X\n" +
-	"\x1apresley_admin_watch_health\x18z \x01(\v2\x19.presley.AdminWatchHealthH\x00R\x17presleyAdminWatchHealth\x122\n" +
-	"\fqueen_config\x18{ \x01(\v2\r.queen.ConfigH\x00R\vqueenConfig\x12J\n" +
-	"\x14serviceconfig_config\x18| \x01(\v2\x15.serviceconfig.ConfigH\x00R\x13serviceconfigConfig\x12?\n" +
-	"\x11snoopy_event_data\x18} \x01(\v2\x11.snoopy.EventDataH\x00R\x0fsnoopyEventData\x12K\n" +
-	"\x15snoopy_service_status\x18~ \x01(\v2\x15.snoopy.ServiceStatusH\x00R\x13snoopyServiceStatus\x12<\n" +
-	"\x10snoopy_task_item\x18\x7f \x01(\v2\x10.snoopy.TaskItemH\x00R\x0esnoopyTaskItem\x12E\n" +
-	"\x12springsteen_config\x18\x80\x01 \x01(\v2\x13.springsteen.ConfigH\x00R\x11springsteenConfig\x12I\n" +
-	"\x14woodstock_event_data\x18\x81\x01 \x01(\v2\x14.woodstock.EventDataH\x00R\x12woodstockEventData\x12U\n" +
-	"\x18woodstock_service_status\x18\x82\x01 \x01(\v2\x18.woodstock.ServiceStatusH\x00R\x16woodstockServiceStatus\x12F\n" +
-	"\x13woodstock_task_item\x18\x83\x01 \x01(\v2\x13.woodstock.TaskItemH\x00R\x11woodstockTaskItem\x127\n" +
-	"\x0ex509_x509_cert\x18\x84\x01 \x01(\v2\x0e.x509.X509CertH\x00R\fx509X509CertB\t\n" +
+	"\x11ironmaiden_config\x18i \x01(\v2\x12.ironmaiden.ConfigH\x00R\x10ironmaidenConfig\x12c\n" +
+	"\x1dironmaiden_entitlement_config\x18j \x01(\v2\x1d.ironmaiden.EntitlementConfigH\x00R\x1bironmaidenEntitlementConfig\x12Q\n" +
+	"\x17ironmaiden_external_jwk\x18k \x01(\v2\x17.ironmaiden.ExternalJwkH\x00R\x15ironmaidenExternalJwk\x12#\n" +
+	"\ajwk_jwk\x18l \x01(\v2\b.jwk.JwkH\x00R\x06jwkJwk\x126\n" +
+	"\x0eopa_opa_policy\x18m \x01(\v2\x0e.opa.OpaPolicyH\x00R\fopaOpaPolicy\x12^\n" +
+	"\x1cpresley_admin_cluster_health\x18n \x01(\v2\x1b.presley.AdminClusterHealthH\x00R\x19presleyAdminClusterHealth\x12X\n" +
+	"\x1apresley_admin_cluster_info\x18o \x01(\v2\x19.presley.AdminClusterInfoH\x00R\x17presleyAdminClusterInfo\x12R\n" +
+	"\x18presley_admin_graph_info\x18p \x01(\v2\x17.presley.AdminGraphInfoH\x00R\x15presleyAdminGraphInfo\x12R\n" +
+	"\x18presley_admin_grpc_stats\x18q \x01(\v2\x17.presley.AdminGrpcStatsH\x00R\x15presleyAdminGrpcStats\x12O\n" +
+	"\x17presley_admin_map_stats\x18r \x01(\v2\x16.presley.AdminMapStatsH\x00R\x14presleyAdminMapStats\x12[\n" +
+	"\x1bpresley_admin_mutation_rate\x18s \x01(\v2\x1a.presley.AdminMutationRateH\x00R\x18presleyAdminMutationRate\x12[\n" +
+	"\x1bpresley_admin_network_stats\x18t \x01(\v2\x1a.presley.AdminNetworkStatsH\x00R\x18presleyAdminNetworkStats\x12X\n" +
+	"\x1apresley_admin_node_metrics\x18u \x01(\v2\x19.presley.AdminNodeMetricsH\x00R\x17presleyAdminNodeMetrics\x12j\n" +
+	" presley_admin_persistence_status\x18v \x01(\v2\x1f.presley.AdminPersistenceStatusH\x00R\x1dpresleyAdminPersistenceStatus\x12U\n" +
+	"\x19presley_admin_queue_stats\x18w \x01(\v2\x18.presley.AdminQueueStatsH\x00R\x16presleyAdminQueueStats\x12j\n" +
+	" presley_admin_service_connection\x18x \x01(\v2\x1f.presley.AdminServiceConnectionH\x00R\x1dpresleyAdminServiceConnection\x12U\n" +
+	"\x19presley_admin_thread_info\x18y \x01(\v2\x18.presley.AdminThreadInfoH\x00R\x16presleyAdminThreadInfo\x12e\n" +
+	"\x1fpresley_admin_token_cache_stats\x18z \x01(\v2\x1d.presley.AdminTokenCacheStatsH\x00R\x1bpresleyAdminTokenCacheStats\x12U\n" +
+	"\x19presley_admin_topic_stats\x18{ \x01(\v2\x18.presley.AdminTopicStatsH\x00R\x16presleyAdminTopicStats\x12X\n" +
+	"\x1apresley_admin_watch_health\x18| \x01(\v2\x19.presley.AdminWatchHealthH\x00R\x17presleyAdminWatchHealth\x122\n" +
+	"\fqueen_config\x18} \x01(\v2\r.queen.ConfigH\x00R\vqueenConfig\x12J\n" +
+	"\x14serviceconfig_config\x18~ \x01(\v2\x15.serviceconfig.ConfigH\x00R\x13serviceconfigConfig\x12?\n" +
+	"\x11snoopy_event_data\x18\x7f \x01(\v2\x11.snoopy.EventDataH\x00R\x0fsnoopyEventData\x12L\n" +
+	"\x15snoopy_service_status\x18\x80\x01 \x01(\v2\x15.snoopy.ServiceStatusH\x00R\x13snoopyServiceStatus\x12=\n" +
+	"\x10snoopy_task_item\x18\x81\x01 \x01(\v2\x10.snoopy.TaskItemH\x00R\x0esnoopyTaskItem\x12E\n" +
+	"\x12springsteen_config\x18\x82\x01 \x01(\v2\x13.springsteen.ConfigH\x00R\x11springsteenConfig\x12I\n" +
+	"\x14woodstock_event_data\x18\x83\x01 \x01(\v2\x14.woodstock.EventDataH\x00R\x12woodstockEventData\x12U\n" +
+	"\x18woodstock_service_status\x18\x84\x01 \x01(\v2\x18.woodstock.ServiceStatusH\x00R\x16woodstockServiceStatus\x12F\n" +
+	"\x13woodstock_task_item\x18\x85\x01 \x01(\v2\x13.woodstock.TaskItemH\x00R\x11woodstockTaskItem\x127\n" +
+	"\x0ex509_x509_cert\x18\x86\x01 \x01(\v2\x0e.x509.X509CertH\x00R\fx509X509CertB\t\n" +
 	"\apayload\"\x9a\x01\n" +
 	"\x06DbDump\x12!\n" +
 	"\ftimestamp_ms\x18\x01 \x01(\x03R\vtimestampMs\x12\x1f\n" +
@@ -902,33 +937,35 @@ var file_services_kitchen_sink_proto_goTypes = []any{
 	(*genesis.GenesisCertData)(nil),            // 7: genesis.GenesisCertData
 	(*healthreport.ServiceInstanceHealth)(nil), // 8: healthreport.ServiceInstanceHealth
 	(*ironmaiden.Config)(nil),                  // 9: ironmaiden.Config
-	(*ironmaiden.ExternalJwk)(nil),             // 10: ironmaiden.ExternalJwk
-	(*jwk.Jwk)(nil),                            // 11: jwk.Jwk
-	(*presley.AdminClusterHealth)(nil),         // 12: presley.AdminClusterHealth
-	(*presley.AdminClusterInfo)(nil),           // 13: presley.AdminClusterInfo
-	(*presley.AdminGraphInfo)(nil),             // 14: presley.AdminGraphInfo
-	(*presley.AdminGrpcStats)(nil),             // 15: presley.AdminGrpcStats
-	(*presley.AdminMapStats)(nil),              // 16: presley.AdminMapStats
-	(*presley.AdminMutationRate)(nil),          // 17: presley.AdminMutationRate
-	(*presley.AdminNetworkStats)(nil),          // 18: presley.AdminNetworkStats
-	(*presley.AdminNodeMetrics)(nil),           // 19: presley.AdminNodeMetrics
-	(*presley.AdminPersistenceStatus)(nil),     // 20: presley.AdminPersistenceStatus
-	(*presley.AdminQueueStats)(nil),            // 21: presley.AdminQueueStats
-	(*presley.AdminServiceConnection)(nil),     // 22: presley.AdminServiceConnection
-	(*presley.AdminThreadInfo)(nil),            // 23: presley.AdminThreadInfo
-	(*presley.AdminTokenCacheStats)(nil),       // 24: presley.AdminTokenCacheStats
-	(*presley.AdminTopicStats)(nil),            // 25: presley.AdminTopicStats
-	(*presley.AdminWatchHealth)(nil),           // 26: presley.AdminWatchHealth
-	(*queen.Config)(nil),                       // 27: queen.Config
-	(*serviceconfig.Config)(nil),               // 28: serviceconfig.Config
-	(*snoopy.EventData)(nil),                   // 29: snoopy.EventData
-	(*snoopy.ServiceStatus)(nil),               // 30: snoopy.ServiceStatus
-	(*snoopy.TaskItem)(nil),                    // 31: snoopy.TaskItem
-	(*springsteen.Config)(nil),                 // 32: springsteen.Config
-	(*woodstock.EventData)(nil),                // 33: woodstock.EventData
-	(*woodstock.ServiceStatus)(nil),            // 34: woodstock.ServiceStatus
-	(*woodstock.TaskItem)(nil),                 // 35: woodstock.TaskItem
-	(*x509.X509Cert)(nil),                      // 36: x509.X509Cert
+	(*ironmaiden.EntitlementConfig)(nil),       // 10: ironmaiden.EntitlementConfig
+	(*ironmaiden.ExternalJwk)(nil),             // 11: ironmaiden.ExternalJwk
+	(*jwk.Jwk)(nil),                            // 12: jwk.Jwk
+	(*opa.OpaPolicy)(nil),                      // 13: opa.OpaPolicy
+	(*presley.AdminClusterHealth)(nil),         // 14: presley.AdminClusterHealth
+	(*presley.AdminClusterInfo)(nil),           // 15: presley.AdminClusterInfo
+	(*presley.AdminGraphInfo)(nil),             // 16: presley.AdminGraphInfo
+	(*presley.AdminGrpcStats)(nil),             // 17: presley.AdminGrpcStats
+	(*presley.AdminMapStats)(nil),              // 18: presley.AdminMapStats
+	(*presley.AdminMutationRate)(nil),          // 19: presley.AdminMutationRate
+	(*presley.AdminNetworkStats)(nil),          // 20: presley.AdminNetworkStats
+	(*presley.AdminNodeMetrics)(nil),           // 21: presley.AdminNodeMetrics
+	(*presley.AdminPersistenceStatus)(nil),     // 22: presley.AdminPersistenceStatus
+	(*presley.AdminQueueStats)(nil),            // 23: presley.AdminQueueStats
+	(*presley.AdminServiceConnection)(nil),     // 24: presley.AdminServiceConnection
+	(*presley.AdminThreadInfo)(nil),            // 25: presley.AdminThreadInfo
+	(*presley.AdminTokenCacheStats)(nil),       // 26: presley.AdminTokenCacheStats
+	(*presley.AdminTopicStats)(nil),            // 27: presley.AdminTopicStats
+	(*presley.AdminWatchHealth)(nil),           // 28: presley.AdminWatchHealth
+	(*queen.Config)(nil),                       // 29: queen.Config
+	(*serviceconfig.Config)(nil),               // 30: serviceconfig.Config
+	(*snoopy.EventData)(nil),                   // 31: snoopy.EventData
+	(*snoopy.ServiceStatus)(nil),               // 32: snoopy.ServiceStatus
+	(*snoopy.TaskItem)(nil),                    // 33: snoopy.TaskItem
+	(*springsteen.Config)(nil),                 // 34: springsteen.Config
+	(*woodstock.EventData)(nil),                // 35: woodstock.EventData
+	(*woodstock.ServiceStatus)(nil),            // 36: woodstock.ServiceStatus
+	(*woodstock.TaskItem)(nil),                 // 37: woodstock.TaskItem
+	(*x509.X509Cert)(nil),                      // 38: x509.X509Cert
 }
 var file_services_kitchen_sink_proto_depIdxs = []int32{
 	0,  // 0: kitchen_sink.KitchenSink.op:type_name -> kitchen_sink.OpType
@@ -939,39 +976,41 @@ var file_services_kitchen_sink_proto_depIdxs = []int32{
 	7,  // 5: kitchen_sink.KitchenSink.genesis_genesis_cert_data:type_name -> genesis.GenesisCertData
 	8,  // 6: kitchen_sink.KitchenSink.healthreport_service_instance_health:type_name -> healthreport.ServiceInstanceHealth
 	9,  // 7: kitchen_sink.KitchenSink.ironmaiden_config:type_name -> ironmaiden.Config
-	10, // 8: kitchen_sink.KitchenSink.ironmaiden_external_jwk:type_name -> ironmaiden.ExternalJwk
-	11, // 9: kitchen_sink.KitchenSink.jwk_jwk:type_name -> jwk.Jwk
-	12, // 10: kitchen_sink.KitchenSink.presley_admin_cluster_health:type_name -> presley.AdminClusterHealth
-	13, // 11: kitchen_sink.KitchenSink.presley_admin_cluster_info:type_name -> presley.AdminClusterInfo
-	14, // 12: kitchen_sink.KitchenSink.presley_admin_graph_info:type_name -> presley.AdminGraphInfo
-	15, // 13: kitchen_sink.KitchenSink.presley_admin_grpc_stats:type_name -> presley.AdminGrpcStats
-	16, // 14: kitchen_sink.KitchenSink.presley_admin_map_stats:type_name -> presley.AdminMapStats
-	17, // 15: kitchen_sink.KitchenSink.presley_admin_mutation_rate:type_name -> presley.AdminMutationRate
-	18, // 16: kitchen_sink.KitchenSink.presley_admin_network_stats:type_name -> presley.AdminNetworkStats
-	19, // 17: kitchen_sink.KitchenSink.presley_admin_node_metrics:type_name -> presley.AdminNodeMetrics
-	20, // 18: kitchen_sink.KitchenSink.presley_admin_persistence_status:type_name -> presley.AdminPersistenceStatus
-	21, // 19: kitchen_sink.KitchenSink.presley_admin_queue_stats:type_name -> presley.AdminQueueStats
-	22, // 20: kitchen_sink.KitchenSink.presley_admin_service_connection:type_name -> presley.AdminServiceConnection
-	23, // 21: kitchen_sink.KitchenSink.presley_admin_thread_info:type_name -> presley.AdminThreadInfo
-	24, // 22: kitchen_sink.KitchenSink.presley_admin_token_cache_stats:type_name -> presley.AdminTokenCacheStats
-	25, // 23: kitchen_sink.KitchenSink.presley_admin_topic_stats:type_name -> presley.AdminTopicStats
-	26, // 24: kitchen_sink.KitchenSink.presley_admin_watch_health:type_name -> presley.AdminWatchHealth
-	27, // 25: kitchen_sink.KitchenSink.queen_config:type_name -> queen.Config
-	28, // 26: kitchen_sink.KitchenSink.serviceconfig_config:type_name -> serviceconfig.Config
-	29, // 27: kitchen_sink.KitchenSink.snoopy_event_data:type_name -> snoopy.EventData
-	30, // 28: kitchen_sink.KitchenSink.snoopy_service_status:type_name -> snoopy.ServiceStatus
-	31, // 29: kitchen_sink.KitchenSink.snoopy_task_item:type_name -> snoopy.TaskItem
-	32, // 30: kitchen_sink.KitchenSink.springsteen_config:type_name -> springsteen.Config
-	33, // 31: kitchen_sink.KitchenSink.woodstock_event_data:type_name -> woodstock.EventData
-	34, // 32: kitchen_sink.KitchenSink.woodstock_service_status:type_name -> woodstock.ServiceStatus
-	35, // 33: kitchen_sink.KitchenSink.woodstock_task_item:type_name -> woodstock.TaskItem
-	36, // 34: kitchen_sink.KitchenSink.x509_x509_cert:type_name -> x509.X509Cert
-	2,  // 35: kitchen_sink.DbDump.entries:type_name -> kitchen_sink.KitchenSink
-	36, // [36:36] is the sub-list for method output_type
-	36, // [36:36] is the sub-list for method input_type
-	36, // [36:36] is the sub-list for extension type_name
-	36, // [36:36] is the sub-list for extension extendee
-	0,  // [0:36] is the sub-list for field type_name
+	10, // 8: kitchen_sink.KitchenSink.ironmaiden_entitlement_config:type_name -> ironmaiden.EntitlementConfig
+	11, // 9: kitchen_sink.KitchenSink.ironmaiden_external_jwk:type_name -> ironmaiden.ExternalJwk
+	12, // 10: kitchen_sink.KitchenSink.jwk_jwk:type_name -> jwk.Jwk
+	13, // 11: kitchen_sink.KitchenSink.opa_opa_policy:type_name -> opa.OpaPolicy
+	14, // 12: kitchen_sink.KitchenSink.presley_admin_cluster_health:type_name -> presley.AdminClusterHealth
+	15, // 13: kitchen_sink.KitchenSink.presley_admin_cluster_info:type_name -> presley.AdminClusterInfo
+	16, // 14: kitchen_sink.KitchenSink.presley_admin_graph_info:type_name -> presley.AdminGraphInfo
+	17, // 15: kitchen_sink.KitchenSink.presley_admin_grpc_stats:type_name -> presley.AdminGrpcStats
+	18, // 16: kitchen_sink.KitchenSink.presley_admin_map_stats:type_name -> presley.AdminMapStats
+	19, // 17: kitchen_sink.KitchenSink.presley_admin_mutation_rate:type_name -> presley.AdminMutationRate
+	20, // 18: kitchen_sink.KitchenSink.presley_admin_network_stats:type_name -> presley.AdminNetworkStats
+	21, // 19: kitchen_sink.KitchenSink.presley_admin_node_metrics:type_name -> presley.AdminNodeMetrics
+	22, // 20: kitchen_sink.KitchenSink.presley_admin_persistence_status:type_name -> presley.AdminPersistenceStatus
+	23, // 21: kitchen_sink.KitchenSink.presley_admin_queue_stats:type_name -> presley.AdminQueueStats
+	24, // 22: kitchen_sink.KitchenSink.presley_admin_service_connection:type_name -> presley.AdminServiceConnection
+	25, // 23: kitchen_sink.KitchenSink.presley_admin_thread_info:type_name -> presley.AdminThreadInfo
+	26, // 24: kitchen_sink.KitchenSink.presley_admin_token_cache_stats:type_name -> presley.AdminTokenCacheStats
+	27, // 25: kitchen_sink.KitchenSink.presley_admin_topic_stats:type_name -> presley.AdminTopicStats
+	28, // 26: kitchen_sink.KitchenSink.presley_admin_watch_health:type_name -> presley.AdminWatchHealth
+	29, // 27: kitchen_sink.KitchenSink.queen_config:type_name -> queen.Config
+	30, // 28: kitchen_sink.KitchenSink.serviceconfig_config:type_name -> serviceconfig.Config
+	31, // 29: kitchen_sink.KitchenSink.snoopy_event_data:type_name -> snoopy.EventData
+	32, // 30: kitchen_sink.KitchenSink.snoopy_service_status:type_name -> snoopy.ServiceStatus
+	33, // 31: kitchen_sink.KitchenSink.snoopy_task_item:type_name -> snoopy.TaskItem
+	34, // 32: kitchen_sink.KitchenSink.springsteen_config:type_name -> springsteen.Config
+	35, // 33: kitchen_sink.KitchenSink.woodstock_event_data:type_name -> woodstock.EventData
+	36, // 34: kitchen_sink.KitchenSink.woodstock_service_status:type_name -> woodstock.ServiceStatus
+	37, // 35: kitchen_sink.KitchenSink.woodstock_task_item:type_name -> woodstock.TaskItem
+	38, // 36: kitchen_sink.KitchenSink.x509_x509_cert:type_name -> x509.X509Cert
+	2,  // 37: kitchen_sink.DbDump.entries:type_name -> kitchen_sink.KitchenSink
+	38, // [38:38] is the sub-list for method output_type
+	38, // [38:38] is the sub-list for method input_type
+	38, // [38:38] is the sub-list for extension type_name
+	38, // [38:38] is the sub-list for extension extendee
+	0,  // [0:38] is the sub-list for field type_name
 }
 
 func init() { file_services_kitchen_sink_proto_init() }
@@ -986,8 +1025,10 @@ func file_services_kitchen_sink_proto_init() {
 		(*KitchenSink_GenesisGenesisCertData)(nil),
 		(*KitchenSink_HealthreportServiceInstanceHealth)(nil),
 		(*KitchenSink_IronmaidenConfig)(nil),
+		(*KitchenSink_IronmaidenEntitlementConfig)(nil),
 		(*KitchenSink_IronmaidenExternalJwk)(nil),
 		(*KitchenSink_JwkJwk)(nil),
+		(*KitchenSink_OpaOpaPolicy)(nil),
 		(*KitchenSink_PresleyAdminClusterHealth)(nil),
 		(*KitchenSink_PresleyAdminClusterInfo)(nil),
 		(*KitchenSink_PresleyAdminGraphInfo)(nil),

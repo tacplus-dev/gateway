@@ -70,7 +70,7 @@ import type { Message } from "@bufbuild/protobuf";
 export const file_services_ironmaiden: GenFile =
   /*@__PURE__*/
   fileDesc(
-    "ChlzZXJ2aWNlcy9pcm9ubWFpZGVuLnByb3RvEgppcm9ubWFpZGVuIpIECgZDb25maWcSJgoFb2F1dGgYASABKAsyFy5pcm9ubWFpZGVuLk9BdXRoQ29uZmlnEjAKHWFjY2Vzc190b2tlbl9saWZldGltZV9zZWNvbmRzGAIgASgDQgnAph0BkKgdhAcSMgoecmVmcmVzaF90b2tlbl9saWZldGltZV9zZWNvbmRzGAMgASgDQgrAph0BkKgdgKMFEi0KFGtleV9saWZldGltZV9zZWNvbmRzGAQgASgDQg/Aph0ByKYdkByQqB2AowUSKwoUbm9uY2VfZXhwaXJlX3NlY29uZHMYBSABKANCDcCmHQHIph0BkKgdrAISGAoGaXNzdWVyGAYgASgJQgiIph0BqKYdAhIvChxqd2tfcmVmZXRjaF9pbnRlcnZhbF9zZWNvbmRzGAcgASgDQgnAph0BkKgdrAISHAoUY2xhaW1fbWFwcGluZ19wb2xpY3kYCiABKAkSGwoTZW50aXRsZW1lbnRzX3BvbGljeRgLIAEoCRJEChRlbnRpdGxlbWVudF9tYXBwaW5ncxgIIAMoCzImLmVudGl0bGVtZW50LlNlcnZpY2VFbnRpdGxlbWVudE1hcHBpbmcSPgoUc2VydmljZV9lbnRpdGxlbWVudHMYCSADKAsyIC5lbnRpdGxlbWVudC5TZXJ2aWNlRW50aXRsZW1lbnRzOhLSqB0OCgppcm9ubWFpZGVuEAYiggEKC09BdXRoQ29uZmlnEg4KBmVuYWJsZRgBIAEoCBIOCgZzY29wZXMYAiADKAkSLQoJcHJvdmlkZXJzGAMgAygLMhouaXJvbm1haWRlbi5Qcm92aWRlckNvbmZpZxIkCghhdWRpZW5jZRgEIAEoCUISiKcdAYqoHQppcm9ubWFpZGVuIq0CCg5Qcm92aWRlckNvbmZpZxIOCgZlbmFibGUYASABKAgSEgoEbmFtZRgCIAEoCUIEiKcdARIPCgdkb21haW5zGAMgAygJEhgKBmlzc3VlchgEIAEoCUIIiKYdAaimHQISGwoJY2xpZW50X2lkGAUgASgJQgiIph0BiKcdARIfCg1jbGllbnRfc2VjcmV0GAYgASgJQgiIph0BiKcdARIkChZhdXRob3JpemF0aW9uX2VuZHBvaW50GAcgASgJQgSoph0CEhwKDnRva2VuX2VuZHBvaW50GAggASgJQgSoph0CEiIKFGVuZF9zZXNzaW9uX2VuZHBvaW50GAkgASgJQgSoph0CEg4KBnNjb3BlcxgKIAMoCRIWCghhdWRpZW5jZRgLIAEoCUIEiKcdASKRAQoPSXJvbk1haWRlblN0YXRlEkIKDnZlcmlmeWluZ19rZXlzGAEgAygLMgguandrLkp3a0Ig4LUYAuC2GAGatxgUSndrVmVyaWZ5aW5nS2V5c1ZpZXcSIQoDb3BhGAIgASgLMg4ub3BhLk9wYVBvbGljeUIE4LUYAjoXmqgdD0lyb25NYWlkZW5TdGF0ZaCoHQIiegoXSXJvbk1haWRlblN0YXRlSW50ZXJuYWwSOgoNZXh0ZXJuYWxfandrcxgBIAMoCzIXLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tCCuC1GALIthiAowU6I5qoHRdJcm9uTWFpZGVuU3RhdGVJbnRlcm5hbKCoHQLYqB0BInkKC0V4dGVybmFsSndrEhkKA2tpZBgBIAEoCUIM0LUYAYimHQGIpx0BEhsKA2tleRgCIAEoCzIILmp3ay5Kd2tCBIimHQESGAoGaXNzdWVyGAMgASgJQgiIph0BqKYdAhIYCgpmZXRjaGVkX2F0GAQgASgDQgSopx0AIkQKFUxpc3RQcm92aWRlcnNSZXNwb25zZRIrCglwcm92aWRlcnMYASADKAsyGC5pcm9ubWFpZGVuLlByb3ZpZGVySW5mbyJVCgxQcm92aWRlckluZm8SFgoEbmFtZRgBIAEoCUIIiKYdAYinHQESDwoHZG9tYWlucxgCIAMoCRIcCg5wcm92aWRlcl9pbmRleBgDIAEoBUIEsKcdACJQChBBdXRob3JpemVSZXF1ZXN0EhwKDnByb3ZpZGVyX2luZGV4GAEgASgFQgSwpx0AEh4KDGNhbGxiYWNrX3VybBgCIAEoCUIIiKYdAaimHQIiMwoRQXV0aG9yaXplUmVzcG9uc2USHgoMcmVkaXJlY3RfdXJsGAEgASgJQgiIph0BqKYdAiI6Cg9DYWxsYmFja1JlcXVlc3QSEgoEY29kZRgBIAEoCUIEiKYdARITCgVzdGF0ZRgCIAEoCUIEiKYdASLCAQoQQ2FsbGJhY2tSZXNwb25zZRIfCg1yZWZyZXNoX3Rva2VuGAEgASgJQgiIph0BiKcdARIeCgxhY2Nlc3NfdG9rZW4YAiABKAlCCIimHQGIpx0BEh4KDGNhbGxiYWNrX3VybBgDIAEoCUIIiKYdAaimHQISJQoXYWNjZXNzX3Rva2VuX2V4cGlyZXNfaW4YBCABKANCBKinHQASJgoYcmVmcmVzaF90b2tlbl9leHBpcmVzX2luGAUgASgDQgSopx0AIkQKE1JlZnJlc2hUb2tlblJlcXVlc3QSGwoNcmVmcmVzaF90b2tlbhgBIAEoCUIEiKYdARIQCghhdWRpZW5jZRgCIAEoCSJQChRSZWZyZXNoVG9rZW5SZXNwb25zZRIeCgxhY2Nlc3NfdG9rZW4YASABKAlCCIimHQGIpx0BEhgKCmV4cGlyZXNfaW4YAiABKANCBKinHQAiTgoNTG9nb3V0UmVxdWVzdBImChhwb3N0X2xvZ291dF9yZWRpcmVjdF91cmwYASABKAlCBKimHQISFQoNaWRfdG9rZW5faGludBgCIAEoCSIsCg5Mb2dvdXRSZXNwb25zZRIaCgxyZWRpcmVjdF91cmwYASABKAlCBKimHQIiTgoURXhjaGFuZ2VUb2tlblJlcXVlc3QSGgoMYWNjZXNzX3Rva2VuGAEgASgJQgSIph0BEhoKCGF1ZGllbmNlGAIgASgJQgiIph0BiKcdASJRChVFeGNoYW5nZVRva2VuUmVzcG9uc2USHgoMYWNjZXNzX3Rva2VuGAEgASgJQgiIph0BiKcdARIYCgpleHBpcmVzX2luGAIgASgDQgSopx0AInAKClF1ZXJ5VmFsdWUSFgoMc3RyaW5nX3ZhbHVlGAEgASgJSAASEwoJaW50X3ZhbHVlGAIgASgDSAASFgoMZG91YmxlX3ZhbHVlGAMgASgBSAASFAoKYm9vbF92YWx1ZRgEIAEoCEgAQgcKBXZhbHVlIpQBCglQcmVkaWNhdGUSEgoKZmllbGRfbmFtZRgBIAEoCRIkCgJvcBgCIAEoDjIYLmlyb25tYWlkZW4uQ29tcGFyaXNvbk9wEiUKBXZhbHVlGAMgASgLMhYuaXJvbm1haWRlbi5RdWVyeVZhbHVlEiYKBnZhbHVlcxgEIAMoCzIWLmlyb25tYWlkZW4uUXVlcnlWYWx1ZSKKAQoOUHJlZGljYXRlR3JvdXASIQoCb3AYASABKA4yFS5pcm9ubWFpZGVuLkxvZ2ljYWxPcBIpCgpwcmVkaWNhdGVzGAIgAygLMhUuaXJvbm1haWRlbi5QcmVkaWNhdGUSKgoGZ3JvdXBzGAMgAygLMhouaXJvbm1haWRlbi5QcmVkaWNhdGVHcm91cCJNCglTb3J0RmllbGQSEgoKZmllbGRfbmFtZRgBIAEoCRIsCglkaXJlY3Rpb24YAiABKA4yGS5pcm9ubWFpZGVuLlNvcnREaXJlY3Rpb24ihAEKD0NvbGxlY3Rpb25RdWVyeRIpCgV3aGVyZRgBIAEoCzIaLmlyb25tYWlkZW4uUHJlZGljYXRlR3JvdXASJwoIb3JkZXJfYnkYAiADKAsyFS5pcm9ubWFpZGVuLlNvcnRGaWVsZBINCgVsaW1pdBgDIAEoBRIOCgZvZmZzZXQYBCABKAUiJgoXVmVyaWZ5aW5nS2V5c0dldFJlcXVlc3QSCwoDa2V5GAEgASgJIlUKF1ZlcmlmeWluZ0tleXNQdXRSZXF1ZXN0EgsKA2tleRgBIAEoCRIXCgV2YWx1ZRgCIAEoCzIILmp3ay5Kd2sSFAoMbG9ja19jb3VudGVyGAMgASgDIhwKGlZlcmlmeWluZ0tleXNHZXRBbGxSZXF1ZXN0IhoKGFZlcmlmeWluZ0tleXNLZXlzUmVxdWVzdCIaChhWZXJpZnlpbmdLZXlzU2l6ZVJlcXVlc3QiGwoZVmVyaWZ5aW5nS2V5c0NsZWFyUmVxdWVzdCJEChpWZXJpZnlpbmdLZXlzVmFsdWVSZXNwb25zZRIXCgV2YWx1ZRgBIAEoCzIILmp3ay5Kd2sSDQoFZm91bmQYAiABKAgioAEKHFZlcmlmeWluZ0tleXNFbnRyaWVzUmVzcG9uc2USRgoHZW50cmllcxgBIAMoCzI1Lmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c0VudHJpZXNSZXNwb25zZS5FbnRyaWVzRW50cnkaOAoMRW50cmllc0VudHJ5EgsKA2tleRgBIAEoCRIXCgV2YWx1ZRgCIAEoCzIILmp3ay5Kd2s6AjgBIikKGVZlcmlmeWluZ0tleXNLZXlzUmVzcG9uc2USDAoEa2V5cxgBIAMoCSIpChlWZXJpZnlpbmdLZXlzU2l6ZVJlc3BvbnNlEgwKBHNpemUYASABKAUiRwoZVmVyaWZ5aW5nS2V5c1F1ZXJ5UmVxdWVzdBIqCgVxdWVyeRgBIAEoCzIbLmlyb25tYWlkZW4uQ29sbGVjdGlvblF1ZXJ5IkwKGlZlcmlmeWluZ0tleXNRdWVyeVJlc3BvbnNlEhkKB3Jlc3VsdHMYASADKAsyCC5qd2suSndrEhMKC3RvdGFsX2NvdW50GAIgASgFIiUKFkV4dGVybmFsSndrc0dldFJlcXVlc3QSCwoDa2V5GAEgASgJImMKFkV4dGVybmFsSndrc1B1dFJlcXVlc3QSCwoDa2V5GAEgASgJEiYKBXZhbHVlGAIgASgLMhcuaXJvbm1haWRlbi5FeHRlcm5hbEp3axIUCgxsb2NrX2NvdW50ZXIYAyABKAMiGwoZRXh0ZXJuYWxKd2tzR2V0QWxsUmVxdWVzdCIZChdFeHRlcm5hbEp3a3NLZXlzUmVxdWVzdCIZChdFeHRlcm5hbEp3a3NTaXplUmVxdWVzdCIaChhFeHRlcm5hbEp3a3NDbGVhclJlcXVlc3QiUgoZRXh0ZXJuYWxKd2tzVmFsdWVSZXNwb25zZRImCgV2YWx1ZRgBIAEoCzIXLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2sSDQoFZm91bmQYAiABKAgirQEKG0V4dGVybmFsSndrc0VudHJpZXNSZXNwb25zZRJFCgdlbnRyaWVzGAEgAygLMjQuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NFbnRyaWVzUmVzcG9uc2UuRW50cmllc0VudHJ5GkcKDEVudHJpZXNFbnRyeRILCgNrZXkYASABKAkSJgoFdmFsdWUYAiABKAsyFy5pcm9ubWFpZGVuLkV4dGVybmFsSndrOgI4ASIoChhFeHRlcm5hbEp3a3NLZXlzUmVzcG9uc2USDAoEa2V5cxgBIAMoCSIoChhFeHRlcm5hbEp3a3NTaXplUmVzcG9uc2USDAoEc2l6ZRgBIAEoBSJGChhFeHRlcm5hbEp3a3NRdWVyeVJlcXVlc3QSKgoFcXVlcnkYASABKAsyGy5pcm9ubWFpZGVuLkNvbGxlY3Rpb25RdWVyeSJaChlFeHRlcm5hbEp3a3NRdWVyeVJlc3BvbnNlEigKB3Jlc3VsdHMYASADKAsyFy5pcm9ubWFpZGVuLkV4dGVybmFsSndrEhMKC3RvdGFsX2NvdW50GAIgASgFIgoKCE1hcEVtcHR5KrMCCgxDb21wYXJpc29uT3ASHQoZQ09NUEFSSVNPTl9PUF9VTlNQRUNJRklFRBAAEhQKEENPTVBBUklTT05fT1BfRVEQARIUChBDT01QQVJJU09OX09QX05FEAISFAoQQ09NUEFSSVNPTl9PUF9HVBADEhQKEENPTVBBUklTT05fT1BfR0UQBBIUChBDT01QQVJJU09OX09QX0xUEAUSFAoQQ09NUEFSSVNPTl9PUF9MRRAGEhQKEENPTVBBUklTT05fT1BfSU4QBxIYChRDT01QQVJJU09OX09QX05PVF9JThAIEhYKEkNPTVBBUklTT05fT1BfTElLRRAJEhkKFUNPTVBBUklTT05fT1BfSVNfTlVMTBAKEh0KGUNPTVBBUklTT05fT1BfSVNfTk9UX05VTEwQCypgCg1Tb3J0RGlyZWN0aW9uEh4KGlNPUlRfRElSRUNUSU9OX1VOU1BFQ0lGSUVEEAASFgoSU09SVF9ESVJFQ1RJT05fQVNDEAESFwoTU09SVF9ESVJFQ1RJT05fREVTQxACKk4KCUxvZ2ljYWxPcBIaChZMT0dJQ0FMX09QX1VOU1BFQ0lGSUVEEAASEgoOTE9HSUNBTF9PUF9BTkQQARIRCg1MT0dJQ0FMX09QX09SEAIy2gUKEUlyb25NYWlkZW5TZXJ2aWNlEnAKDUxpc3RQcm92aWRlcnMSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaIS5pcm9ubWFpZGVuLkxpc3RQcm92aWRlcnNSZXNwb25zZSIkgtPkkwIeEhwvYXBpL2lyb25tYWlkZW4vdjEvcHJvdmlkZXJzEnEKCUF1dGhvcml6ZRIcLmlyb25tYWlkZW4uQXV0aG9yaXplUmVxdWVzdBodLmlyb25tYWlkZW4uQXV0aG9yaXplUmVzcG9uc2UiJ4LT5JMCISIcL2FwaS9pcm9ubWFpZGVuL3YxL2F1dGhvcml6ZToBKhJtCghDYWxsYmFjaxIbLmlyb25tYWlkZW4uQ2FsbGJhY2tSZXF1ZXN0GhwuaXJvbm1haWRlbi5DYWxsYmFja1Jlc3BvbnNlIiaC0+STAiAiGy9hcGkvaXJvbm1haWRlbi92MS9jYWxsYmFjazoBKhJ4CgxSZWZyZXNoVG9rZW4SHy5pcm9ubWFpZGVuLlJlZnJlc2hUb2tlblJlcXVlc3QaIC5pcm9ubWFpZGVuLlJlZnJlc2hUb2tlblJlc3BvbnNlIiWC0+STAh8iGi9hcGkvaXJvbm1haWRlbi92MS9yZWZyZXNoOgEqEnwKDUV4Y2hhbmdlVG9rZW4SIC5pcm9ubWFpZGVuLkV4Y2hhbmdlVG9rZW5SZXF1ZXN0GiEuaXJvbm1haWRlbi5FeGNoYW5nZVRva2VuUmVzcG9uc2UiJoLT5JMCICIbL2FwaS9pcm9ubWFpZGVuL3YxL2V4Y2hhbmdlOgEqEmUKBkxvZ291dBIZLmlyb25tYWlkZW4uTG9nb3V0UmVxdWVzdBoaLmlyb25tYWlkZW4uTG9nb3V0UmVzcG9uc2UiJILT5JMCHiIZL2FwaS9pcm9ubWFpZGVuL3YxL2xvZ291dDoBKhoSopciCmlyb25tYWlkZW64lyIBMvcLCh1Jcm9uTWFpZGVuU3RhdGVCYWNrZW5kU2VydmljZRIwCgZHZXRPcGESFi5nb29nbGUucHJvdG9idWYuRW1wdHkaDi5vcGEuT3BhUG9saWN5EigKBlNldE9wYRIOLm9wYS5PcGFQb2xpY3kaDi5vcGEuT3BhUG9saWN5EjQKCFdhdGNoT3BhEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5Gg4ub3BhLk9wYVBvbGljeTABEl8KEEdldFZlcmlmeWluZ0tleXMSIy5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNHZXRSZXF1ZXN0GiYuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzVmFsdWVSZXNwb25zZRJfChBQdXRWZXJpZnlpbmdLZXlzEiMuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzUHV0UmVxdWVzdBomLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c1ZhbHVlUmVzcG9uc2USTQoQU2V0VmVyaWZ5aW5nS2V5cxIjLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c1B1dFJlcXVlc3QaFC5pcm9ubWFpZGVuLk1hcEVtcHR5EmIKE1JlbW92ZVZlcmlmeWluZ0tleXMSIy5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNHZXRSZXF1ZXN0GiYuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzVmFsdWVSZXNwb25zZRJQChNEZWxldGVWZXJpZnlpbmdLZXlzEiMuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzR2V0UmVxdWVzdBoULmlyb25tYWlkZW4uTWFwRW1wdHkSZwoYQ29udGFpbnNLZXlWZXJpZnlpbmdLZXlzEiMuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzR2V0UmVxdWVzdBomLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c1ZhbHVlUmVzcG9uc2USZwoTR2V0QWxsVmVyaWZ5aW5nS2V5cxImLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c0dldEFsbFJlcXVlc3QaKC5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNFbnRyaWVzUmVzcG9uc2USYgoTS2V5U2V0VmVyaWZ5aW5nS2V5cxIkLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c0tleXNSZXF1ZXN0GiUuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzS2V5c1Jlc3BvbnNlEmAKEVNpemVWZXJpZnlpbmdLZXlzEiQuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzU2l6ZVJlcXVlc3QaJS5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNTaXplUmVzcG9uc2USUQoSQ2xlYXJWZXJpZnlpbmdLZXlzEiUuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzQ2xlYXJSZXF1ZXN0GhQuaXJvbm1haWRlbi5NYXBFbXB0eRJnChhQdXRJZkFic2VudFZlcmlmeWluZ0tleXMSIy5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNQdXRSZXF1ZXN0GiYuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzVmFsdWVSZXNwb25zZRJYChJXYXRjaFZlcmlmeWluZ0tleXMSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaKC5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNFbnRyaWVzUmVzcG9uc2UwARJjChJRdWVyeVZlcmlmeWluZ0tleXMSJS5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNRdWVyeVJlcXVlc3QaJi5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNRdWVyeVJlc3BvbnNlEmoKF1dhdGNoUXVlcnlWZXJpZnlpbmdLZXlzEiUuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzUXVlcnlSZXF1ZXN0GiYuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzUXVlcnlSZXNwb25zZTABMscKCiVJcm9uTWFpZGVuU3RhdGVJbnRlcm5hbEJhY2tlbmRTZXJ2aWNlElwKD0dldEV4dGVybmFsSndrcxIiLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzR2V0UmVxdWVzdBolLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzVmFsdWVSZXNwb25zZRJcCg9QdXRFeHRlcm5hbEp3a3MSIi5pcm9ubWFpZGVuLkV4dGVybmFsSndrc1B1dFJlcXVlc3QaJS5pcm9ubWFpZGVuLkV4dGVybmFsSndrc1ZhbHVlUmVzcG9uc2USSwoPU2V0RXh0ZXJuYWxKd2tzEiIuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NQdXRSZXF1ZXN0GhQuaXJvbm1haWRlbi5NYXBFbXB0eRJfChJSZW1vdmVFeHRlcm5hbEp3a3MSIi5pcm9ubWFpZGVuLkV4dGVybmFsSndrc0dldFJlcXVlc3QaJS5pcm9ubWFpZGVuLkV4dGVybmFsSndrc1ZhbHVlUmVzcG9uc2USTgoSRGVsZXRlRXh0ZXJuYWxKd2tzEiIuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NHZXRSZXF1ZXN0GhQuaXJvbm1haWRlbi5NYXBFbXB0eRJkChdDb250YWluc0tleUV4dGVybmFsSndrcxIiLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzR2V0UmVxdWVzdBolLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzVmFsdWVSZXNwb25zZRJkChJHZXRBbGxFeHRlcm5hbEp3a3MSJS5pcm9ubWFpZGVuLkV4dGVybmFsSndrc0dldEFsbFJlcXVlc3QaJy5pcm9ubWFpZGVuLkV4dGVybmFsSndrc0VudHJpZXNSZXNwb25zZRJfChJLZXlTZXRFeHRlcm5hbEp3a3MSIy5pcm9ubWFpZGVuLkV4dGVybmFsSndrc0tleXNSZXF1ZXN0GiQuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NLZXlzUmVzcG9uc2USXQoQU2l6ZUV4dGVybmFsSndrcxIjLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzU2l6ZVJlcXVlc3QaJC5pcm9ubWFpZGVuLkV4dGVybmFsSndrc1NpemVSZXNwb25zZRJPChFDbGVhckV4dGVybmFsSndrcxIkLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzQ2xlYXJSZXF1ZXN0GhQuaXJvbm1haWRlbi5NYXBFbXB0eRJkChdQdXRJZkFic2VudEV4dGVybmFsSndrcxIiLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzUHV0UmVxdWVzdBolLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzVmFsdWVSZXNwb25zZRJWChFXYXRjaEV4dGVybmFsSndrcxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRonLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzRW50cmllc1Jlc3BvbnNlMAESYAoRUXVlcnlFeHRlcm5hbEp3a3MSJC5pcm9ubWFpZGVuLkV4dGVybmFsSndrc1F1ZXJ5UmVxdWVzdBolLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzUXVlcnlSZXNwb25zZRJnChZXYXRjaFF1ZXJ5RXh0ZXJuYWxKd2tzEiQuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NRdWVyeVJlcXVlc3QaJS5pcm9ubWFpZGVuLkV4dGVybmFsSndrc1F1ZXJ5UmVzcG9uc2UwAWIGcHJvdG8z",
+    "ChlzZXJ2aWNlcy9pcm9ubWFpZGVuLnByb3RvEgppcm9ubWFpZGVuIpIECgZDb25maWcSJgoFb2F1dGgYASABKAsyFy5pcm9ubWFpZGVuLk9BdXRoQ29uZmlnEjAKHWFjY2Vzc190b2tlbl9saWZldGltZV9zZWNvbmRzGAIgASgDQgnAph0BkKgdhAcSMgoecmVmcmVzaF90b2tlbl9saWZldGltZV9zZWNvbmRzGAMgASgDQgrAph0BkKgdgKMFEi0KFGtleV9saWZldGltZV9zZWNvbmRzGAQgASgDQg/Aph0ByKYdkByQqB2AowUSKwoUbm9uY2VfZXhwaXJlX3NlY29uZHMYBSABKANCDcCmHQHIph0BkKgdrAISGAoGaXNzdWVyGAYgASgJQgiIph0BqKYdAhIvChxqd2tfcmVmZXRjaF9pbnRlcnZhbF9zZWNvbmRzGAcgASgDQgnAph0BkKgdrAISHAoUY2xhaW1fbWFwcGluZ19wb2xpY3kYCiABKAkSGwoTZW50aXRsZW1lbnRzX3BvbGljeRgLIAEoCRJEChRlbnRpdGxlbWVudF9tYXBwaW5ncxgIIAMoCzImLmVudGl0bGVtZW50LlNlcnZpY2VFbnRpdGxlbWVudE1hcHBpbmcSPgoUc2VydmljZV9lbnRpdGxlbWVudHMYCSADKAsyIC5lbnRpdGxlbWVudC5TZXJ2aWNlRW50aXRsZW1lbnRzOhLSqB0OCgppcm9ubWFpZGVuEAYiggEKC09BdXRoQ29uZmlnEg4KBmVuYWJsZRgBIAEoCBIOCgZzY29wZXMYAiADKAkSLQoJcHJvdmlkZXJzGAMgAygLMhouaXJvbm1haWRlbi5Qcm92aWRlckNvbmZpZxIkCghhdWRpZW5jZRgEIAEoCUISiKcdAYqoHQppcm9ubWFpZGVuIq0CCg5Qcm92aWRlckNvbmZpZxIOCgZlbmFibGUYASABKAgSEgoEbmFtZRgCIAEoCUIEiKcdARIPCgdkb21haW5zGAMgAygJEhgKBmlzc3VlchgEIAEoCUIIiKYdAaimHQISGwoJY2xpZW50X2lkGAUgASgJQgiIph0BiKcdARIfCg1jbGllbnRfc2VjcmV0GAYgASgJQgiIph0BiKcdARIkChZhdXRob3JpemF0aW9uX2VuZHBvaW50GAcgASgJQgSoph0CEhwKDnRva2VuX2VuZHBvaW50GAggASgJQgSoph0CEiIKFGVuZF9zZXNzaW9uX2VuZHBvaW50GAkgASgJQgSoph0CEg4KBnNjb3BlcxgKIAMoCRIWCghhdWRpZW5jZRgLIAEoCUIEiKcdASKZAQoRRW50aXRsZW1lbnRDb25maWcSRAoUZW50aXRsZW1lbnRfbWFwcGluZ3MYASADKAsyJi5lbnRpdGxlbWVudC5TZXJ2aWNlRW50aXRsZW1lbnRNYXBwaW5nEj4KFHNlcnZpY2VfZW50aXRsZW1lbnRzGAIgAygLMiAuZW50aXRsZW1lbnQuU2VydmljZUVudGl0bGVtZW50cyKWAgoPSXJvbk1haWRlblN0YXRlEkIKDnZlcmlmeWluZ19rZXlzGAEgAygLMgguandrLkp3a0Ig4LUYAuC2GAGatxgUSndrVmVyaWZ5aW5nS2V5c1ZpZXcSMQoTZW50aXRsZW1lbnRzX3BvbGljeRgCIAEoCzIOLm9wYS5PcGFQb2xpY3lCBOC1GAISMgoUY2xhaW1fbWFwcGluZ19wb2xpY3kYAyABKAsyDi5vcGEuT3BhUG9saWN5QgTgtRgCEj8KEmVudGl0bGVtZW50X2NvbmZpZxgEIAEoCzIdLmlyb25tYWlkZW4uRW50aXRsZW1lbnRDb25maWdCBOC1GAI6F5qoHQ9Jcm9uTWFpZGVuU3RhdGWgqB0CInoKF0lyb25NYWlkZW5TdGF0ZUludGVybmFsEjoKDWV4dGVybmFsX2p3a3MYASADKAsyFy5pcm9ubWFpZGVuLkV4dGVybmFsSndrQgrgtRgCyLYYgKMFOiOaqB0XSXJvbk1haWRlblN0YXRlSW50ZXJuYWygqB0C2KgdASJ5CgtFeHRlcm5hbEp3axIZCgNraWQYASABKAlCDNC1GAGIph0BiKcdARIbCgNrZXkYAiABKAsyCC5qd2suSndrQgSIph0BEhgKBmlzc3VlchgDIAEoCUIIiKYdAaimHQISGAoKZmV0Y2hlZF9hdBgEIAEoA0IEqKcdACJEChVMaXN0UHJvdmlkZXJzUmVzcG9uc2USKwoJcHJvdmlkZXJzGAEgAygLMhguaXJvbm1haWRlbi5Qcm92aWRlckluZm8iVQoMUHJvdmlkZXJJbmZvEhYKBG5hbWUYASABKAlCCIimHQGIpx0BEg8KB2RvbWFpbnMYAiADKAkSHAoOcHJvdmlkZXJfaW5kZXgYAyABKAVCBLCnHQAiUAoQQXV0aG9yaXplUmVxdWVzdBIcCg5wcm92aWRlcl9pbmRleBgBIAEoBUIEsKcdABIeCgxjYWxsYmFja191cmwYAiABKAlCCIimHQGoph0CIjMKEUF1dGhvcml6ZVJlc3BvbnNlEh4KDHJlZGlyZWN0X3VybBgBIAEoCUIIiKYdAaimHQIiOgoPQ2FsbGJhY2tSZXF1ZXN0EhIKBGNvZGUYASABKAlCBIimHQESEwoFc3RhdGUYAiABKAlCBIimHQEiwgEKEENhbGxiYWNrUmVzcG9uc2USHwoNcmVmcmVzaF90b2tlbhgBIAEoCUIIiKYdAYinHQESHgoMYWNjZXNzX3Rva2VuGAIgASgJQgiIph0BiKcdARIeCgxjYWxsYmFja191cmwYAyABKAlCCIimHQGoph0CEiUKF2FjY2Vzc190b2tlbl9leHBpcmVzX2luGAQgASgDQgSopx0AEiYKGHJlZnJlc2hfdG9rZW5fZXhwaXJlc19pbhgFIAEoA0IEqKcdACJEChNSZWZyZXNoVG9rZW5SZXF1ZXN0EhsKDXJlZnJlc2hfdG9rZW4YASABKAlCBIimHQESEAoIYXVkaWVuY2UYAiABKAkiUAoUUmVmcmVzaFRva2VuUmVzcG9uc2USHgoMYWNjZXNzX3Rva2VuGAEgASgJQgiIph0BiKcdARIYCgpleHBpcmVzX2luGAIgASgDQgSopx0AIk4KDUxvZ291dFJlcXVlc3QSJgoYcG9zdF9sb2dvdXRfcmVkaXJlY3RfdXJsGAEgASgJQgSoph0CEhUKDWlkX3Rva2VuX2hpbnQYAiABKAkiLAoOTG9nb3V0UmVzcG9uc2USGgoMcmVkaXJlY3RfdXJsGAEgASgJQgSoph0CIk4KFEV4Y2hhbmdlVG9rZW5SZXF1ZXN0EhoKDGFjY2Vzc190b2tlbhgBIAEoCUIEiKYdARIaCghhdWRpZW5jZRgCIAEoCUIIiKYdAYinHQEiUQoVRXhjaGFuZ2VUb2tlblJlc3BvbnNlEh4KDGFjY2Vzc190b2tlbhgBIAEoCUIIiKYdAYinHQESGAoKZXhwaXJlc19pbhgCIAEoA0IEqKcdACJwCgpRdWVyeVZhbHVlEhYKDHN0cmluZ192YWx1ZRgBIAEoCUgAEhMKCWludF92YWx1ZRgCIAEoA0gAEhYKDGRvdWJsZV92YWx1ZRgDIAEoAUgAEhQKCmJvb2xfdmFsdWUYBCABKAhIAEIHCgV2YWx1ZSKUAQoJUHJlZGljYXRlEhIKCmZpZWxkX25hbWUYASABKAkSJAoCb3AYAiABKA4yGC5pcm9ubWFpZGVuLkNvbXBhcmlzb25PcBIlCgV2YWx1ZRgDIAEoCzIWLmlyb25tYWlkZW4uUXVlcnlWYWx1ZRImCgZ2YWx1ZXMYBCADKAsyFi5pcm9ubWFpZGVuLlF1ZXJ5VmFsdWUiigEKDlByZWRpY2F0ZUdyb3VwEiEKAm9wGAEgASgOMhUuaXJvbm1haWRlbi5Mb2dpY2FsT3ASKQoKcHJlZGljYXRlcxgCIAMoCzIVLmlyb25tYWlkZW4uUHJlZGljYXRlEioKBmdyb3VwcxgDIAMoCzIaLmlyb25tYWlkZW4uUHJlZGljYXRlR3JvdXAiTQoJU29ydEZpZWxkEhIKCmZpZWxkX25hbWUYASABKAkSLAoJZGlyZWN0aW9uGAIgASgOMhkuaXJvbm1haWRlbi5Tb3J0RGlyZWN0aW9uIoQBCg9Db2xsZWN0aW9uUXVlcnkSKQoFd2hlcmUYASABKAsyGi5pcm9ubWFpZGVuLlByZWRpY2F0ZUdyb3VwEicKCG9yZGVyX2J5GAIgAygLMhUuaXJvbm1haWRlbi5Tb3J0RmllbGQSDQoFbGltaXQYAyABKAUSDgoGb2Zmc2V0GAQgASgFIiYKF1ZlcmlmeWluZ0tleXNHZXRSZXF1ZXN0EgsKA2tleRgBIAEoCSJVChdWZXJpZnlpbmdLZXlzUHV0UmVxdWVzdBILCgNrZXkYASABKAkSFwoFdmFsdWUYAiABKAsyCC5qd2suSndrEhQKDGxvY2tfY291bnRlchgDIAEoAyIcChpWZXJpZnlpbmdLZXlzR2V0QWxsUmVxdWVzdCIaChhWZXJpZnlpbmdLZXlzS2V5c1JlcXVlc3QiGgoYVmVyaWZ5aW5nS2V5c1NpemVSZXF1ZXN0IhsKGVZlcmlmeWluZ0tleXNDbGVhclJlcXVlc3QiRAoaVmVyaWZ5aW5nS2V5c1ZhbHVlUmVzcG9uc2USFwoFdmFsdWUYASABKAsyCC5qd2suSndrEg0KBWZvdW5kGAIgASgIIqABChxWZXJpZnlpbmdLZXlzRW50cmllc1Jlc3BvbnNlEkYKB2VudHJpZXMYASADKAsyNS5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNFbnRyaWVzUmVzcG9uc2UuRW50cmllc0VudHJ5GjgKDEVudHJpZXNFbnRyeRILCgNrZXkYASABKAkSFwoFdmFsdWUYAiABKAsyCC5qd2suSndrOgI4ASIpChlWZXJpZnlpbmdLZXlzS2V5c1Jlc3BvbnNlEgwKBGtleXMYASADKAkiKQoZVmVyaWZ5aW5nS2V5c1NpemVSZXNwb25zZRIMCgRzaXplGAEgASgFIkcKGVZlcmlmeWluZ0tleXNRdWVyeVJlcXVlc3QSKgoFcXVlcnkYASABKAsyGy5pcm9ubWFpZGVuLkNvbGxlY3Rpb25RdWVyeSJMChpWZXJpZnlpbmdLZXlzUXVlcnlSZXNwb25zZRIZCgdyZXN1bHRzGAEgAygLMgguandrLkp3axITCgt0b3RhbF9jb3VudBgCIAEoBSIlChZFeHRlcm5hbEp3a3NHZXRSZXF1ZXN0EgsKA2tleRgBIAEoCSJjChZFeHRlcm5hbEp3a3NQdXRSZXF1ZXN0EgsKA2tleRgBIAEoCRImCgV2YWx1ZRgCIAEoCzIXLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2sSFAoMbG9ja19jb3VudGVyGAMgASgDIhsKGUV4dGVybmFsSndrc0dldEFsbFJlcXVlc3QiGQoXRXh0ZXJuYWxKd2tzS2V5c1JlcXVlc3QiGQoXRXh0ZXJuYWxKd2tzU2l6ZVJlcXVlc3QiGgoYRXh0ZXJuYWxKd2tzQ2xlYXJSZXF1ZXN0IlIKGUV4dGVybmFsSndrc1ZhbHVlUmVzcG9uc2USJgoFdmFsdWUYASABKAsyFy5pcm9ubWFpZGVuLkV4dGVybmFsSndrEg0KBWZvdW5kGAIgASgIIq0BChtFeHRlcm5hbEp3a3NFbnRyaWVzUmVzcG9uc2USRQoHZW50cmllcxgBIAMoCzI0Lmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzRW50cmllc1Jlc3BvbnNlLkVudHJpZXNFbnRyeRpHCgxFbnRyaWVzRW50cnkSCwoDa2V5GAEgASgJEiYKBXZhbHVlGAIgASgLMhcuaXJvbm1haWRlbi5FeHRlcm5hbEp3azoCOAEiKAoYRXh0ZXJuYWxKd2tzS2V5c1Jlc3BvbnNlEgwKBGtleXMYASADKAkiKAoYRXh0ZXJuYWxKd2tzU2l6ZVJlc3BvbnNlEgwKBHNpemUYASABKAUiRgoYRXh0ZXJuYWxKd2tzUXVlcnlSZXF1ZXN0EioKBXF1ZXJ5GAEgASgLMhsuaXJvbm1haWRlbi5Db2xsZWN0aW9uUXVlcnkiWgoZRXh0ZXJuYWxKd2tzUXVlcnlSZXNwb25zZRIoCgdyZXN1bHRzGAEgAygLMhcuaXJvbm1haWRlbi5FeHRlcm5hbEp3axITCgt0b3RhbF9jb3VudBgCIAEoBSIKCghNYXBFbXB0eSqzAgoMQ29tcGFyaXNvbk9wEh0KGUNPTVBBUklTT05fT1BfVU5TUEVDSUZJRUQQABIUChBDT01QQVJJU09OX09QX0VREAESFAoQQ09NUEFSSVNPTl9PUF9ORRACEhQKEENPTVBBUklTT05fT1BfR1QQAxIUChBDT01QQVJJU09OX09QX0dFEAQSFAoQQ09NUEFSSVNPTl9PUF9MVBAFEhQKEENPTVBBUklTT05fT1BfTEUQBhIUChBDT01QQVJJU09OX09QX0lOEAcSGAoUQ09NUEFSSVNPTl9PUF9OT1RfSU4QCBIWChJDT01QQVJJU09OX09QX0xJS0UQCRIZChVDT01QQVJJU09OX09QX0lTX05VTEwQChIdChlDT01QQVJJU09OX09QX0lTX05PVF9OVUxMEAsqYAoNU29ydERpcmVjdGlvbhIeChpTT1JUX0RJUkVDVElPTl9VTlNQRUNJRklFRBAAEhYKElNPUlRfRElSRUNUSU9OX0FTQxABEhcKE1NPUlRfRElSRUNUSU9OX0RFU0MQAipOCglMb2dpY2FsT3ASGgoWTE9HSUNBTF9PUF9VTlNQRUNJRklFRBAAEhIKDkxPR0lDQUxfT1BfQU5EEAESEQoNTE9HSUNBTF9PUF9PUhACMtoFChFJcm9uTWFpZGVuU2VydmljZRJwCg1MaXN0UHJvdmlkZXJzEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5GiEuaXJvbm1haWRlbi5MaXN0UHJvdmlkZXJzUmVzcG9uc2UiJILT5JMCHhIcL2FwaS9pcm9ubWFpZGVuL3YxL3Byb3ZpZGVycxJxCglBdXRob3JpemUSHC5pcm9ubWFpZGVuLkF1dGhvcml6ZVJlcXVlc3QaHS5pcm9ubWFpZGVuLkF1dGhvcml6ZVJlc3BvbnNlIieC0+STAiEiHC9hcGkvaXJvbm1haWRlbi92MS9hdXRob3JpemU6ASoSbQoIQ2FsbGJhY2sSGy5pcm9ubWFpZGVuLkNhbGxiYWNrUmVxdWVzdBocLmlyb25tYWlkZW4uQ2FsbGJhY2tSZXNwb25zZSImgtPkkwIgIhsvYXBpL2lyb25tYWlkZW4vdjEvY2FsbGJhY2s6ASoSeAoMUmVmcmVzaFRva2VuEh8uaXJvbm1haWRlbi5SZWZyZXNoVG9rZW5SZXF1ZXN0GiAuaXJvbm1haWRlbi5SZWZyZXNoVG9rZW5SZXNwb25zZSIlgtPkkwIfIhovYXBpL2lyb25tYWlkZW4vdjEvcmVmcmVzaDoBKhJ8Cg1FeGNoYW5nZVRva2VuEiAuaXJvbm1haWRlbi5FeGNoYW5nZVRva2VuUmVxdWVzdBohLmlyb25tYWlkZW4uRXhjaGFuZ2VUb2tlblJlc3BvbnNlIiaC0+STAiAiGy9hcGkvaXJvbm1haWRlbi92MS9leGNoYW5nZToBKhJlCgZMb2dvdXQSGS5pcm9ubWFpZGVuLkxvZ291dFJlcXVlc3QaGi5pcm9ubWFpZGVuLkxvZ291dFJlc3BvbnNlIiSC0+STAh4iGS9hcGkvaXJvbm1haWRlbi92MS9sb2dvdXQ6ASoaEqKXIgppcm9ubWFpZGVuuJciATLbDwodSXJvbk1haWRlblN0YXRlQmFja2VuZFNlcnZpY2USPwoVR2V0RW50aXRsZW1lbnRzUG9saWN5EhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5Gg4ub3BhLk9wYVBvbGljeRI3ChVTZXRFbnRpdGxlbWVudHNQb2xpY3kSDi5vcGEuT3BhUG9saWN5Gg4ub3BhLk9wYVBvbGljeRJDChdXYXRjaEVudGl0bGVtZW50c1BvbGljeRIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRoOLm9wYS5PcGFQb2xpY3kwARI/ChVHZXRDbGFpbU1hcHBpbmdQb2xpY3kSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaDi5vcGEuT3BhUG9saWN5EjcKFVNldENsYWltTWFwcGluZ1BvbGljeRIOLm9wYS5PcGFQb2xpY3kaDi5vcGEuT3BhUG9saWN5EkMKF1dhdGNoQ2xhaW1NYXBwaW5nUG9saWN5EhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5Gg4ub3BhLk9wYVBvbGljeTABEk0KFEdldEVudGl0bGVtZW50Q29uZmlnEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5Gh0uaXJvbm1haWRlbi5FbnRpdGxlbWVudENvbmZpZxJUChRTZXRFbnRpdGxlbWVudENvbmZpZxIdLmlyb25tYWlkZW4uRW50aXRsZW1lbnRDb25maWcaHS5pcm9ubWFpZGVuLkVudGl0bGVtZW50Q29uZmlnElEKFldhdGNoRW50aXRsZW1lbnRDb25maWcSFi5nb29nbGUucHJvdG9idWYuRW1wdHkaHS5pcm9ubWFpZGVuLkVudGl0bGVtZW50Q29uZmlnMAESXwoQR2V0VmVyaWZ5aW5nS2V5cxIjLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c0dldFJlcXVlc3QaJi5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNWYWx1ZVJlc3BvbnNlEl8KEFB1dFZlcmlmeWluZ0tleXMSIy5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNQdXRSZXF1ZXN0GiYuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzVmFsdWVSZXNwb25zZRJNChBTZXRWZXJpZnlpbmdLZXlzEiMuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzUHV0UmVxdWVzdBoULmlyb25tYWlkZW4uTWFwRW1wdHkSYgoTUmVtb3ZlVmVyaWZ5aW5nS2V5cxIjLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c0dldFJlcXVlc3QaJi5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNWYWx1ZVJlc3BvbnNlElAKE0RlbGV0ZVZlcmlmeWluZ0tleXMSIy5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNHZXRSZXF1ZXN0GhQuaXJvbm1haWRlbi5NYXBFbXB0eRJnChhDb250YWluc0tleVZlcmlmeWluZ0tleXMSIy5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNHZXRSZXF1ZXN0GiYuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzVmFsdWVSZXNwb25zZRJnChNHZXRBbGxWZXJpZnlpbmdLZXlzEiYuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzR2V0QWxsUmVxdWVzdBooLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c0VudHJpZXNSZXNwb25zZRJiChNLZXlTZXRWZXJpZnlpbmdLZXlzEiQuaXJvbm1haWRlbi5WZXJpZnlpbmdLZXlzS2V5c1JlcXVlc3QaJS5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNLZXlzUmVzcG9uc2USYAoRU2l6ZVZlcmlmeWluZ0tleXMSJC5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNTaXplUmVxdWVzdBolLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c1NpemVSZXNwb25zZRJRChJDbGVhclZlcmlmeWluZ0tleXMSJS5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNDbGVhclJlcXVlc3QaFC5pcm9ubWFpZGVuLk1hcEVtcHR5EmcKGFB1dElmQWJzZW50VmVyaWZ5aW5nS2V5cxIjLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c1B1dFJlcXVlc3QaJi5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNWYWx1ZVJlc3BvbnNlElgKEldhdGNoVmVyaWZ5aW5nS2V5cxIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eRooLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c0VudHJpZXNSZXNwb25zZTABEmMKElF1ZXJ5VmVyaWZ5aW5nS2V5cxIlLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c1F1ZXJ5UmVxdWVzdBomLmlyb25tYWlkZW4uVmVyaWZ5aW5nS2V5c1F1ZXJ5UmVzcG9uc2USagoXV2F0Y2hRdWVyeVZlcmlmeWluZ0tleXMSJS5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNRdWVyeVJlcXVlc3QaJi5pcm9ubWFpZGVuLlZlcmlmeWluZ0tleXNRdWVyeVJlc3BvbnNlMAEyxwoKJUlyb25NYWlkZW5TdGF0ZUludGVybmFsQmFja2VuZFNlcnZpY2USXAoPR2V0RXh0ZXJuYWxKd2tzEiIuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NHZXRSZXF1ZXN0GiUuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NWYWx1ZVJlc3BvbnNlElwKD1B1dEV4dGVybmFsSndrcxIiLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzUHV0UmVxdWVzdBolLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzVmFsdWVSZXNwb25zZRJLCg9TZXRFeHRlcm5hbEp3a3MSIi5pcm9ubWFpZGVuLkV4dGVybmFsSndrc1B1dFJlcXVlc3QaFC5pcm9ubWFpZGVuLk1hcEVtcHR5El8KElJlbW92ZUV4dGVybmFsSndrcxIiLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzR2V0UmVxdWVzdBolLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzVmFsdWVSZXNwb25zZRJOChJEZWxldGVFeHRlcm5hbEp3a3MSIi5pcm9ubWFpZGVuLkV4dGVybmFsSndrc0dldFJlcXVlc3QaFC5pcm9ubWFpZGVuLk1hcEVtcHR5EmQKF0NvbnRhaW5zS2V5RXh0ZXJuYWxKd2tzEiIuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NHZXRSZXF1ZXN0GiUuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NWYWx1ZVJlc3BvbnNlEmQKEkdldEFsbEV4dGVybmFsSndrcxIlLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzR2V0QWxsUmVxdWVzdBonLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzRW50cmllc1Jlc3BvbnNlEl8KEktleVNldEV4dGVybmFsSndrcxIjLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzS2V5c1JlcXVlc3QaJC5pcm9ubWFpZGVuLkV4dGVybmFsSndrc0tleXNSZXNwb25zZRJdChBTaXplRXh0ZXJuYWxKd2tzEiMuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NTaXplUmVxdWVzdBokLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzU2l6ZVJlc3BvbnNlEk8KEUNsZWFyRXh0ZXJuYWxKd2tzEiQuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NDbGVhclJlcXVlc3QaFC5pcm9ubWFpZGVuLk1hcEVtcHR5EmQKF1B1dElmQWJzZW50RXh0ZXJuYWxKd2tzEiIuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NQdXRSZXF1ZXN0GiUuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NWYWx1ZVJlc3BvbnNlElYKEVdhdGNoRXh0ZXJuYWxKd2tzEhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5GicuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NFbnRyaWVzUmVzcG9uc2UwARJgChFRdWVyeUV4dGVybmFsSndrcxIkLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzUXVlcnlSZXF1ZXN0GiUuaXJvbm1haWRlbi5FeHRlcm5hbEp3a3NRdWVyeVJlc3BvbnNlEmcKFldhdGNoUXVlcnlFeHRlcm5hbEp3a3MSJC5pcm9ubWFpZGVuLkV4dGVybmFsSndrc1F1ZXJ5UmVxdWVzdBolLmlyb25tYWlkZW4uRXh0ZXJuYWxKd2tzUXVlcnlSZXNwb25zZTABYgZwcm90bzM",
     [
       file_libs_spec,
       file_libs_entitlement,
@@ -332,32 +332,74 @@ export const ProviderConfigSchema: GenMessage<ProviderConfig> =
   messageDesc(file_services_ironmaiden, 2);
 
 /**
- * IronMaidenState holds public verifying keys readable by all services.
- * Each Iron Maiden instance generates its own key pair locally, keeps the private
- * key in memory, and publishes the public JWK here. Other services subscribe
- * via Watch (RO) and receive new keys immediately to verify access tokens.
- * Access: RW for ironmaiden, RO for any service that needs to verify tokens.
+ * EntitlementConfig wraps the entitlement mappings and service entitlement
+ * definitions. Published by Iron Maiden from config so other services (queen)
+ * can read them via Watch (RO) without duplicating config.
+ *
+ * @generated from message ironmaiden.EntitlementConfig
+ */
+export type EntitlementConfig = Message<"ironmaiden.EntitlementConfig"> & {
+  /**
+   * @generated from field: repeated entitlement.ServiceEntitlementMapping entitlement_mappings = 1;
+   */
+  entitlementMappings: ServiceEntitlementMapping[];
+
+  /**
+   * @generated from field: repeated entitlement.ServiceEntitlements service_entitlements = 2;
+   */
+  serviceEntitlements: ServiceEntitlements[];
+};
+
+/**
+ * Describes the message ironmaiden.EntitlementConfig.
+ * Use `create(EntitlementConfigSchema)` to create a new message.
+ */
+export const EntitlementConfigSchema: GenMessage<EntitlementConfig> =
+  /*@__PURE__*/
+  messageDesc(file_services_ironmaiden, 3);
+
+/**
+ * IronMaidenState holds public verifying keys and auth config readable by all
+ * services. Each Iron Maiden instance generates its own key pair locally, keeps
+ * the private key in memory, and publishes the public JWK here. OPA policies
+ * and entitlement config are also published here so downstream services (queen)
+ * can consume them without duplicating config.
+ * Access: RW for ironmaiden, RO for any service that needs to verify tokens
+ * or read auth config.
  *
  * @generated from message ironmaiden.IronMaidenState
  */
 export type IronMaidenState = Message<"ironmaiden.IronMaidenState"> & {
   /**
    * verifying_keys are the public JWKs published by all Iron Maiden instances.
-   * Each instance publishes its own JWK (keyed by kid). Other services subscribe
-   * via Watch (RO) to verify access tokens signed by any Iron Maiden instance.
-   * Old keys are removed after the access token lifetime elapses post-rotation.
    *
    * @generated from field: repeated jwk.Jwk verifying_keys = 1;
    */
   verifyingKeys: Jwk[];
 
   /**
-   * opa holds the entitlements OPA policy, published by Iron Maiden from config.
-   * Other services (queen) subscribe via Watch (RO) to get the current policy.
+   * entitlements_policy is the OPA policy for determining entitlements at token
+   * exchange time. Published by ironmaiden from config.
    *
-   * @generated from field: opa.OpaPolicy opa = 2;
+   * @generated from field: opa.OpaPolicy entitlements_policy = 2;
    */
-  opa?: OpaPolicy;
+  entitlementsPolicy?: OpaPolicy;
+
+  /**
+   * claim_mapping_policy is the OPA policy for mapping IDP claims to a principal
+   * at login time. Published by ironmaiden from config.
+   *
+   * @generated from field: opa.OpaPolicy claim_mapping_policy = 3;
+   */
+  claimMappingPolicy?: OpaPolicy;
+
+  /**
+   * entitlement_config holds the entitlement mappings and service entitlement
+   * definitions, published from ironmaiden's config.
+   *
+   * @generated from field: ironmaiden.EntitlementConfig entitlement_config = 4;
+   */
+  entitlementConfig?: EntitlementConfig;
 };
 
 /**
@@ -366,7 +408,7 @@ export type IronMaidenState = Message<"ironmaiden.IronMaidenState"> & {
  */
 export const IronMaidenStateSchema: GenMessage<IronMaidenState> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 3);
+  messageDesc(file_services_ironmaiden, 4);
 
 /**
  * IronMaidenStateInternal holds private state used only by Iron Maiden instances.
@@ -393,7 +435,7 @@ export type IronMaidenStateInternal =
  */
 export const IronMaidenStateInternalSchema: GenMessage<IronMaidenStateInternal> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 4);
+  messageDesc(file_services_ironmaiden, 5);
 
 /**
  * ExternalJwk is a cached JWK fetched from an external identity provider.
@@ -436,7 +478,7 @@ export type ExternalJwk = Message<"ironmaiden.ExternalJwk"> & {
  */
 export const ExternalJwkSchema: GenMessage<ExternalJwk> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 5);
+  messageDesc(file_services_ironmaiden, 6);
 
 /**
  * ListProvidersResponse contains public provider information for the login UI.
@@ -457,7 +499,7 @@ export type ListProvidersResponse =
  */
 export const ListProvidersResponseSchema: GenMessage<ListProvidersResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 6);
+  messageDesc(file_services_ironmaiden, 7);
 
 /**
  * ProviderInfo is the public-facing information about a provider.
@@ -493,7 +535,7 @@ export type ProviderInfo = Message<"ironmaiden.ProviderInfo"> & {
  */
 export const ProviderInfoSchema: GenMessage<ProviderInfo> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 7);
+  messageDesc(file_services_ironmaiden, 8);
 
 /**
  * AuthorizeRequest initiates an OAuth2 flow.
@@ -523,7 +565,7 @@ export type AuthorizeRequest = Message<"ironmaiden.AuthorizeRequest"> & {
  */
 export const AuthorizeRequestSchema: GenMessage<AuthorizeRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 8);
+  messageDesc(file_services_ironmaiden, 9);
 
 /**
  * AuthorizeResponse contains the IDP redirect URL.
@@ -545,7 +587,7 @@ export type AuthorizeResponse = Message<"ironmaiden.AuthorizeResponse"> & {
  */
 export const AuthorizeResponseSchema: GenMessage<AuthorizeResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 9);
+  messageDesc(file_services_ironmaiden, 10);
 
 /**
  * CallbackRequest handles the OAuth2 authorization code callback.
@@ -574,7 +616,7 @@ export type CallbackRequest = Message<"ironmaiden.CallbackRequest"> & {
  */
 export const CallbackRequestSchema: GenMessage<CallbackRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 10);
+  messageDesc(file_services_ironmaiden, 11);
 
 /**
  * CallbackResponse contains the minted tokens and the callback destination.
@@ -624,7 +666,7 @@ export type CallbackResponse = Message<"ironmaiden.CallbackResponse"> & {
  */
 export const CallbackResponseSchema: GenMessage<CallbackResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 11);
+  messageDesc(file_services_ironmaiden, 12);
 
 /**
  * RefreshTokenRequest exchanges a refresh token for a new access token.
@@ -656,7 +698,7 @@ export type RefreshTokenRequest = Message<"ironmaiden.RefreshTokenRequest"> & {
  */
 export const RefreshTokenRequestSchema: GenMessage<RefreshTokenRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 12);
+  messageDesc(file_services_ironmaiden, 13);
 
 /**
  * RefreshTokenResponse contains the new access token.
@@ -686,7 +728,7 @@ export type RefreshTokenResponse =
  */
 export const RefreshTokenResponseSchema: GenMessage<RefreshTokenResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 13);
+  messageDesc(file_services_ironmaiden, 14);
 
 /**
  * LogoutRequest initiates logout.
@@ -715,7 +757,7 @@ export type LogoutRequest = Message<"ironmaiden.LogoutRequest"> & {
  */
 export const LogoutRequestSchema: GenMessage<LogoutRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 14);
+  messageDesc(file_services_ironmaiden, 15);
 
 /**
  * LogoutResponse contains the IDP logout redirect URL.
@@ -737,7 +779,7 @@ export type LogoutResponse = Message<"ironmaiden.LogoutResponse"> & {
  */
 export const LogoutResponseSchema: GenMessage<LogoutResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 15);
+  messageDesc(file_services_ironmaiden, 16);
 
 /**
  * ExchangeTokenRequest exchanges a generic access token for a service-specific one.
@@ -767,7 +809,7 @@ export type ExchangeTokenRequest =
  */
 export const ExchangeTokenRequestSchema: GenMessage<ExchangeTokenRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 16);
+  messageDesc(file_services_ironmaiden, 17);
 
 /**
  * ExchangeTokenResponse contains a service-specific access token with entitlements.
@@ -797,7 +839,7 @@ export type ExchangeTokenResponse =
  */
 export const ExchangeTokenResponseSchema: GenMessage<ExchangeTokenResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 17);
+  messageDesc(file_services_ironmaiden, 18);
 
 /**
  * @generated from message ironmaiden.QueryValue
@@ -844,7 +886,7 @@ export type QueryValue = Message<"ironmaiden.QueryValue"> & {
  */
 export const QueryValueSchema: GenMessage<QueryValue> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 18);
+  messageDesc(file_services_ironmaiden, 19);
 
 /**
  * @generated from message ironmaiden.Predicate
@@ -877,7 +919,7 @@ export type Predicate = Message<"ironmaiden.Predicate"> & {
  */
 export const PredicateSchema: GenMessage<Predicate> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 19);
+  messageDesc(file_services_ironmaiden, 20);
 
 /**
  * @generated from message ironmaiden.PredicateGroup
@@ -905,7 +947,7 @@ export type PredicateGroup = Message<"ironmaiden.PredicateGroup"> & {
  */
 export const PredicateGroupSchema: GenMessage<PredicateGroup> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 20);
+  messageDesc(file_services_ironmaiden, 21);
 
 /**
  * @generated from message ironmaiden.SortField
@@ -928,7 +970,7 @@ export type SortField = Message<"ironmaiden.SortField"> & {
  */
 export const SortFieldSchema: GenMessage<SortField> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 21);
+  messageDesc(file_services_ironmaiden, 22);
 
 /**
  * @generated from message ironmaiden.CollectionQuery
@@ -961,7 +1003,7 @@ export type CollectionQuery = Message<"ironmaiden.CollectionQuery"> & {
  */
 export const CollectionQuerySchema: GenMessage<CollectionQuery> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 22);
+  messageDesc(file_services_ironmaiden, 23);
 
 /**
  * @generated from message ironmaiden.VerifyingKeysGetRequest
@@ -980,7 +1022,7 @@ export type VerifyingKeysGetRequest =
  */
 export const VerifyingKeysGetRequestSchema: GenMessage<VerifyingKeysGetRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 23);
+  messageDesc(file_services_ironmaiden, 24);
 
 /**
  * @generated from message ironmaiden.VerifyingKeysPutRequest
@@ -1009,7 +1051,7 @@ export type VerifyingKeysPutRequest =
  */
 export const VerifyingKeysPutRequestSchema: GenMessage<VerifyingKeysPutRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 24);
+  messageDesc(file_services_ironmaiden, 25);
 
 /**
  * @generated from message ironmaiden.VerifyingKeysGetAllRequest
@@ -1023,7 +1065,7 @@ export type VerifyingKeysGetAllRequest =
  */
 export const VerifyingKeysGetAllRequestSchema: GenMessage<VerifyingKeysGetAllRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 25);
+  messageDesc(file_services_ironmaiden, 26);
 
 /**
  * @generated from message ironmaiden.VerifyingKeysKeysRequest
@@ -1037,7 +1079,7 @@ export type VerifyingKeysKeysRequest =
  */
 export const VerifyingKeysKeysRequestSchema: GenMessage<VerifyingKeysKeysRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 26);
+  messageDesc(file_services_ironmaiden, 27);
 
 /**
  * @generated from message ironmaiden.VerifyingKeysSizeRequest
@@ -1051,7 +1093,7 @@ export type VerifyingKeysSizeRequest =
  */
 export const VerifyingKeysSizeRequestSchema: GenMessage<VerifyingKeysSizeRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 27);
+  messageDesc(file_services_ironmaiden, 28);
 
 /**
  * @generated from message ironmaiden.VerifyingKeysClearRequest
@@ -1065,7 +1107,7 @@ export type VerifyingKeysClearRequest =
  */
 export const VerifyingKeysClearRequestSchema: GenMessage<VerifyingKeysClearRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 28);
+  messageDesc(file_services_ironmaiden, 29);
 
 /**
  * @generated from message ironmaiden.VerifyingKeysValueResponse
@@ -1089,7 +1131,7 @@ export type VerifyingKeysValueResponse =
  */
 export const VerifyingKeysValueResponseSchema: GenMessage<VerifyingKeysValueResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 29);
+  messageDesc(file_services_ironmaiden, 30);
 
 /**
  * @generated from message ironmaiden.VerifyingKeysEntriesResponse
@@ -1108,7 +1150,7 @@ export type VerifyingKeysEntriesResponse =
  */
 export const VerifyingKeysEntriesResponseSchema: GenMessage<VerifyingKeysEntriesResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 30);
+  messageDesc(file_services_ironmaiden, 31);
 
 /**
  * @generated from message ironmaiden.VerifyingKeysKeysResponse
@@ -1127,7 +1169,7 @@ export type VerifyingKeysKeysResponse =
  */
 export const VerifyingKeysKeysResponseSchema: GenMessage<VerifyingKeysKeysResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 31);
+  messageDesc(file_services_ironmaiden, 32);
 
 /**
  * @generated from message ironmaiden.VerifyingKeysSizeResponse
@@ -1146,7 +1188,7 @@ export type VerifyingKeysSizeResponse =
  */
 export const VerifyingKeysSizeResponseSchema: GenMessage<VerifyingKeysSizeResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 32);
+  messageDesc(file_services_ironmaiden, 33);
 
 /**
  * @generated from message ironmaiden.VerifyingKeysQueryRequest
@@ -1165,7 +1207,7 @@ export type VerifyingKeysQueryRequest =
  */
 export const VerifyingKeysQueryRequestSchema: GenMessage<VerifyingKeysQueryRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 33);
+  messageDesc(file_services_ironmaiden, 34);
 
 /**
  * @generated from message ironmaiden.VerifyingKeysQueryResponse
@@ -1189,7 +1231,7 @@ export type VerifyingKeysQueryResponse =
  */
 export const VerifyingKeysQueryResponseSchema: GenMessage<VerifyingKeysQueryResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 34);
+  messageDesc(file_services_ironmaiden, 35);
 
 /**
  * @generated from message ironmaiden.ExternalJwksGetRequest
@@ -1208,7 +1250,7 @@ export type ExternalJwksGetRequest =
  */
 export const ExternalJwksGetRequestSchema: GenMessage<ExternalJwksGetRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 35);
+  messageDesc(file_services_ironmaiden, 36);
 
 /**
  * @generated from message ironmaiden.ExternalJwksPutRequest
@@ -1237,7 +1279,7 @@ export type ExternalJwksPutRequest =
  */
 export const ExternalJwksPutRequestSchema: GenMessage<ExternalJwksPutRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 36);
+  messageDesc(file_services_ironmaiden, 37);
 
 /**
  * @generated from message ironmaiden.ExternalJwksGetAllRequest
@@ -1251,7 +1293,7 @@ export type ExternalJwksGetAllRequest =
  */
 export const ExternalJwksGetAllRequestSchema: GenMessage<ExternalJwksGetAllRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 37);
+  messageDesc(file_services_ironmaiden, 38);
 
 /**
  * @generated from message ironmaiden.ExternalJwksKeysRequest
@@ -1265,7 +1307,7 @@ export type ExternalJwksKeysRequest =
  */
 export const ExternalJwksKeysRequestSchema: GenMessage<ExternalJwksKeysRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 38);
+  messageDesc(file_services_ironmaiden, 39);
 
 /**
  * @generated from message ironmaiden.ExternalJwksSizeRequest
@@ -1279,7 +1321,7 @@ export type ExternalJwksSizeRequest =
  */
 export const ExternalJwksSizeRequestSchema: GenMessage<ExternalJwksSizeRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 39);
+  messageDesc(file_services_ironmaiden, 40);
 
 /**
  * @generated from message ironmaiden.ExternalJwksClearRequest
@@ -1293,7 +1335,7 @@ export type ExternalJwksClearRequest =
  */
 export const ExternalJwksClearRequestSchema: GenMessage<ExternalJwksClearRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 40);
+  messageDesc(file_services_ironmaiden, 41);
 
 /**
  * @generated from message ironmaiden.ExternalJwksValueResponse
@@ -1317,7 +1359,7 @@ export type ExternalJwksValueResponse =
  */
 export const ExternalJwksValueResponseSchema: GenMessage<ExternalJwksValueResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 41);
+  messageDesc(file_services_ironmaiden, 42);
 
 /**
  * @generated from message ironmaiden.ExternalJwksEntriesResponse
@@ -1336,7 +1378,7 @@ export type ExternalJwksEntriesResponse =
  */
 export const ExternalJwksEntriesResponseSchema: GenMessage<ExternalJwksEntriesResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 42);
+  messageDesc(file_services_ironmaiden, 43);
 
 /**
  * @generated from message ironmaiden.ExternalJwksKeysResponse
@@ -1355,7 +1397,7 @@ export type ExternalJwksKeysResponse =
  */
 export const ExternalJwksKeysResponseSchema: GenMessage<ExternalJwksKeysResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 43);
+  messageDesc(file_services_ironmaiden, 44);
 
 /**
  * @generated from message ironmaiden.ExternalJwksSizeResponse
@@ -1374,7 +1416,7 @@ export type ExternalJwksSizeResponse =
  */
 export const ExternalJwksSizeResponseSchema: GenMessage<ExternalJwksSizeResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 44);
+  messageDesc(file_services_ironmaiden, 45);
 
 /**
  * @generated from message ironmaiden.ExternalJwksQueryRequest
@@ -1393,7 +1435,7 @@ export type ExternalJwksQueryRequest =
  */
 export const ExternalJwksQueryRequestSchema: GenMessage<ExternalJwksQueryRequest> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 45);
+  messageDesc(file_services_ironmaiden, 46);
 
 /**
  * @generated from message ironmaiden.ExternalJwksQueryResponse
@@ -1417,7 +1459,7 @@ export type ExternalJwksQueryResponse =
  */
 export const ExternalJwksQueryResponseSchema: GenMessage<ExternalJwksQueryResponse> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 46);
+  messageDesc(file_services_ironmaiden, 47);
 
 /**
  * @generated from message ironmaiden.MapEmpty
@@ -1430,7 +1472,7 @@ export type MapEmpty = Message<"ironmaiden.MapEmpty"> & {};
  */
 export const MapEmptySchema: GenMessage<MapEmpty> =
   /*@__PURE__*/
-  messageDesc(file_services_ironmaiden, 47);
+  messageDesc(file_services_ironmaiden, 48);
 
 /**
  * Collection query types (auto-injected)
@@ -1640,30 +1682,82 @@ export const IronMaidenService: GenService<{
  */
 export const IronMaidenStateBackendService: GenService<{
   /**
-   * Singleton: Opa
+   * Singleton: EntitlementsPolicy
    *
-   * @generated from rpc ironmaiden.IronMaidenStateBackendService.GetOpa
+   * @generated from rpc ironmaiden.IronMaidenStateBackendService.GetEntitlementsPolicy
    */
-  getOpa: {
+  getEntitlementsPolicy: {
     methodKind: "unary";
     input: typeof EmptySchema;
     output: typeof OpaPolicySchema;
   };
   /**
-   * @generated from rpc ironmaiden.IronMaidenStateBackendService.SetOpa
+   * @generated from rpc ironmaiden.IronMaidenStateBackendService.SetEntitlementsPolicy
    */
-  setOpa: {
+  setEntitlementsPolicy: {
     methodKind: "unary";
     input: typeof OpaPolicySchema;
     output: typeof OpaPolicySchema;
   };
   /**
-   * @generated from rpc ironmaiden.IronMaidenStateBackendService.WatchOpa
+   * @generated from rpc ironmaiden.IronMaidenStateBackendService.WatchEntitlementsPolicy
    */
-  watchOpa: {
+  watchEntitlementsPolicy: {
     methodKind: "server_streaming";
     input: typeof EmptySchema;
     output: typeof OpaPolicySchema;
+  };
+  /**
+   * Singleton: ClaimMappingPolicy
+   *
+   * @generated from rpc ironmaiden.IronMaidenStateBackendService.GetClaimMappingPolicy
+   */
+  getClaimMappingPolicy: {
+    methodKind: "unary";
+    input: typeof EmptySchema;
+    output: typeof OpaPolicySchema;
+  };
+  /**
+   * @generated from rpc ironmaiden.IronMaidenStateBackendService.SetClaimMappingPolicy
+   */
+  setClaimMappingPolicy: {
+    methodKind: "unary";
+    input: typeof OpaPolicySchema;
+    output: typeof OpaPolicySchema;
+  };
+  /**
+   * @generated from rpc ironmaiden.IronMaidenStateBackendService.WatchClaimMappingPolicy
+   */
+  watchClaimMappingPolicy: {
+    methodKind: "server_streaming";
+    input: typeof EmptySchema;
+    output: typeof OpaPolicySchema;
+  };
+  /**
+   * Singleton: EntitlementConfig
+   *
+   * @generated from rpc ironmaiden.IronMaidenStateBackendService.GetEntitlementConfig
+   */
+  getEntitlementConfig: {
+    methodKind: "unary";
+    input: typeof EmptySchema;
+    output: typeof EntitlementConfigSchema;
+  };
+  /**
+   * @generated from rpc ironmaiden.IronMaidenStateBackendService.SetEntitlementConfig
+   */
+  setEntitlementConfig: {
+    methodKind: "unary";
+    input: typeof EntitlementConfigSchema;
+    output: typeof EntitlementConfigSchema;
+  };
+  /**
+   * @generated from rpc ironmaiden.IronMaidenStateBackendService.WatchEntitlementConfig
+   */
+  watchEntitlementConfig: {
+    methodKind: "server_streaming";
+    input: typeof EmptySchema;
+    output: typeof EntitlementConfigSchema;
   };
   /**
    * Collection: VerifyingKeys

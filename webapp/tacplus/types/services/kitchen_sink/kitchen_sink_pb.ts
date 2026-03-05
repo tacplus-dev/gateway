@@ -33,6 +33,7 @@ import type {
 import { file_services_genesis } from "../genesis/genesis_pb.js";
 import type {
   Config as Config$3,
+  EntitlementConfig,
   ExternalJwk,
 } from "../ironmaiden/ironmaiden_pb.js";
 import { file_services_ironmaiden } from "../ironmaiden/ironmaiden_pb.js";
@@ -78,7 +79,7 @@ import type { Message } from "@bufbuild/protobuf";
 export const file_services_kitchen_sink: GenFile =
   /*@__PURE__*/
   fileDesc(
-    "ChtzZXJ2aWNlcy9raXRjaGVuX3NpbmsucHJvdG8SDGtpdGNoZW5fc2luayLPEAoLS2l0Y2hlblNpbmsSEAoIbWFwX25hbWUYASABKAkSCwoDa2V5GAIgASgJEiAKAm9wGAMgASgOMhQua2l0Y2hlbl9zaW5rLk9wVHlwZRIyCgtjb25zaXN0ZW5jeRgEIAEoDjIdLmtpdGNoZW5fc2luay5Db25zaXN0ZW5jeVR5cGUSFAoMdGltZXN0YW1wX21zGAUgASgDEiUKDGVsdmlzX2NvbmZpZxhkIAEoCzINLmVsdmlzLkNvbmZpZ0gAEi0KEGZsZWV0d29vZF9jb25maWcYZSABKAsyES5mbGVldHdvb2QuQ29uZmlnSAASKQoOZ2VuZXNpc19jb25maWcYZiABKAsyDy5nZW5lc2lzLkNvbmZpZ0gAEj0KGWdlbmVzaXNfZ2VuZXNpc19jZXJ0X2RhdGEYZyABKAsyGC5nZW5lc2lzLkdlbmVzaXNDZXJ0RGF0YUgAElMKJGhlYWx0aHJlcG9ydF9zZXJ2aWNlX2luc3RhbmNlX2hlYWx0aBhoIAEoCzIjLmhlYWx0aHJlcG9ydC5TZXJ2aWNlSW5zdGFuY2VIZWFsdGhIABIvChFpcm9ubWFpZGVuX2NvbmZpZxhpIAEoCzISLmlyb25tYWlkZW4uQ29uZmlnSAASOgoXaXJvbm1haWRlbl9leHRlcm5hbF9qd2sYaiABKAsyFy5pcm9ubWFpZGVuLkV4dGVybmFsSndrSAASGwoHandrX2p3axhrIAEoCzIILmp3ay5Kd2tIABIoCg5vcGFfb3BhX3BvbGljeRhsIAEoCzIOLm9wYS5PcGFQb2xpY3lIABJDChxwcmVzbGV5X2FkbWluX2NsdXN0ZXJfaGVhbHRoGG0gASgLMhsucHJlc2xleS5BZG1pbkNsdXN0ZXJIZWFsdGhIABI/ChpwcmVzbGV5X2FkbWluX2NsdXN0ZXJfaW5mbxhuIAEoCzIZLnByZXNsZXkuQWRtaW5DbHVzdGVySW5mb0gAEjsKGHByZXNsZXlfYWRtaW5fZ3JhcGhfaW5mbxhvIAEoCzIXLnByZXNsZXkuQWRtaW5HcmFwaEluZm9IABI7ChhwcmVzbGV5X2FkbWluX2dycGNfc3RhdHMYcCABKAsyFy5wcmVzbGV5LkFkbWluR3JwY1N0YXRzSAASOQoXcHJlc2xleV9hZG1pbl9tYXBfc3RhdHMYcSABKAsyFi5wcmVzbGV5LkFkbWluTWFwU3RhdHNIABJBChtwcmVzbGV5X2FkbWluX211dGF0aW9uX3JhdGUYciABKAsyGi5wcmVzbGV5LkFkbWluTXV0YXRpb25SYXRlSAASQQobcHJlc2xleV9hZG1pbl9uZXR3b3JrX3N0YXRzGHMgASgLMhoucHJlc2xleS5BZG1pbk5ldHdvcmtTdGF0c0gAEj8KGnByZXNsZXlfYWRtaW5fbm9kZV9tZXRyaWNzGHQgASgLMhkucHJlc2xleS5BZG1pbk5vZGVNZXRyaWNzSAASSwogcHJlc2xleV9hZG1pbl9wZXJzaXN0ZW5jZV9zdGF0dXMYdSABKAsyHy5wcmVzbGV5LkFkbWluUGVyc2lzdGVuY2VTdGF0dXNIABI9ChlwcmVzbGV5X2FkbWluX3F1ZXVlX3N0YXRzGHYgASgLMhgucHJlc2xleS5BZG1pblF1ZXVlU3RhdHNIABJLCiBwcmVzbGV5X2FkbWluX3NlcnZpY2VfY29ubmVjdGlvbhh3IAEoCzIfLnByZXNsZXkuQWRtaW5TZXJ2aWNlQ29ubmVjdGlvbkgAEj0KGXByZXNsZXlfYWRtaW5fdGhyZWFkX2luZm8YeCABKAsyGC5wcmVzbGV5LkFkbWluVGhyZWFkSW5mb0gAEkgKH3ByZXNsZXlfYWRtaW5fdG9rZW5fY2FjaGVfc3RhdHMYeSABKAsyHS5wcmVzbGV5LkFkbWluVG9rZW5DYWNoZVN0YXRzSAASPQoZcHJlc2xleV9hZG1pbl90b3BpY19zdGF0cxh6IAEoCzIYLnByZXNsZXkuQWRtaW5Ub3BpY1N0YXRzSAASPwoacHJlc2xleV9hZG1pbl93YXRjaF9oZWFsdGgYeyABKAsyGS5wcmVzbGV5LkFkbWluV2F0Y2hIZWFsdGhIABIlCgxxdWVlbl9jb25maWcYfCABKAsyDS5xdWVlbi5Db25maWdIABI1ChRzZXJ2aWNlY29uZmlnX2NvbmZpZxh9IAEoCzIVLnNlcnZpY2Vjb25maWcuQ29uZmlnSAASLgoRc25vb3B5X2V2ZW50X2RhdGEYfiABKAsyES5zbm9vcHkuRXZlbnREYXRhSAASNgoVc25vb3B5X3NlcnZpY2Vfc3RhdHVzGH8gASgLMhUuc25vb3B5LlNlcnZpY2VTdGF0dXNIABItChBzbm9vcHlfdGFza19pdGVtGIABIAEoCzIQLnNub29weS5UYXNrSXRlbUgAEjIKEnNwcmluZ3N0ZWVuX2NvbmZpZxiBASABKAsyEy5zcHJpbmdzdGVlbi5Db25maWdIABI1ChR3b29kc3RvY2tfZXZlbnRfZGF0YRiCASABKAsyFC53b29kc3RvY2suRXZlbnREYXRhSAASPQoYd29vZHN0b2NrX3NlcnZpY2Vfc3RhdHVzGIMBIAEoCzIYLndvb2RzdG9jay5TZXJ2aWNlU3RhdHVzSAASMwoTd29vZHN0b2NrX3Rhc2tfaXRlbRiEASABKAsyEy53b29kc3RvY2suVGFza0l0ZW1IABIpCg54NTA5X3g1MDlfY2VydBiFASABKAsyDi54NTA5Llg1MDlDZXJ0SABCCQoHcGF5bG9hZCJwCgZEYkR1bXASFAoMdGltZXN0YW1wX21zGAEgASgDEhMKC2VudHJ5X2NvdW50GAIgASgFEg8KB25vZGVfaWQYAyABKAkSKgoHZW50cmllcxgEIAMoCzIZLmtpdGNoZW5fc2luay5LaXRjaGVuU2luayotCgZPcFR5cGUSDwoLT1BfVFlQRV9QVVQQABISCg5PUF9UWVBFX0RFTEVURRABKkUKD0NvbnNpc3RlbmN5VHlwZRIaChZDT05TSVNURU5DWV9DT05WRVJHRU5UEAASFgoSQ09OU0lTVEVOQ1lfQVRPTUlDEAFiBnByb3RvMw",
+    "ChtzZXJ2aWNlcy9raXRjaGVuX3NpbmsucHJvdG8SDGtpdGNoZW5fc2luayKYEQoLS2l0Y2hlblNpbmsSEAoIbWFwX25hbWUYASABKAkSCwoDa2V5GAIgASgJEiAKAm9wGAMgASgOMhQua2l0Y2hlbl9zaW5rLk9wVHlwZRIyCgtjb25zaXN0ZW5jeRgEIAEoDjIdLmtpdGNoZW5fc2luay5Db25zaXN0ZW5jeVR5cGUSFAoMdGltZXN0YW1wX21zGAUgASgDEiUKDGVsdmlzX2NvbmZpZxhkIAEoCzINLmVsdmlzLkNvbmZpZ0gAEi0KEGZsZWV0d29vZF9jb25maWcYZSABKAsyES5mbGVldHdvb2QuQ29uZmlnSAASKQoOZ2VuZXNpc19jb25maWcYZiABKAsyDy5nZW5lc2lzLkNvbmZpZ0gAEj0KGWdlbmVzaXNfZ2VuZXNpc19jZXJ0X2RhdGEYZyABKAsyGC5nZW5lc2lzLkdlbmVzaXNDZXJ0RGF0YUgAElMKJGhlYWx0aHJlcG9ydF9zZXJ2aWNlX2luc3RhbmNlX2hlYWx0aBhoIAEoCzIjLmhlYWx0aHJlcG9ydC5TZXJ2aWNlSW5zdGFuY2VIZWFsdGhIABIvChFpcm9ubWFpZGVuX2NvbmZpZxhpIAEoCzISLmlyb25tYWlkZW4uQ29uZmlnSAASRgodaXJvbm1haWRlbl9lbnRpdGxlbWVudF9jb25maWcYaiABKAsyHS5pcm9ubWFpZGVuLkVudGl0bGVtZW50Q29uZmlnSAASOgoXaXJvbm1haWRlbl9leHRlcm5hbF9qd2sYayABKAsyFy5pcm9ubWFpZGVuLkV4dGVybmFsSndrSAASGwoHandrX2p3axhsIAEoCzIILmp3ay5Kd2tIABIoCg5vcGFfb3BhX3BvbGljeRhtIAEoCzIOLm9wYS5PcGFQb2xpY3lIABJDChxwcmVzbGV5X2FkbWluX2NsdXN0ZXJfaGVhbHRoGG4gASgLMhsucHJlc2xleS5BZG1pbkNsdXN0ZXJIZWFsdGhIABI/ChpwcmVzbGV5X2FkbWluX2NsdXN0ZXJfaW5mbxhvIAEoCzIZLnByZXNsZXkuQWRtaW5DbHVzdGVySW5mb0gAEjsKGHByZXNsZXlfYWRtaW5fZ3JhcGhfaW5mbxhwIAEoCzIXLnByZXNsZXkuQWRtaW5HcmFwaEluZm9IABI7ChhwcmVzbGV5X2FkbWluX2dycGNfc3RhdHMYcSABKAsyFy5wcmVzbGV5LkFkbWluR3JwY1N0YXRzSAASOQoXcHJlc2xleV9hZG1pbl9tYXBfc3RhdHMYciABKAsyFi5wcmVzbGV5LkFkbWluTWFwU3RhdHNIABJBChtwcmVzbGV5X2FkbWluX211dGF0aW9uX3JhdGUYcyABKAsyGi5wcmVzbGV5LkFkbWluTXV0YXRpb25SYXRlSAASQQobcHJlc2xleV9hZG1pbl9uZXR3b3JrX3N0YXRzGHQgASgLMhoucHJlc2xleS5BZG1pbk5ldHdvcmtTdGF0c0gAEj8KGnByZXNsZXlfYWRtaW5fbm9kZV9tZXRyaWNzGHUgASgLMhkucHJlc2xleS5BZG1pbk5vZGVNZXRyaWNzSAASSwogcHJlc2xleV9hZG1pbl9wZXJzaXN0ZW5jZV9zdGF0dXMYdiABKAsyHy5wcmVzbGV5LkFkbWluUGVyc2lzdGVuY2VTdGF0dXNIABI9ChlwcmVzbGV5X2FkbWluX3F1ZXVlX3N0YXRzGHcgASgLMhgucHJlc2xleS5BZG1pblF1ZXVlU3RhdHNIABJLCiBwcmVzbGV5X2FkbWluX3NlcnZpY2VfY29ubmVjdGlvbhh4IAEoCzIfLnByZXNsZXkuQWRtaW5TZXJ2aWNlQ29ubmVjdGlvbkgAEj0KGXByZXNsZXlfYWRtaW5fdGhyZWFkX2luZm8YeSABKAsyGC5wcmVzbGV5LkFkbWluVGhyZWFkSW5mb0gAEkgKH3ByZXNsZXlfYWRtaW5fdG9rZW5fY2FjaGVfc3RhdHMYeiABKAsyHS5wcmVzbGV5LkFkbWluVG9rZW5DYWNoZVN0YXRzSAASPQoZcHJlc2xleV9hZG1pbl90b3BpY19zdGF0cxh7IAEoCzIYLnByZXNsZXkuQWRtaW5Ub3BpY1N0YXRzSAASPwoacHJlc2xleV9hZG1pbl93YXRjaF9oZWFsdGgYfCABKAsyGS5wcmVzbGV5LkFkbWluV2F0Y2hIZWFsdGhIABIlCgxxdWVlbl9jb25maWcYfSABKAsyDS5xdWVlbi5Db25maWdIABI1ChRzZXJ2aWNlY29uZmlnX2NvbmZpZxh+IAEoCzIVLnNlcnZpY2Vjb25maWcuQ29uZmlnSAASLgoRc25vb3B5X2V2ZW50X2RhdGEYfyABKAsyES5zbm9vcHkuRXZlbnREYXRhSAASNwoVc25vb3B5X3NlcnZpY2Vfc3RhdHVzGIABIAEoCzIVLnNub29weS5TZXJ2aWNlU3RhdHVzSAASLQoQc25vb3B5X3Rhc2tfaXRlbRiBASABKAsyEC5zbm9vcHkuVGFza0l0ZW1IABIyChJzcHJpbmdzdGVlbl9jb25maWcYggEgASgLMhMuc3ByaW5nc3RlZW4uQ29uZmlnSAASNQoUd29vZHN0b2NrX2V2ZW50X2RhdGEYgwEgASgLMhQud29vZHN0b2NrLkV2ZW50RGF0YUgAEj0KGHdvb2RzdG9ja19zZXJ2aWNlX3N0YXR1cxiEASABKAsyGC53b29kc3RvY2suU2VydmljZVN0YXR1c0gAEjMKE3dvb2RzdG9ja190YXNrX2l0ZW0YhQEgASgLMhMud29vZHN0b2NrLlRhc2tJdGVtSAASKQoOeDUwOV94NTA5X2NlcnQYhgEgASgLMg4ueDUwOS5YNTA5Q2VydEgAQgkKB3BheWxvYWQicAoGRGJEdW1wEhQKDHRpbWVzdGFtcF9tcxgBIAEoAxITCgtlbnRyeV9jb3VudBgCIAEoBRIPCgdub2RlX2lkGAMgASgJEioKB2VudHJpZXMYBCADKAsyGS5raXRjaGVuX3NpbmsuS2l0Y2hlblNpbmsqLQoGT3BUeXBlEg8KC09QX1RZUEVfUFVUEAASEgoOT1BfVFlQRV9ERUxFVEUQASpFCg9Db25zaXN0ZW5jeVR5cGUSGgoWQ09OU0lTVEVOQ1lfQ09OVkVSR0VOVBAAEhYKEkNPTlNJU1RFTkNZX0FUT01JQxABYgZwcm90bzM",
     [
       file_libs_healthreport,
       file_libs_jwk,
@@ -174,196 +175,203 @@ export type KitchenSink = Message<"kitchen_sink.KitchenSink"> & {
       }
     | {
         /**
-         * @generated from field: ironmaiden.ExternalJwk ironmaiden_external_jwk = 106;
+         * @generated from field: ironmaiden.EntitlementConfig ironmaiden_entitlement_config = 106;
+         */
+        value: EntitlementConfig;
+        case: "ironmaidenEntitlementConfig";
+      }
+    | {
+        /**
+         * @generated from field: ironmaiden.ExternalJwk ironmaiden_external_jwk = 107;
          */
         value: ExternalJwk;
         case: "ironmaidenExternalJwk";
       }
     | {
         /**
-         * @generated from field: jwk.Jwk jwk_jwk = 107;
+         * @generated from field: jwk.Jwk jwk_jwk = 108;
          */
         value: Jwk;
         case: "jwkJwk";
       }
     | {
         /**
-         * @generated from field: opa.OpaPolicy opa_opa_policy = 108;
+         * @generated from field: opa.OpaPolicy opa_opa_policy = 109;
          */
         value: OpaPolicy;
         case: "opaOpaPolicy";
       }
     | {
         /**
-         * @generated from field: presley.AdminClusterHealth presley_admin_cluster_health = 109;
+         * @generated from field: presley.AdminClusterHealth presley_admin_cluster_health = 110;
          */
         value: AdminClusterHealth;
         case: "presleyAdminClusterHealth";
       }
     | {
         /**
-         * @generated from field: presley.AdminClusterInfo presley_admin_cluster_info = 110;
+         * @generated from field: presley.AdminClusterInfo presley_admin_cluster_info = 111;
          */
         value: AdminClusterInfo;
         case: "presleyAdminClusterInfo";
       }
     | {
         /**
-         * @generated from field: presley.AdminGraphInfo presley_admin_graph_info = 111;
+         * @generated from field: presley.AdminGraphInfo presley_admin_graph_info = 112;
          */
         value: AdminGraphInfo;
         case: "presleyAdminGraphInfo";
       }
     | {
         /**
-         * @generated from field: presley.AdminGrpcStats presley_admin_grpc_stats = 112;
+         * @generated from field: presley.AdminGrpcStats presley_admin_grpc_stats = 113;
          */
         value: AdminGrpcStats;
         case: "presleyAdminGrpcStats";
       }
     | {
         /**
-         * @generated from field: presley.AdminMapStats presley_admin_map_stats = 113;
+         * @generated from field: presley.AdminMapStats presley_admin_map_stats = 114;
          */
         value: AdminMapStats;
         case: "presleyAdminMapStats";
       }
     | {
         /**
-         * @generated from field: presley.AdminMutationRate presley_admin_mutation_rate = 114;
+         * @generated from field: presley.AdminMutationRate presley_admin_mutation_rate = 115;
          */
         value: AdminMutationRate;
         case: "presleyAdminMutationRate";
       }
     | {
         /**
-         * @generated from field: presley.AdminNetworkStats presley_admin_network_stats = 115;
+         * @generated from field: presley.AdminNetworkStats presley_admin_network_stats = 116;
          */
         value: AdminNetworkStats;
         case: "presleyAdminNetworkStats";
       }
     | {
         /**
-         * @generated from field: presley.AdminNodeMetrics presley_admin_node_metrics = 116;
+         * @generated from field: presley.AdminNodeMetrics presley_admin_node_metrics = 117;
          */
         value: AdminNodeMetrics;
         case: "presleyAdminNodeMetrics";
       }
     | {
         /**
-         * @generated from field: presley.AdminPersistenceStatus presley_admin_persistence_status = 117;
+         * @generated from field: presley.AdminPersistenceStatus presley_admin_persistence_status = 118;
          */
         value: AdminPersistenceStatus;
         case: "presleyAdminPersistenceStatus";
       }
     | {
         /**
-         * @generated from field: presley.AdminQueueStats presley_admin_queue_stats = 118;
+         * @generated from field: presley.AdminQueueStats presley_admin_queue_stats = 119;
          */
         value: AdminQueueStats;
         case: "presleyAdminQueueStats";
       }
     | {
         /**
-         * @generated from field: presley.AdminServiceConnection presley_admin_service_connection = 119;
+         * @generated from field: presley.AdminServiceConnection presley_admin_service_connection = 120;
          */
         value: AdminServiceConnection;
         case: "presleyAdminServiceConnection";
       }
     | {
         /**
-         * @generated from field: presley.AdminThreadInfo presley_admin_thread_info = 120;
+         * @generated from field: presley.AdminThreadInfo presley_admin_thread_info = 121;
          */
         value: AdminThreadInfo;
         case: "presleyAdminThreadInfo";
       }
     | {
         /**
-         * @generated from field: presley.AdminTokenCacheStats presley_admin_token_cache_stats = 121;
+         * @generated from field: presley.AdminTokenCacheStats presley_admin_token_cache_stats = 122;
          */
         value: AdminTokenCacheStats;
         case: "presleyAdminTokenCacheStats";
       }
     | {
         /**
-         * @generated from field: presley.AdminTopicStats presley_admin_topic_stats = 122;
+         * @generated from field: presley.AdminTopicStats presley_admin_topic_stats = 123;
          */
         value: AdminTopicStats;
         case: "presleyAdminTopicStats";
       }
     | {
         /**
-         * @generated from field: presley.AdminWatchHealth presley_admin_watch_health = 123;
+         * @generated from field: presley.AdminWatchHealth presley_admin_watch_health = 124;
          */
         value: AdminWatchHealth;
         case: "presleyAdminWatchHealth";
       }
     | {
         /**
-         * @generated from field: queen.Config queen_config = 124;
+         * @generated from field: queen.Config queen_config = 125;
          */
         value: Config$4;
         case: "queenConfig";
       }
     | {
         /**
-         * @generated from field: serviceconfig.Config serviceconfig_config = 125;
+         * @generated from field: serviceconfig.Config serviceconfig_config = 126;
          */
         value: Config$5;
         case: "serviceconfigConfig";
       }
     | {
         /**
-         * @generated from field: snoopy.EventData snoopy_event_data = 126;
+         * @generated from field: snoopy.EventData snoopy_event_data = 127;
          */
         value: EventData;
         case: "snoopyEventData";
       }
     | {
         /**
-         * @generated from field: snoopy.ServiceStatus snoopy_service_status = 127;
+         * @generated from field: snoopy.ServiceStatus snoopy_service_status = 128;
          */
         value: ServiceStatus;
         case: "snoopyServiceStatus";
       }
     | {
         /**
-         * @generated from field: snoopy.TaskItem snoopy_task_item = 128;
+         * @generated from field: snoopy.TaskItem snoopy_task_item = 129;
          */
         value: TaskItem;
         case: "snoopyTaskItem";
       }
     | {
         /**
-         * @generated from field: springsteen.Config springsteen_config = 129;
+         * @generated from field: springsteen.Config springsteen_config = 130;
          */
         value: Config$6;
         case: "springsteenConfig";
       }
     | {
         /**
-         * @generated from field: woodstock.EventData woodstock_event_data = 130;
+         * @generated from field: woodstock.EventData woodstock_event_data = 131;
          */
         value: EventData$1;
         case: "woodstockEventData";
       }
     | {
         /**
-         * @generated from field: woodstock.ServiceStatus woodstock_service_status = 131;
+         * @generated from field: woodstock.ServiceStatus woodstock_service_status = 132;
          */
         value: ServiceStatus$1;
         case: "woodstockServiceStatus";
       }
     | {
         /**
-         * @generated from field: woodstock.TaskItem woodstock_task_item = 132;
+         * @generated from field: woodstock.TaskItem woodstock_task_item = 133;
          */
         value: TaskItem$1;
         case: "woodstockTaskItem";
       }
     | {
         /**
-         * @generated from field: x509.X509Cert x509_x509_cert = 133;
+         * @generated from field: x509.X509Cert x509_x509_cert = 134;
          */
         value: X509Cert;
         case: "x509X509Cert";

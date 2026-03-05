@@ -15,7 +15,7 @@ import type { Message } from "@bufbuild/protobuf";
 export const file_libs_opa: GenFile =
   /*@__PURE__*/
   fileDesc(
-    "Cg5saWJzL29wYS5wcm90bxIDb3BhIpIBCglPcGFQb2xpY3kSHQoLZW50cnlfcG9pbnQYASABKAlCCIimHQGIpx0BEhwKBmJ1bmRsZRgCIAEoCUIMiKYdAYCnHQHYpx0BEiEKB2NyZWF0ZWQYAyABKANCELCnHYCL0rsGwKcdgIbB/B0SFQoHdmVyc2lvbhgEIAEoCUIE4KcdARIOCgZzb3VyY2UYBSABKAliBnByb3RvMw",
+    "Cg5saWJzL29wYS5wcm90bxIDb3BhIooBCglPcGFQb2xpY3kSGQoLZW50cnlfcG9pbnQYASABKAlCBIinHQESGAoGYnVuZGxlGAIgASgJQgiApx0B2KcdARIhCgdjcmVhdGVkGAMgASgDQhCwpx2Ai9K7BsCnHYCGwfwdEhUKB3ZlcnNpb24YBCABKAlCBOCnHQESDgoGc291cmNlGAUgASgJYgZwcm90bzM",
     [file_libs_spec],
   );
 
@@ -35,6 +35,7 @@ export type OpaPolicy = Message<"opa.OpaPolicy"> & {
 
   /**
    * bundle contains the base64-encoded OPA policy bundle (tar.gz format).
+   * Optional — policies can be provided as raw source instead.
    *
    * @generated from field: string bundle = 2;
    */

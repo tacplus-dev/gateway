@@ -430,17 +430,17 @@ export function validatePublicKey(m: PublicKey | undefined): void {
     return;
   }
 
-  // Validate id (assert_required)
-  if (!m.id) {
-    throw newErrMissingInvalidData(undefined, `field id is required`);
-  }
-
   // Validate id (assert_min_length: 1)
   if (m.id && m.id.length < 1) {
     throw newErrMissingInvalidData(
       undefined,
       `field id must have length >= 1, got: ${m.id.length}`,
     );
+  }
+
+  // Validate id (assert_required)
+  if (!m.id) {
+    throw newErrMissingInvalidData(undefined, `field id is required`);
   }
 
   // Validate base64 (assert_required)
@@ -459,14 +459,6 @@ export function validatePublicKey(m: PublicKey | undefined): void {
     }
   }
 
-  // Validate created (assert_le: 8045740800)
-  if (m.created !== undefined && m.created > 8045740800) {
-    throw newErrMissingInvalidData(
-      undefined,
-      `field created must be <= 8045740800, got: ${m.created}`,
-    );
-  }
-
   // Validate created (assert_required)
   if (!m.created) {
     throw newErrMissingInvalidData(undefined, `field created is required`);
@@ -477,6 +469,14 @@ export function validatePublicKey(m: PublicKey | undefined): void {
     throw newErrMissingInvalidData(
       undefined,
       `field created must be >= 1735689600, got: ${m.created}`,
+    );
+  }
+
+  // Validate created (assert_le: 8045740800)
+  if (m.created !== undefined && m.created > 8045740800) {
+    throw newErrMissingInvalidData(
+      undefined,
+      `field created must be <= 8045740800, got: ${m.created}`,
     );
   }
 

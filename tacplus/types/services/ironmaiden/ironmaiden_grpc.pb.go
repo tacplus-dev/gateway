@@ -15,6 +15,7 @@ package ironmaiden
 
 import (
 	context "context"
+	opa "gitlab.com/secondstarcavalier/controlplane/services/springsteen/tacplus/types/libs/opa"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -349,6 +350,15 @@ var IronMaidenService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	IronMaidenStateBackendService_GetEntitlementsPolicy_FullMethodName    = "/ironmaiden.IronMaidenStateBackendService/GetEntitlementsPolicy"
+	IronMaidenStateBackendService_SetEntitlementsPolicy_FullMethodName    = "/ironmaiden.IronMaidenStateBackendService/SetEntitlementsPolicy"
+	IronMaidenStateBackendService_WatchEntitlementsPolicy_FullMethodName  = "/ironmaiden.IronMaidenStateBackendService/WatchEntitlementsPolicy"
+	IronMaidenStateBackendService_GetClaimMappingPolicy_FullMethodName    = "/ironmaiden.IronMaidenStateBackendService/GetClaimMappingPolicy"
+	IronMaidenStateBackendService_SetClaimMappingPolicy_FullMethodName    = "/ironmaiden.IronMaidenStateBackendService/SetClaimMappingPolicy"
+	IronMaidenStateBackendService_WatchClaimMappingPolicy_FullMethodName  = "/ironmaiden.IronMaidenStateBackendService/WatchClaimMappingPolicy"
+	IronMaidenStateBackendService_GetEntitlementConfig_FullMethodName     = "/ironmaiden.IronMaidenStateBackendService/GetEntitlementConfig"
+	IronMaidenStateBackendService_SetEntitlementConfig_FullMethodName     = "/ironmaiden.IronMaidenStateBackendService/SetEntitlementConfig"
+	IronMaidenStateBackendService_WatchEntitlementConfig_FullMethodName   = "/ironmaiden.IronMaidenStateBackendService/WatchEntitlementConfig"
 	IronMaidenStateBackendService_GetVerifyingKeys_FullMethodName         = "/ironmaiden.IronMaidenStateBackendService/GetVerifyingKeys"
 	IronMaidenStateBackendService_PutVerifyingKeys_FullMethodName         = "/ironmaiden.IronMaidenStateBackendService/PutVerifyingKeys"
 	IronMaidenStateBackendService_SetVerifyingKeys_FullMethodName         = "/ironmaiden.IronMaidenStateBackendService/SetVerifyingKeys"
@@ -369,6 +379,18 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type IronMaidenStateBackendServiceClient interface {
+	// Singleton: EntitlementsPolicy
+	GetEntitlementsPolicy(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*opa.OpaPolicy, error)
+	SetEntitlementsPolicy(ctx context.Context, in *opa.OpaPolicy, opts ...grpc.CallOption) (*opa.OpaPolicy, error)
+	WatchEntitlementsPolicy(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[opa.OpaPolicy], error)
+	// Singleton: ClaimMappingPolicy
+	GetClaimMappingPolicy(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*opa.OpaPolicy, error)
+	SetClaimMappingPolicy(ctx context.Context, in *opa.OpaPolicy, opts ...grpc.CallOption) (*opa.OpaPolicy, error)
+	WatchClaimMappingPolicy(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[opa.OpaPolicy], error)
+	// Singleton: EntitlementConfig
+	GetEntitlementConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*EntitlementConfig, error)
+	SetEntitlementConfig(ctx context.Context, in *EntitlementConfig, opts ...grpc.CallOption) (*EntitlementConfig, error)
+	WatchEntitlementConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[EntitlementConfig], error)
 	// Collection: VerifyingKeys
 	GetVerifyingKeys(ctx context.Context, in *VerifyingKeysGetRequest, opts ...grpc.CallOption) (*VerifyingKeysValueResponse, error)
 	PutVerifyingKeys(ctx context.Context, in *VerifyingKeysPutRequest, opts ...grpc.CallOption) (*VerifyingKeysValueResponse, error)
@@ -393,6 +415,123 @@ type ironMaidenStateBackendServiceClient struct {
 func NewIronMaidenStateBackendServiceClient(cc grpc.ClientConnInterface) IronMaidenStateBackendServiceClient {
 	return &ironMaidenStateBackendServiceClient{cc}
 }
+
+func (c *ironMaidenStateBackendServiceClient) GetEntitlementsPolicy(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*opa.OpaPolicy, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(opa.OpaPolicy)
+	err := c.cc.Invoke(ctx, IronMaidenStateBackendService_GetEntitlementsPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ironMaidenStateBackendServiceClient) SetEntitlementsPolicy(ctx context.Context, in *opa.OpaPolicy, opts ...grpc.CallOption) (*opa.OpaPolicy, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(opa.OpaPolicy)
+	err := c.cc.Invoke(ctx, IronMaidenStateBackendService_SetEntitlementsPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ironMaidenStateBackendServiceClient) WatchEntitlementsPolicy(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[opa.OpaPolicy], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &IronMaidenStateBackendService_ServiceDesc.Streams[0], IronMaidenStateBackendService_WatchEntitlementsPolicy_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[emptypb.Empty, opa.OpaPolicy]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type IronMaidenStateBackendService_WatchEntitlementsPolicyClient = grpc.ServerStreamingClient[opa.OpaPolicy]
+
+func (c *ironMaidenStateBackendServiceClient) GetClaimMappingPolicy(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*opa.OpaPolicy, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(opa.OpaPolicy)
+	err := c.cc.Invoke(ctx, IronMaidenStateBackendService_GetClaimMappingPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ironMaidenStateBackendServiceClient) SetClaimMappingPolicy(ctx context.Context, in *opa.OpaPolicy, opts ...grpc.CallOption) (*opa.OpaPolicy, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(opa.OpaPolicy)
+	err := c.cc.Invoke(ctx, IronMaidenStateBackendService_SetClaimMappingPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ironMaidenStateBackendServiceClient) WatchClaimMappingPolicy(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[opa.OpaPolicy], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &IronMaidenStateBackendService_ServiceDesc.Streams[1], IronMaidenStateBackendService_WatchClaimMappingPolicy_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[emptypb.Empty, opa.OpaPolicy]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type IronMaidenStateBackendService_WatchClaimMappingPolicyClient = grpc.ServerStreamingClient[opa.OpaPolicy]
+
+func (c *ironMaidenStateBackendServiceClient) GetEntitlementConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*EntitlementConfig, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EntitlementConfig)
+	err := c.cc.Invoke(ctx, IronMaidenStateBackendService_GetEntitlementConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ironMaidenStateBackendServiceClient) SetEntitlementConfig(ctx context.Context, in *EntitlementConfig, opts ...grpc.CallOption) (*EntitlementConfig, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EntitlementConfig)
+	err := c.cc.Invoke(ctx, IronMaidenStateBackendService_SetEntitlementConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ironMaidenStateBackendServiceClient) WatchEntitlementConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[EntitlementConfig], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &IronMaidenStateBackendService_ServiceDesc.Streams[2], IronMaidenStateBackendService_WatchEntitlementConfig_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[emptypb.Empty, EntitlementConfig]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type IronMaidenStateBackendService_WatchEntitlementConfigClient = grpc.ServerStreamingClient[EntitlementConfig]
 
 func (c *ironMaidenStateBackendServiceClient) GetVerifyingKeys(ctx context.Context, in *VerifyingKeysGetRequest, opts ...grpc.CallOption) (*VerifyingKeysValueResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -506,7 +645,7 @@ func (c *ironMaidenStateBackendServiceClient) PutIfAbsentVerifyingKeys(ctx conte
 
 func (c *ironMaidenStateBackendServiceClient) WatchVerifyingKeys(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[VerifyingKeysEntriesResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &IronMaidenStateBackendService_ServiceDesc.Streams[0], IronMaidenStateBackendService_WatchVerifyingKeys_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &IronMaidenStateBackendService_ServiceDesc.Streams[3], IronMaidenStateBackendService_WatchVerifyingKeys_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +674,7 @@ func (c *ironMaidenStateBackendServiceClient) QueryVerifyingKeys(ctx context.Con
 
 func (c *ironMaidenStateBackendServiceClient) WatchQueryVerifyingKeys(ctx context.Context, in *VerifyingKeysQueryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[VerifyingKeysQueryResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &IronMaidenStateBackendService_ServiceDesc.Streams[1], IronMaidenStateBackendService_WatchQueryVerifyingKeys_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &IronMaidenStateBackendService_ServiceDesc.Streams[4], IronMaidenStateBackendService_WatchQueryVerifyingKeys_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -556,6 +695,18 @@ type IronMaidenStateBackendService_WatchQueryVerifyingKeysClient = grpc.ServerSt
 // All implementations must embed UnimplementedIronMaidenStateBackendServiceServer
 // for forward compatibility.
 type IronMaidenStateBackendServiceServer interface {
+	// Singleton: EntitlementsPolicy
+	GetEntitlementsPolicy(context.Context, *emptypb.Empty) (*opa.OpaPolicy, error)
+	SetEntitlementsPolicy(context.Context, *opa.OpaPolicy) (*opa.OpaPolicy, error)
+	WatchEntitlementsPolicy(*emptypb.Empty, grpc.ServerStreamingServer[opa.OpaPolicy]) error
+	// Singleton: ClaimMappingPolicy
+	GetClaimMappingPolicy(context.Context, *emptypb.Empty) (*opa.OpaPolicy, error)
+	SetClaimMappingPolicy(context.Context, *opa.OpaPolicy) (*opa.OpaPolicy, error)
+	WatchClaimMappingPolicy(*emptypb.Empty, grpc.ServerStreamingServer[opa.OpaPolicy]) error
+	// Singleton: EntitlementConfig
+	GetEntitlementConfig(context.Context, *emptypb.Empty) (*EntitlementConfig, error)
+	SetEntitlementConfig(context.Context, *EntitlementConfig) (*EntitlementConfig, error)
+	WatchEntitlementConfig(*emptypb.Empty, grpc.ServerStreamingServer[EntitlementConfig]) error
 	// Collection: VerifyingKeys
 	GetVerifyingKeys(context.Context, *VerifyingKeysGetRequest) (*VerifyingKeysValueResponse, error)
 	PutVerifyingKeys(context.Context, *VerifyingKeysPutRequest) (*VerifyingKeysValueResponse, error)
@@ -581,6 +732,33 @@ type IronMaidenStateBackendServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedIronMaidenStateBackendServiceServer struct{}
 
+func (UnimplementedIronMaidenStateBackendServiceServer) GetEntitlementsPolicy(context.Context, *emptypb.Empty) (*opa.OpaPolicy, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetEntitlementsPolicy not implemented")
+}
+func (UnimplementedIronMaidenStateBackendServiceServer) SetEntitlementsPolicy(context.Context, *opa.OpaPolicy) (*opa.OpaPolicy, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetEntitlementsPolicy not implemented")
+}
+func (UnimplementedIronMaidenStateBackendServiceServer) WatchEntitlementsPolicy(*emptypb.Empty, grpc.ServerStreamingServer[opa.OpaPolicy]) error {
+	return status.Error(codes.Unimplemented, "method WatchEntitlementsPolicy not implemented")
+}
+func (UnimplementedIronMaidenStateBackendServiceServer) GetClaimMappingPolicy(context.Context, *emptypb.Empty) (*opa.OpaPolicy, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetClaimMappingPolicy not implemented")
+}
+func (UnimplementedIronMaidenStateBackendServiceServer) SetClaimMappingPolicy(context.Context, *opa.OpaPolicy) (*opa.OpaPolicy, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetClaimMappingPolicy not implemented")
+}
+func (UnimplementedIronMaidenStateBackendServiceServer) WatchClaimMappingPolicy(*emptypb.Empty, grpc.ServerStreamingServer[opa.OpaPolicy]) error {
+	return status.Error(codes.Unimplemented, "method WatchClaimMappingPolicy not implemented")
+}
+func (UnimplementedIronMaidenStateBackendServiceServer) GetEntitlementConfig(context.Context, *emptypb.Empty) (*EntitlementConfig, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetEntitlementConfig not implemented")
+}
+func (UnimplementedIronMaidenStateBackendServiceServer) SetEntitlementConfig(context.Context, *EntitlementConfig) (*EntitlementConfig, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetEntitlementConfig not implemented")
+}
+func (UnimplementedIronMaidenStateBackendServiceServer) WatchEntitlementConfig(*emptypb.Empty, grpc.ServerStreamingServer[EntitlementConfig]) error {
+	return status.Error(codes.Unimplemented, "method WatchEntitlementConfig not implemented")
+}
 func (UnimplementedIronMaidenStateBackendServiceServer) GetVerifyingKeys(context.Context, *VerifyingKeysGetRequest) (*VerifyingKeysValueResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetVerifyingKeys not implemented")
 }
@@ -644,6 +822,147 @@ func RegisterIronMaidenStateBackendServiceServer(s grpc.ServiceRegistrar, srv Ir
 	}
 	s.RegisterService(&IronMaidenStateBackendService_ServiceDesc, srv)
 }
+
+func _IronMaidenStateBackendService_GetEntitlementsPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IronMaidenStateBackendServiceServer).GetEntitlementsPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IronMaidenStateBackendService_GetEntitlementsPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IronMaidenStateBackendServiceServer).GetEntitlementsPolicy(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IronMaidenStateBackendService_SetEntitlementsPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(opa.OpaPolicy)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IronMaidenStateBackendServiceServer).SetEntitlementsPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IronMaidenStateBackendService_SetEntitlementsPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IronMaidenStateBackendServiceServer).SetEntitlementsPolicy(ctx, req.(*opa.OpaPolicy))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IronMaidenStateBackendService_WatchEntitlementsPolicy_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(emptypb.Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(IronMaidenStateBackendServiceServer).WatchEntitlementsPolicy(m, &grpc.GenericServerStream[emptypb.Empty, opa.OpaPolicy]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type IronMaidenStateBackendService_WatchEntitlementsPolicyServer = grpc.ServerStreamingServer[opa.OpaPolicy]
+
+func _IronMaidenStateBackendService_GetClaimMappingPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IronMaidenStateBackendServiceServer).GetClaimMappingPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IronMaidenStateBackendService_GetClaimMappingPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IronMaidenStateBackendServiceServer).GetClaimMappingPolicy(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IronMaidenStateBackendService_SetClaimMappingPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(opa.OpaPolicy)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IronMaidenStateBackendServiceServer).SetClaimMappingPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IronMaidenStateBackendService_SetClaimMappingPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IronMaidenStateBackendServiceServer).SetClaimMappingPolicy(ctx, req.(*opa.OpaPolicy))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IronMaidenStateBackendService_WatchClaimMappingPolicy_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(emptypb.Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(IronMaidenStateBackendServiceServer).WatchClaimMappingPolicy(m, &grpc.GenericServerStream[emptypb.Empty, opa.OpaPolicy]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type IronMaidenStateBackendService_WatchClaimMappingPolicyServer = grpc.ServerStreamingServer[opa.OpaPolicy]
+
+func _IronMaidenStateBackendService_GetEntitlementConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IronMaidenStateBackendServiceServer).GetEntitlementConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IronMaidenStateBackendService_GetEntitlementConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IronMaidenStateBackendServiceServer).GetEntitlementConfig(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IronMaidenStateBackendService_SetEntitlementConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EntitlementConfig)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IronMaidenStateBackendServiceServer).SetEntitlementConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IronMaidenStateBackendService_SetEntitlementConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IronMaidenStateBackendServiceServer).SetEntitlementConfig(ctx, req.(*EntitlementConfig))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IronMaidenStateBackendService_WatchEntitlementConfig_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(emptypb.Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(IronMaidenStateBackendServiceServer).WatchEntitlementConfig(m, &grpc.GenericServerStream[emptypb.Empty, EntitlementConfig]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type IronMaidenStateBackendService_WatchEntitlementConfigServer = grpc.ServerStreamingServer[EntitlementConfig]
 
 func _IronMaidenStateBackendService_GetVerifyingKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VerifyingKeysGetRequest)
@@ -891,6 +1210,30 @@ var IronMaidenStateBackendService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*IronMaidenStateBackendServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "GetEntitlementsPolicy",
+			Handler:    _IronMaidenStateBackendService_GetEntitlementsPolicy_Handler,
+		},
+		{
+			MethodName: "SetEntitlementsPolicy",
+			Handler:    _IronMaidenStateBackendService_SetEntitlementsPolicy_Handler,
+		},
+		{
+			MethodName: "GetClaimMappingPolicy",
+			Handler:    _IronMaidenStateBackendService_GetClaimMappingPolicy_Handler,
+		},
+		{
+			MethodName: "SetClaimMappingPolicy",
+			Handler:    _IronMaidenStateBackendService_SetClaimMappingPolicy_Handler,
+		},
+		{
+			MethodName: "GetEntitlementConfig",
+			Handler:    _IronMaidenStateBackendService_GetEntitlementConfig_Handler,
+		},
+		{
+			MethodName: "SetEntitlementConfig",
+			Handler:    _IronMaidenStateBackendService_SetEntitlementConfig_Handler,
+		},
+		{
 			MethodName: "GetVerifyingKeys",
 			Handler:    _IronMaidenStateBackendService_GetVerifyingKeys_Handler,
 		},
@@ -940,6 +1283,21 @@ var IronMaidenStateBackendService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "WatchEntitlementsPolicy",
+			Handler:       _IronMaidenStateBackendService_WatchEntitlementsPolicy_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "WatchClaimMappingPolicy",
+			Handler:       _IronMaidenStateBackendService_WatchClaimMappingPolicy_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "WatchEntitlementConfig",
+			Handler:       _IronMaidenStateBackendService_WatchEntitlementConfig_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "WatchVerifyingKeys",
 			Handler:       _IronMaidenStateBackendService_WatchVerifyingKeys_Handler,

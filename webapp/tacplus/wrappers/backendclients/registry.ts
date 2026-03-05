@@ -186,7 +186,19 @@ export function boundaries(): BoundaryInfo[] {
     },
     {
       service: "services/ironmaiden",
-      boundary: "Opa",
+      boundary: "EntitlementsPolicy",
+      consistency: "convergent",
+      persistence: false,
+    },
+    {
+      service: "services/ironmaiden",
+      boundary: "ClaimMappingPolicy",
+      consistency: "convergent",
+      persistence: false,
+    },
+    {
+      service: "services/ironmaiden",
+      boundary: "EntitlementConfig",
       consistency: "convergent",
       persistence: false,
     },

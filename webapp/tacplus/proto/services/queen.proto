@@ -15,7 +15,7 @@ syntax = "proto3";
 
 package queen;
 
-import "libs/entitlement.proto";
+import "libs/opa.proto";
 import "google/protobuf/empty.proto";
 import "google/api/annotations.proto";
 
@@ -23,22 +23,9 @@ import "google/api/annotations.proto";
 // Config
 // ============================================================================
 
+// Queen reads all auth config (OPA policies, entitlement mappings) from
+// IronMaidenState via Watch (RO). No config duplication needed.
 message Config {
-
-  // claim_mapping_policy is a Rego policy that maps IDP claims to a principal.
-  // Deployed with the same value as ironmaiden's claim_mapping_policy.
-  string claim_mapping_policy = 1;
-
-  // entitlements_policy is a Rego policy evaluated to determine entitlements.
-  // Deployed with the same value as ironmaiden's entitlements_policy.
-  string entitlements_policy = 2;
-
-  // entitlement_mappings maps OPA-resolved principals to entitlement definitions.
-  repeated entitlement.ServiceEntitlementMapping entitlement_mappings = 3;
-
-  // service_entitlements holds named entitlement definitions loaded from
-  // proto/security/*.json at config build time.
-  repeated entitlement.ServiceEntitlements service_entitlements = 4;
 }
 
 // ============================================================================
@@ -155,9 +142,11 @@ message EvaluatePolicyResponse {
   repeated string errors = 3;
 }
 
-// GetPoliciesResponse returns the deployed OPA Rego policies.
+// GetPoliciesResponse returns the deployed OPA policies as full OpaPolicy objects.
 message GetPoliciesResponse {
-  // entitlements_policy is the Rego policy evaluated to determine entitlements.
-  // Read from IronMaidenState (published by ironmaiden from its config).
-  string entitlements_policy = 1;
+  // entitlements_policy is the OPA policy evaluated to determine entitlements.
+  opa.OpaPolicy entitlements_policy = 1;
+
+  // claim_mapping_policy is the OPA policy that maps IDP claims to a principal.
+  opa.OpaPolicy claim_mapping_policy = 2;
 }

@@ -756,11 +756,6 @@ export function validateX509Cert(m: X509Cert | undefined): void {
     return;
   }
 
-  // Validate base64 (assert_required)
-  if (!m.base64) {
-    throw newErrMissingInvalidData(undefined, `field base64 is required`);
-  }
-
   // Validate base64 (assert_base64)
   if (m.base64) {
     const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -770,6 +765,11 @@ export function validateX509Cert(m: X509Cert | undefined): void {
         `field base64 must be valid base64`,
       );
     }
+  }
+
+  // Validate base64 (assert_required)
+  if (!m.base64) {
+    throw newErrMissingInvalidData(undefined, `field base64 is required`);
   }
 
   // Validate id (default max size: 32768 bytes)

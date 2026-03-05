@@ -6,6 +6,7 @@ import {
   Config,
   OAuthConfig,
   ProviderConfig,
+  EntitlementConfig,
   IronMaidenState,
   IronMaidenStateInternal,
   ExternalJwk,
@@ -54,6 +55,7 @@ import {
   ConfigSchema,
   OAuthConfigSchema,
   ProviderConfigSchema,
+  EntitlementConfigSchema,
   IronMaidenStateSchema,
   IronMaidenStateInternalSchema,
   ExternalJwkSchema,
@@ -777,6 +779,172 @@ export function providerConfigFromBytes(
     throw newErrMissingInvalidData(
       undefined,
       `Failed to parse ProviderConfig: invalid format`,
+    );
+  }
+}
+
+/**
+ * Converts EntitlementConfig to JSON string.
+ * @param m The message to serialize
+ * @param pretty If true, formats the JSON with indentation
+ * @returns JSON string representation
+ */
+export function entitlementConfigToJSON(
+  m: EntitlementConfig,
+  pretty: boolean = false,
+): string {
+  const json = toJson(EntitlementConfigSchema, m);
+  return pretty ? JSON.stringify(json, null, 2) : JSON.stringify(json);
+}
+
+/**
+ * Creates EntitlementConfig from JSON string or object.
+ * @param data JSON string or object
+ * @returns Parsed message instance
+ */
+export function entitlementConfigFromJSON(
+  data: string | object,
+): EntitlementConfig {
+  const jsonObj = typeof data === "string" ? JSON.parse(data) : data;
+  return fromJson(EntitlementConfigSchema, jsonObj);
+}
+
+/**
+ * Converts EntitlementConfig to binary protobuf format.
+ * @param m The message to serialize
+ * @returns Uint8Array containing the binary data
+ */
+export function entitlementConfigToBinary(m: EntitlementConfig): Uint8Array {
+  return toBinary(EntitlementConfigSchema, m);
+}
+
+/**
+ * Creates EntitlementConfig from binary protobuf data.
+ * @param data Binary protobuf data
+ * @returns Parsed message instance
+ */
+export function entitlementConfigFromBinary(
+  data: Uint8Array,
+): EntitlementConfig {
+  return fromBinary(EntitlementConfigSchema, data);
+}
+
+/**
+ * Converts EntitlementConfig to YAML string.
+ * @param m The message to serialize
+ * @returns YAML string representation
+ */
+export function entitlementConfigToYAML(m: EntitlementConfig): string {
+  const json = toJson(EntitlementConfigSchema, m);
+  return yaml.dump(json);
+}
+
+/**
+ * Converts EntitlementConfig to TOML string.
+ * @param m The message to serialize
+ * @returns TOML string representation
+ */
+export function entitlementConfigToTOML(m: EntitlementConfig): string {
+  const json = toJson(EntitlementConfigSchema, m);
+  return toml.stringify(json as toml.JsonMap);
+}
+
+/**
+ * Creates EntitlementConfig from bytes, auto-detecting the format (JSON, YAML, TOML, or binary protobuf).
+ * @param data Bytes to parse
+ * @returns Parsed message instance
+ * @throws Error if the data cannot be parsed
+ */
+export function entitlementConfigFromBytes(
+  data: Uint8Array | string,
+): EntitlementConfig {
+  // If it's a string, try to detect format
+  if (typeof data === "string") {
+    // Try JSON first (most common)
+    if (data.trimStart().startsWith("{") || data.trimStart().startsWith("[")) {
+      try {
+        return entitlementConfigFromJSON(data);
+      } catch (e) {
+        // Fall through to try other formats
+      }
+    }
+
+    // Try YAML
+    try {
+      const yamlObj = yaml.load(data) as string | object;
+      return entitlementConfigFromJSON(yamlObj);
+    } catch (e) {
+      // Fall through to try TOML
+    }
+
+    // Try TOML
+    try {
+      const tomlObj = toml.parse(data) as string | object;
+      return entitlementConfigFromJSON(tomlObj);
+    } catch (e) {
+      throw newErrMissingInvalidData(
+        undefined,
+        "Failed to parse EntitlementConfig from string: not valid JSON, YAML, or TOML",
+      );
+    }
+  }
+
+  // Try to detect format from the first byte
+  // JSON starts with '{' (0x7B) or '[' (0x5B) or whitespace
+  if (data.length > 0) {
+    const firstByte = data[0];
+    // Check for JSON markers (after trimming whitespace)
+    let i = 0;
+    while (
+      i < data.length &&
+      (data[i] === 0x20 ||
+        data[i] === 0x09 ||
+        data[i] === 0x0a ||
+        data[i] === 0x0d)
+    ) {
+      i++;
+    }
+    if (i < data.length && (data[i] === 0x7b || data[i] === 0x5b)) {
+      // Looks like JSON
+      try {
+        const text = new TextDecoder().decode(data);
+        return entitlementConfigFromJSON(text);
+      } catch (e) {
+        // Fall through to try other formats
+      }
+    }
+
+    // Try to decode as text and parse as YAML/TOML
+    try {
+      const text = new TextDecoder().decode(data);
+
+      // Try YAML
+      try {
+        const yamlObj = yaml.load(text) as string | object;
+        return entitlementConfigFromJSON(yamlObj);
+      } catch (e) {
+        // Fall through
+      }
+
+      // Try TOML
+      try {
+        const tomlObj = toml.parse(text) as string | object;
+        return entitlementConfigFromJSON(tomlObj);
+      } catch (e) {
+        // Fall through
+      }
+    } catch (e) {
+      // Fall through to try binary
+    }
+  }
+
+  // Try binary protobuf
+  try {
+    return entitlementConfigFromBinary(data);
+  } catch (e) {
+    throw newErrMissingInvalidData(
+      undefined,
+      `Failed to parse EntitlementConfig: invalid format`,
     );
   }
 }
@@ -8378,6 +8546,14 @@ export function validateConfig(m: Config | undefined): void {
     );
   }
 
+  // Validate keyLifetimeSeconds (assert_duration: POSITIVE)
+  if (m.keyLifetimeSeconds !== undefined && m.keyLifetimeSeconds <= 0) {
+    throw newErrMissingInvalidData(
+      undefined,
+      `field keyLifetimeSeconds must be positive (> 0), got: ${m.keyLifetimeSeconds}`,
+    );
+  }
+
   // Validate keyLifetimeSeconds (assert_duration_min: 3600)
   if (m.keyLifetimeSeconds !== undefined && m.keyLifetimeSeconds < 3600) {
     throw newErrMissingInvalidData(
@@ -8386,11 +8562,11 @@ export function validateConfig(m: Config | undefined): void {
     );
   }
 
-  // Validate keyLifetimeSeconds (assert_duration: POSITIVE)
-  if (m.keyLifetimeSeconds !== undefined && m.keyLifetimeSeconds <= 0) {
+  // Validate nonceExpireSeconds (assert_duration: POSITIVE)
+  if (m.nonceExpireSeconds !== undefined && m.nonceExpireSeconds <= 0) {
     throw newErrMissingInvalidData(
       undefined,
-      `field keyLifetimeSeconds must be positive (> 0), got: ${m.keyLifetimeSeconds}`,
+      `field nonceExpireSeconds must be positive (> 0), got: ${m.nonceExpireSeconds}`,
     );
   }
 
@@ -8402,12 +8578,9 @@ export function validateConfig(m: Config | undefined): void {
     );
   }
 
-  // Validate nonceExpireSeconds (assert_duration: POSITIVE)
-  if (m.nonceExpireSeconds !== undefined && m.nonceExpireSeconds <= 0) {
-    throw newErrMissingInvalidData(
-      undefined,
-      `field nonceExpireSeconds must be positive (> 0), got: ${m.nonceExpireSeconds}`,
-    );
+  // Validate issuer (assert_required)
+  if (!m.issuer) {
+    throw newErrMissingInvalidData(undefined, `field issuer is required`);
   }
 
   // Validate issuer (assert_url)
@@ -8420,11 +8593,6 @@ export function validateConfig(m: Config | undefined): void {
         `field issuer must be a valid URL`,
       );
     }
-  }
-
-  // Validate issuer (assert_required)
-  if (!m.issuer) {
-    throw newErrMissingInvalidData(undefined, `field issuer is required`);
   }
 
   // Validate jwkRefetchIntervalSeconds (assert_duration: POSITIVE)
@@ -8510,6 +8678,11 @@ export function validateProviderConfig(m: ProviderConfig | undefined): void {
     );
   }
 
+  // Validate issuer (assert_required)
+  if (!m.issuer) {
+    throw newErrMissingInvalidData(undefined, `field issuer is required`);
+  }
+
   // Validate issuer (assert_url)
   if (m.issuer) {
     try {
@@ -8520,11 +8693,6 @@ export function validateProviderConfig(m: ProviderConfig | undefined): void {
         `field issuer must be a valid URL`,
       );
     }
-  }
-
-  // Validate issuer (assert_required)
-  if (!m.issuer) {
-    throw newErrMissingInvalidData(undefined, `field issuer is required`);
   }
 
   // Validate clientId (assert_required)
@@ -8540,17 +8708,17 @@ export function validateProviderConfig(m: ProviderConfig | undefined): void {
     );
   }
 
+  // Validate clientSecret (assert_required)
+  if (!m.clientSecret) {
+    throw newErrMissingInvalidData(undefined, `field clientSecret is required`);
+  }
+
   // Validate clientSecret (assert_min_length: 1)
   if (m.clientSecret && m.clientSecret.length < 1) {
     throw newErrMissingInvalidData(
       undefined,
       `field clientSecret must have length >= 1, got: ${m.clientSecret.length}`,
     );
-  }
-
-  // Validate clientSecret (assert_required)
-  if (!m.clientSecret) {
-    throw newErrMissingInvalidData(undefined, `field clientSecret is required`);
   }
 
   // Validate authorizationEndpoint (assert_url)
@@ -8674,6 +8842,19 @@ export function validateProviderConfig(m: ProviderConfig | undefined): void {
   }
 }
 /**
+ * Validates all fields in EntitlementConfig according to their annotations.
+ * @throws {BlueErr} if validation fails
+ */
+export function validateEntitlementConfig(
+  m: EntitlementConfig | undefined,
+): void {
+  if (!m) {
+    return;
+  }
+
+  // No field validations defined
+}
+/**
  * Validates all fields in IronMaidenState according to their annotations.
  * @throws {BlueErr} if validation fails
  */
@@ -8783,17 +8964,17 @@ export function validateProviderInfo(m: ProviderInfo | undefined): void {
     return;
   }
 
+  // Validate name (assert_required)
+  if (!m.name) {
+    throw newErrMissingInvalidData(undefined, `field name is required`);
+  }
+
   // Validate name (assert_min_length: 1)
   if (m.name && m.name.length < 1) {
     throw newErrMissingInvalidData(
       undefined,
       `field name must have length >= 1, got: ${m.name.length}`,
     );
-  }
-
-  // Validate name (assert_required)
-  if (!m.name) {
-    throw newErrMissingInvalidData(undefined, `field name is required`);
   }
 
   // Validate providerIndex (assert_ge: 0)
@@ -8938,17 +9119,17 @@ export function validateCallbackResponse(
     return;
   }
 
-  // Validate refreshToken (assert_required)
-  if (!m.refreshToken) {
-    throw newErrMissingInvalidData(undefined, `field refreshToken is required`);
-  }
-
   // Validate refreshToken (assert_min_length: 1)
   if (m.refreshToken && m.refreshToken.length < 1) {
     throw newErrMissingInvalidData(
       undefined,
       `field refreshToken must have length >= 1, got: ${m.refreshToken.length}`,
     );
+  }
+
+  // Validate refreshToken (assert_required)
+  if (!m.refreshToken) {
+    throw newErrMissingInvalidData(undefined, `field refreshToken is required`);
   }
 
   // Validate accessToken (assert_required)
@@ -9809,6 +9990,21 @@ export function mergeProviderConfig(
   }
 }
 // ============================================================
+// Merge: EntitlementConfig
+// ============================================================
+/** Fills zero-valued fields in dst from src. dst takes precedence. */
+export function mergeEntitlementConfig(
+  dst: EntitlementConfig,
+  src: EntitlementConfig,
+): void {
+  if (dst.entitlementMappings.length === 0) {
+    dst.entitlementMappings = src.entitlementMappings;
+  }
+  if (dst.serviceEntitlements.length === 0) {
+    dst.serviceEntitlements = src.serviceEntitlements;
+  }
+}
+// ============================================================
 // Merge: IronMaidenState
 // ============================================================
 /** Fills zero-valued fields in dst from src. dst takes precedence. */
@@ -9819,8 +10015,16 @@ export function mergeIronMaidenState(
   if (dst.verifyingKeys.length === 0) {
     dst.verifyingKeys = src.verifyingKeys;
   }
-  if (!dst.opa && src.opa) {
-    dst.opa = src.opa;
+  if (!dst.entitlementsPolicy && src.entitlementsPolicy) {
+    dst.entitlementsPolicy = src.entitlementsPolicy;
+  }
+  if (!dst.claimMappingPolicy && src.claimMappingPolicy) {
+    dst.claimMappingPolicy = src.claimMappingPolicy;
+  }
+  if (!dst.entitlementConfig && src.entitlementConfig) {
+    dst.entitlementConfig = src.entitlementConfig;
+  } else if (dst.entitlementConfig && src.entitlementConfig) {
+    mergeEntitlementConfig(dst.entitlementConfig, src.entitlementConfig);
   }
 }
 // ============================================================

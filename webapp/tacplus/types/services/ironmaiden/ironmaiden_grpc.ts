@@ -44,6 +44,7 @@ import {
   AuthorizeResponse,
   CallbackRequest,
   CallbackResponse,
+  EntitlementConfig,
   ExchangeTokenRequest,
   ExchangeTokenResponse,
   ExternalJwksClearRequest,
@@ -170,32 +171,90 @@ export const IronMaidenStateBackendService = {
   typeName: "ironmaiden.IronMaidenStateBackendService",
   methods: {
     /**
-     * Singleton: Opa
+     * Singleton: EntitlementsPolicy
      *
-     * @generated from rpc ironmaiden.IronMaidenStateBackendService.GetOpa
+     * @generated from rpc ironmaiden.IronMaidenStateBackendService.GetEntitlementsPolicy
      */
-    getOpa: {
-      name: "GetOpa",
+    getEntitlementsPolicy: {
+      name: "GetEntitlementsPolicy",
       I: Empty,
       O: OpaPolicy,
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc ironmaiden.IronMaidenStateBackendService.SetOpa
+     * @generated from rpc ironmaiden.IronMaidenStateBackendService.SetEntitlementsPolicy
      */
-    setOpa: {
-      name: "SetOpa",
+    setEntitlementsPolicy: {
+      name: "SetEntitlementsPolicy",
       I: OpaPolicy,
       O: OpaPolicy,
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc ironmaiden.IronMaidenStateBackendService.WatchOpa
+     * @generated from rpc ironmaiden.IronMaidenStateBackendService.WatchEntitlementsPolicy
      */
-    watchOpa: {
-      name: "WatchOpa",
+    watchEntitlementsPolicy: {
+      name: "WatchEntitlementsPolicy",
       I: Empty,
       O: OpaPolicy,
+      kind: MethodKind.ServerStreaming,
+    },
+    /**
+     * Singleton: ClaimMappingPolicy
+     *
+     * @generated from rpc ironmaiden.IronMaidenStateBackendService.GetClaimMappingPolicy
+     */
+    getClaimMappingPolicy: {
+      name: "GetClaimMappingPolicy",
+      I: Empty,
+      O: OpaPolicy,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc ironmaiden.IronMaidenStateBackendService.SetClaimMappingPolicy
+     */
+    setClaimMappingPolicy: {
+      name: "SetClaimMappingPolicy",
+      I: OpaPolicy,
+      O: OpaPolicy,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc ironmaiden.IronMaidenStateBackendService.WatchClaimMappingPolicy
+     */
+    watchClaimMappingPolicy: {
+      name: "WatchClaimMappingPolicy",
+      I: Empty,
+      O: OpaPolicy,
+      kind: MethodKind.ServerStreaming,
+    },
+    /**
+     * Singleton: EntitlementConfig
+     *
+     * @generated from rpc ironmaiden.IronMaidenStateBackendService.GetEntitlementConfig
+     */
+    getEntitlementConfig: {
+      name: "GetEntitlementConfig",
+      I: Empty,
+      O: EntitlementConfig,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc ironmaiden.IronMaidenStateBackendService.SetEntitlementConfig
+     */
+    setEntitlementConfig: {
+      name: "SetEntitlementConfig",
+      I: EntitlementConfig,
+      O: EntitlementConfig,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc ironmaiden.IronMaidenStateBackendService.WatchEntitlementConfig
+     */
+    watchEntitlementConfig: {
+      name: "WatchEntitlementConfig",
+      I: Empty,
+      O: EntitlementConfig,
       kind: MethodKind.ServerStreaming,
     },
     /**
