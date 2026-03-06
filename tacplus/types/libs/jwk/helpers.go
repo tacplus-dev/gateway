@@ -1169,14 +1169,14 @@ func ValidateJwk(m *Jwk) error {
 		return nil
 	}
 
-	// Validate Alg (assert_min_length: 1)
-	if len(m.Alg) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Alg must be at least 1 characters, got: %d", len(m.Alg))
-	}
-
 	// Validate Alg (assert_required)
 	if m.Alg == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Alg is required")
+	}
+
+	// Validate Alg (assert_min_length: 1)
+	if len(m.Alg) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Alg must be at least 1 characters, got: %d", len(m.Alg))
 	}
 
 	// Validate Kid (assert_required)
