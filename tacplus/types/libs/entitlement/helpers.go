@@ -673,14 +673,14 @@ func ValidateServiceEntitlement(m *ServiceEntitlement) error {
 		return nil
 	}
 
-	// Validate ServiceName (assert_required)
-	if m.ServiceName == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field ServiceName is required")
-	}
-
 	// Validate ServiceName (assert_max_length: 128)
 	if len(m.ServiceName) > 128 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ServiceName must be at most 128 characters, got: %d", len(m.ServiceName))
+	}
+
+	// Validate ServiceName (assert_required)
+	if m.ServiceName == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field ServiceName is required")
 	}
 
 	// Validate AllowedRpcs (assert_required)
@@ -743,14 +743,14 @@ func ValidateIdentityProfile(m *IdentityProfile) error {
 		return nil
 	}
 
-	// Validate Id (assert_required)
-	if m.Id == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Id is required")
-	}
-
 	// Validate Id (assert_max_length: 128)
 	if len(m.Id) > 128 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Id must be at most 128 characters, got: %d", len(m.Id))
+	}
+
+	// Validate Id (assert_required)
+	if m.Id == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Id is required")
 	}
 
 	// Validate Entitlements (assert_required)
@@ -778,14 +778,14 @@ func ValidateServiceEntitlementMapping(m *ServiceEntitlementMapping) error {
 		return nil
 	}
 
-	// Validate CredentialId (assert_required)
-	if m.CredentialId == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field CredentialId is required")
-	}
-
 	// Validate CredentialId (assert_max_length: 512)
 	if len(m.CredentialId) > 512 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field CredentialId must be at most 512 characters, got: %d", len(m.CredentialId))
+	}
+
+	// Validate CredentialId (assert_required)
+	if m.CredentialId == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field CredentialId is required")
 	}
 
 	// Validate Service (assert_required)

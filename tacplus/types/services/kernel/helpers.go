@@ -25,13 +25,13 @@ import (
 	entitlement "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/entitlement"
 	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
 	healthreport "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/healthreport"
+	host "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/host"
 	jwk "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/jwk"
 	logger "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/logger"
 	outputformat "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/outputformat"
 	x509 "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/x509"
 	config_holder "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/config_holder"
 	sentinel "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/sentinel"
-	utils "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/utils"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
@@ -40,6 +40,110 @@ import (
 // ============================================================
 // Enum Helpers
 // ============================================================
+// NodeModeValues returns all valid NodeMode values (excluding UNDEFINED)
+func NodeModeValues() []NodeMode {
+	return []NodeMode{
+		NodeMode_NODE_MODE_CORE,
+		NodeMode_NODE_MODE_EDGE,
+	}
+}
+
+// NodeModeStringValues returns all valid NodeMode names as strings
+func NodeModeStringValues() []string {
+	return []string{"core", "edge"}
+}
+
+// ParseNodeMode converts a string to a NodeMode enum value
+// Accepts both hyphen and underscore formats for compatibility (case-insensitive)
+func ParseNodeMode(s string) (NodeMode, error) {
+	// Normalize: convert to lowercase and replace underscores with hyphens for case-insensitive comparison
+	normalized := strings.ReplaceAll(strings.ToLower(s), "_", "-")
+	switch normalized {
+	case "":
+		return NodeMode_NODE_MODE_CORE_EDGE, nil
+	case "core", "node-mode-core":
+		return NodeMode_NODE_MODE_CORE, nil
+	case "edge", "node-mode-edge":
+		return NodeMode_NODE_MODE_EDGE, nil
+	default:
+		return NodeMode_NODE_MODE_CORE_EDGE, protoerrors.NewErrMissingInvalidData(nil, "invalid nodemode %s, expecting one of: %v", s, NodeModeStringValues())
+	}
+}
+
+// ParseNodeModes converts a comma-separated string to a slice of NodeMode enum values
+// Returns an error if any value is invalid
+func ParseNodeModes(s string) ([]NodeMode, error) {
+	if s == "" {
+		return nil, nil
+	}
+	parts := strings.Split(s, ",")
+	result := make([]NodeMode, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		val, err := ParseNodeMode(trimmed)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, val)
+	}
+	return result, nil
+}
+
+// NodeModeToString converts a NodeMode to its lowercase string representation
+func NodeModeToString(v NodeMode) string {
+	switch v {
+	case NodeMode_NODE_MODE_CORE:
+		return "core"
+	case NodeMode_NODE_MODE_EDGE:
+		return "edge"
+	default:
+		return ""
+	}
+}
+
+// ParseNodeModeLiberal parses a NodeMode liberally, accepting:
+// - Integer values (as string or int)
+// - Enum names in any case
+// - RFC-compliant JSON names
+func ParseNodeModeLiberal(s string) NodeMode {
+	if s == "" {
+		return NodeMode_NODE_MODE_CORE_EDGE
+	}
+	// Try parsing as integer
+	if num, err := strconv.Atoi(s); err == nil {
+		return NodeMode(num)
+	}
+	// Normalize and try parsing
+	normalized := strings.ToLower(strings.TrimSpace(s))
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	normalized = strings.ReplaceAll(normalized, " ", "-")
+	switch normalized {
+	case "core", "node-mode-core":
+		return NodeMode_NODE_MODE_CORE
+	case "edge", "node-mode-edge":
+		return NodeMode_NODE_MODE_EDGE
+	default:
+		return NodeMode_NODE_MODE_CORE_EDGE
+	}
+}
+
+// NodeModeToSpecName converts a NodeMode to its canonical protobuf spec name
+func NodeModeToSpecName(v NodeMode) string {
+	switch v {
+	case NodeMode_NODE_MODE_CORE_EDGE:
+		return "NODE_MODE_CORE_EDGE"
+	case NodeMode_NODE_MODE_CORE:
+		return "NODE_MODE_CORE"
+	case NodeMode_NODE_MODE_EDGE:
+		return "NODE_MODE_EDGE"
+	default:
+		return ""
+	}
+}
+
 // OpTypeValues returns all valid OpType values (excluding UNDEFINED)
 func OpTypeValues() []OpType {
 	return []OpType{
@@ -631,8 +735,8 @@ func LogicalOpToSpecName(v LogicalOp) string {
 // MARKER: JSON helper struct generated from serial.go
 type bootstrapconfigJSON struct {
 	ClusterName       string            `json:"cluster_name,omitempty"`
-	Listener          string            `json:"listener,omitempty"`
-	Members           []string          `json:"members,omitempty"`
+	Listener          json.RawMessage   `json:"listener,omitempty"`
+	Members           []json.RawMessage `json:"members,omitempty"`
 	NodeCount         int32             `json:"node_count,omitempty"`
 	Secret            string            `json:"secret,omitempty"`
 	PartitionCount    int32             `json:"partition_count,omitempty"`
@@ -646,6 +750,7 @@ type bootstrapconfigJSON struct {
 	LoaderCa          []json.RawMessage `json:"loader_ca,omitempty"`
 	Tls               json.RawMessage   `json:"tls,omitempty"`
 	RaftPort          int32             `json:"raft_port,omitempty"`
+	Mode              string            `json:"mode,omitempty"`
 }
 
 // BootstrapConfigToJSON converts BootstrapConfig to JSON bytes.
@@ -656,9 +761,28 @@ func BootstrapConfigToJSON(v *BootstrapConfig) ([]byte, error) {
 	}
 	// Convert to JSON helper struct with string enums
 	helper := bootstrapconfigJSON{
-		ClusterName:    v.ClusterName,
-		Listener:       v.Listener,
-		Members:        v.Members,
+		ClusterName: v.ClusterName,
+		Listener: func() json.RawMessage {
+			if v.Listener == nil {
+				return nil
+			}
+			data, _ := host.HostToJSON(v.Listener)
+			return data
+		}(),
+		Members: func() []json.RawMessage {
+			if len(v.Members) == 0 {
+				return nil
+			}
+			result := make([]json.RawMessage, 0, len(v.Members))
+			for _, item := range v.Members {
+				if item != nil {
+					if data, err := host.HostToJSON(item); err == nil {
+						result = append(result, data)
+					}
+				}
+			}
+			return result
+		}(),
 		NodeCount:      v.NodeCount,
 		Secret:         v.Secret,
 		PartitionCount: v.PartitionCount,
@@ -709,6 +833,7 @@ func BootstrapConfigToJSON(v *BootstrapConfig) ([]byte, error) {
 			return data
 		}(),
 		RaftPort: v.RaftPort,
+		Mode:     NodeModeToString(v.Mode),
 	}
 	return json.Marshal(helper)
 }
@@ -774,8 +899,25 @@ func BootstrapConfigFromJSON(data []byte) (*BootstrapConfig, error) {
 	// Build result with parsed enums
 	result := &BootstrapConfig{}
 	result.ClusterName = raw.ClusterName
-	result.Listener = raw.Listener
-	result.Members = raw.Members
+	// Parse message field: Listener
+	if len(raw.Listener) > 0 {
+		parsed, err := host.HostFromJSON(raw.Listener)
+		if err == nil {
+			result.Listener = parsed
+		}
+	}
+	// Parse repeated message field: Members
+	if len(raw.Members) > 0 {
+		result.Members = make([]*host.Host, 0, len(raw.Members))
+		for _, itemJSON := range raw.Members {
+			if len(itemJSON) > 0 {
+				parsed, err := host.HostFromJSON(itemJSON)
+				if err == nil {
+					result.Members = append(result.Members, parsed)
+				}
+			}
+		}
+	}
 	result.NodeCount = raw.NodeCount
 	result.Secret = raw.Secret
 	result.PartitionCount = raw.PartitionCount
@@ -829,6 +971,12 @@ func BootstrapConfigFromJSON(data []byte) (*BootstrapConfig, error) {
 		}
 	}
 	result.RaftPort = raw.RaftPort
+	// Parse enum field: Mode
+	if raw.Mode != "" {
+		if parsed, err := ParseNodeMode(raw.Mode); err == nil {
+			result.Mode = parsed
+		}
+	}
 	return result, nil
 }
 
@@ -28528,9 +28676,10 @@ func BootstrapConfigToEnvVar(v *BootstrapConfig) map[string]string {
 	}
 	result := make(map[string]string)
 	result["PROTO_SERVICES_KERNEL_BOOTSTRAP_CONFIG_CLUSTER_NAME"] = v.ClusterName
-	result["PROTO_SERVICES_KERNEL_BOOTSTRAP_CONFIG_LISTENER"] = v.Listener
-	if len(v.Members) > 0 {
-		result["PROTO_SERVICES_KERNEL_BOOTSTRAP_CONFIG_MEMBERS"] = strings.Join(v.Members, ",")
+	if v.Listener != nil {
+		for k, val := range host.HostToEnvVar(v.Listener) {
+			result[k] = val
+		}
 	}
 	result["PROTO_SERVICES_KERNEL_BOOTSTRAP_CONFIG_NODE_COUNT"] = strconv.FormatInt(int64(v.NodeCount), 10)
 	result["PROTO_SERVICES_KERNEL_BOOTSTRAP_CONFIG_SECRET"] = v.Secret
@@ -28560,6 +28709,7 @@ func BootstrapConfigToEnvVar(v *BootstrapConfig) map[string]string {
 		}
 	}
 	result["PROTO_SERVICES_KERNEL_BOOTSTRAP_CONFIG_RAFT_PORT"] = strconv.FormatInt(int64(v.RaftPort), 10)
+	result["PROTO_SERVICES_KERNEL_BOOTSTRAP_CONFIG_MODE"] = NodeModeToString(v.Mode)
 	return result
 }
 
@@ -28569,11 +28719,10 @@ func BootstrapConfigFromEnvVar(env map[string]string) (*BootstrapConfig, error) 
 	if val, ok := env["PROTO_SERVICES_KERNEL_BOOTSTRAP_CONFIG_CLUSTER_NAME"]; ok && val != "" {
 		result.ClusterName = val
 	}
-	if val, ok := env["PROTO_SERVICES_KERNEL_BOOTSTRAP_CONFIG_LISTENER"]; ok && val != "" {
-		result.Listener = val
-	}
-	if val, ok := env["PROTO_SERVICES_KERNEL_BOOTSTRAP_CONFIG_MEMBERS"]; ok && val != "" {
-		result.Members = strings.Split(val, ",")
+	if sub, err := host.HostFromEnvVar(env); err != nil {
+		return nil, err
+	} else if sub != nil {
+		result.Listener = sub
 	}
 	if val, ok := env["PROTO_SERVICES_KERNEL_BOOTSTRAP_CONFIG_NODE_COUNT"]; ok && val != "" {
 		parsed, err := strconv.ParseInt(val, 10, 32)
@@ -28642,6 +28791,13 @@ func BootstrapConfigFromEnvVar(env map[string]string) (*BootstrapConfig, error) 
 			return nil, err
 		}
 		result.RaftPort = int32(parsed)
+	}
+	if val, ok := env["PROTO_SERVICES_KERNEL_BOOTSTRAP_CONFIG_MODE"]; ok && val != "" {
+		parsed, err := ParseNodeMode(val)
+		if err != nil {
+			return nil, err
+		}
+		result.Mode = parsed
 	}
 	return result, nil
 }
@@ -33478,34 +33634,18 @@ func ValidateBootstrapConfig(m *BootstrapConfig) error {
 	}
 
 	// Validate Listener (assert_required)
-	if m.Listener == "" {
+	if m.Listener == nil {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Listener is required")
-	}
-
-	// Validate Listener (assert_listen_addr)
-	if m.Listener != "" {
-		if err := utils.ValidateAssertListenAddr(m.Listener); err != nil {
-			return protoerrors.NewErrMissingInvalidData(err, "field Listener listen address validation failed")
-		}
-	}
-
-	// Validate Members (assert_listen_addr)
-	for _, v := range m.Members {
-		if v != "" {
-			if err := utils.ValidateAssertListenAddr(v); err != nil {
-				return protoerrors.NewErrMissingInvalidData(err, "field Members listen address validation failed")
-			}
-		}
-	}
-
-	// Validate Members (assert_max_items: 32)
-	if len(m.Members) > 32 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Members exceeds max items of 32, got: %d", len(m.Members))
 	}
 
 	// Validate Members (assert_required)
 	if len(m.Members) == 0 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Members is required")
+	}
+
+	// Validate Members (assert_max_items: 32)
+	if len(m.Members) > 32 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Members exceeds max items of 32, got: %d", len(m.Members))
 	}
 
 	// Validate NodeCount (assert_gt: 0)
@@ -33529,11 +33669,6 @@ func ValidateBootstrapConfig(m *BootstrapConfig) error {
 	// Validate ClusterName (default max size: 32768 bytes)
 	if len(m.ClusterName) > 32768 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ClusterName exceeds max size of 32768 bytes, got: %d", len(m.ClusterName))
-	}
-
-	// Validate Listener (default max size: 32768 bytes)
-	if len(m.Listener) > 32768 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Listener exceeds max size of 32768 bytes, got: %d", len(m.Listener))
 	}
 
 	// Validate Secret (default max size: 32768 bytes)
@@ -36185,7 +36320,6 @@ const (
 // ============================================================
 const (
 	MaxSizeBootstrapconfigClusterName          int = 32768
-	MaxSizeBootstrapconfigListener             int = 32768
 	MaxItemsBootstrapconfigMembers             int = 32
 	MaxSizeBootstrapconfigSecret               int = 32768
 	MaxSizeBootstrapconfigPersistenceDir       int = 32768
@@ -36516,7 +36650,7 @@ func MergeBootstrapConfig(dst, src *BootstrapConfig) {
 	if dst.ClusterName == "" {
 		dst.ClusterName = src.ClusterName
 	}
-	if dst.Listener == "" {
+	if dst.Listener == nil {
 		dst.Listener = src.Listener
 	}
 	if len(dst.Members) == 0 {
@@ -36564,6 +36698,9 @@ func MergeBootstrapConfig(dst, src *BootstrapConfig) {
 	}
 	if dst.RaftPort == 0 {
 		dst.RaftPort = src.RaftPort
+	}
+	if dst.Mode == 0 {
+		dst.Mode = src.Mode
 	}
 	if dst.Config == nil {
 		dst.Config = src.Config
@@ -38390,7 +38527,6 @@ func ConfigLlmTypeDescriptor() string {
       "message": {
         "name": "ConfigHolder",
         "package": "config_holder",
-        "description": "ConfigHolder wraps all frontend service configs for YAML loading by kernel.\n Field IDs must match the (spec.frontend_config) id annotation on each Config message.",
         "fields": [
           {
             "name": "sentinel_config",
@@ -38561,8 +38697,8 @@ func ConfigLlmTypeDescriptor() string {
                   "description": "key_lifetime_seconds controls how long each instance's signing key is used.\n On rotation the instance generates a new key pair, publishes the new JWK\n to kernel (consumers receive it immediately via Watch), and starts\n signing with the new key. The old JWK remains in verifying_keys until\n all tokens signed by it have expired (access_token_lifetime_seconds).\n Minimum: 3600 (1 hour). Default: 86400 (24 hours).",
                   "default": 86400,
                   "constraints": [
-                    "minimum value: 3600",
-                    "duration constraint: DURATION_TYPE_POSITIVE"
+                    "duration constraint: DURATION_TYPE_POSITIVE",
+                    "minimum value: 3600"
                   ]
                 },
                 {
@@ -38770,7 +38906,7 @@ func ConfigLlmTypeDescriptor() string {
             "type": "message",
             "message": {
               "name": "Config",
-              "package": "mcp_assist",
+              "package": "mcp",
               "description": "Config is the service-level configuration for the MCP assist service.",
               "fields": [
                 {

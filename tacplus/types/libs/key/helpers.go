@@ -596,16 +596,16 @@ func ValidatePublicKey(m *PublicKey) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Id must be at least 1 characters, got: %d", len(m.Id))
 	}
 
-	// Validate Base64 (assert_required)
-	if m.Base64 == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Base64 is required")
-	}
-
 	// Validate Base64 (assert_base64)
 	if m.Base64 != "" {
 		if err := utils.ValidateAssertBase64(m.Base64); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field Base64 base64 validation failed")
 		}
+	}
+
+	// Validate Base64 (assert_required)
+	if m.Base64 == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Base64 is required")
 	}
 
 	// Validate Created (assert_required: must be > 0)
@@ -670,10 +670,6 @@ func ValidateKey(m *Key) error {
 		}
 	}
 
-	// Validate Created (assert_le: 8045740800)
-	if m.Created > 8045740800 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be <= 8045740800, got: %v", m.Created)
-	}
 	// Validate Created (assert_required: must be > 0)
 	if m.Created <= 0 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Created is required and must be greater than zero")
@@ -682,6 +678,10 @@ func ValidateKey(m *Key) error {
 	// Validate Created (assert_ge: 1735689600)
 	if m.Created < 1735689600 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be >= 1735689600, got: %v", m.Created)
+	}
+	// Validate Created (assert_le: 8045740800)
+	if m.Created > 8045740800 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be <= 8045740800, got: %v", m.Created)
 	}
 	// Validate Id (default max size: 32768 bytes)
 	if len(m.Id) > 32768 {

@@ -8433,16 +8433,16 @@ func ValidateConfig(m *Config) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field NonceExpireSeconds must be >= 1, got: %d", m.NonceExpireSeconds)
 	}
 
-	// Validate Issuer (assert_required)
-	if m.Issuer == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
-	}
-
 	// Validate Issuer (assert_url: URL_SCHEME_HTTPS)
 	if m.Issuer != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.Issuer); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field Issuer URL validation failed")
 		}
+	}
+
+	// Validate Issuer (assert_required)
+	if m.Issuer == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
 	}
 
 	// Validate JwkRefetchIntervalSeconds (assert_duration: POSITIVE)
@@ -8507,14 +8507,14 @@ func ValidateProviderConfig(m *ProviderConfig) error {
 		}
 	}
 
-	// Validate ClientId (assert_required)
-	if m.ClientId == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field ClientId is required")
-	}
-
 	// Validate ClientId (assert_min_length: 1)
 	if len(m.ClientId) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ClientId must be at least 1 characters, got: %d", len(m.ClientId))
+	}
+
+	// Validate ClientId (assert_required)
+	if m.ClientId == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field ClientId is required")
 	}
 
 	// Validate ClientSecret (assert_required)
@@ -8634,14 +8634,14 @@ func ValidateExternalJwk(m *ExternalJwk) error {
 		return nil
 	}
 
-	// Validate Kid (assert_min_length: 1)
-	if len(m.Kid) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Kid must be at least 1 characters, got: %d", len(m.Kid))
-	}
-
 	// Validate Kid (assert_required)
 	if m.Kid == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Kid is required")
+	}
+
+	// Validate Kid (assert_min_length: 1)
+	if len(m.Kid) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Kid must be at least 1 characters, got: %d", len(m.Kid))
 	}
 
 	// Validate Key (assert_required)

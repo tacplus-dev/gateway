@@ -22,7 +22,7 @@ import (
 	gateway "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/gateway"
 	identity "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/identity"
 	letsencrypt "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/letsencrypt"
-	mcp_assist "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/mcp_assist"
+	mcp "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/mcp"
 	policy "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/policy"
 	policysim "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/policysim"
 	sentinel "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/sentinel"
@@ -101,7 +101,7 @@ func ConfigHolderToJSON(v *ConfigHolder) ([]byte, error) {
 			if v.McpConfig == nil {
 				return nil
 			}
-			data, _ := mcp_assist.ConfigToJSON(v.McpConfig)
+			data, _ := mcp.ConfigToJSON(v.McpConfig)
 			return data
 		}(),
 	}
@@ -212,7 +212,7 @@ func ConfigHolderFromJSON(data []byte) (*ConfigHolder, error) {
 	}
 	// Parse message field: McpConfig
 	if len(raw.McpConfig) > 0 {
-		parsed, err := mcp_assist.ConfigFromJSON(raw.McpConfig)
+		parsed, err := mcp.ConfigFromJSON(raw.McpConfig)
 		if err == nil {
 			result.McpConfig = parsed
 		}
@@ -299,7 +299,7 @@ func ConfigHolderToEnvVar(v *ConfigHolder) map[string]string {
 		}
 	}
 	if v.McpConfig != nil {
-		for k, val := range mcp_assist.ConfigToEnvVar(v.McpConfig) {
+		for k, val := range mcp.ConfigToEnvVar(v.McpConfig) {
 			result[k] = val
 		}
 	}
@@ -339,7 +339,7 @@ func ConfigHolderFromEnvVar(env map[string]string) (*ConfigHolder, error) {
 	} else if sub != nil {
 		result.PolicysimConfig = sub
 	}
-	if sub, err := mcp_assist.ConfigFromEnvVar(env); err != nil {
+	if sub, err := mcp.ConfigFromEnvVar(env); err != nil {
 		return nil, err
 	} else if sub != nil {
 		result.McpConfig = sub

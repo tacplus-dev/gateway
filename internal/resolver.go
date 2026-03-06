@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"net/url"
 	"sync"
 
 	"go.uber.org/zap"
@@ -36,12 +37,27 @@ func NewHealthResolver(hw *HealthWatcher) *HealthResolver {
 }
 
 // Build implements resolver.Builder. Called by gRPC when dialing a health:/// target.
+// Targets may include query parameters for label filtering, e.g. "health:///dgraph?mode=alpha".
 func (hr *HealthResolver) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
-	serviceID := target.Endpoint()
+	endpoint := target.Endpoint()
+	serviceID := endpoint
+	var labels map[string]string
+
+	// Parse query params as label filters.
+	if u, err := url.Parse(endpoint); err == nil && u.RawQuery != "" {
+		serviceID = u.Path
+		labels = make(map[string]string)
+		for k, vs := range u.Query() {
+			if len(vs) > 0 {
+				labels[k] = vs[0]
+			}
+		}
+	}
 
 	inst := &healthResolverInstance{
 		hr:        hr,
 		serviceID: serviceID,
+		labels:    labels,
 		cc:        cc,
 	}
 
@@ -89,12 +105,13 @@ func (hr *HealthResolver) remove(inst *healthResolverInstance) {
 type healthResolverInstance struct {
 	hr        *HealthResolver
 	serviceID string
+	labels    map[string]string
 	cc        resolver.ClientConn
 }
 
 // push queries HealthWatcher for current endpoints and pushes them to gRPC.
 func (r *healthResolverInstance) push() {
-	endpoints := r.hr.hw.GetEndpoints(r.serviceID)
+	endpoints := r.hr.hw.GetEndpoints(r.serviceID, r.labels)
 	addrs := make([]resolver.Address, len(endpoints))
 	for i, ep := range endpoints {
 		addrs[i] = resolver.Address{Addr: ep}

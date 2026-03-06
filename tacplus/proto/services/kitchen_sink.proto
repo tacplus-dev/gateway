@@ -15,7 +15,7 @@ import "services/gateway.proto";
 import "services/identity.proto";
 import "services/kernel.proto";
 import "services/letsencrypt.proto";
-import "services/mcp_assist.proto";
+import "services/mcp.proto";
 import "services/policy.proto";
 import "services/policysim.proto";
 import "services/sentinel.proto";
@@ -39,7 +39,7 @@ message KitchenSink {
     kernel.Config kernel_config = 106;
     letsencrypt.Config letsencrypt_config = 107;
     letsencrypt.LetsEncryptCertData letsencrypt_lets_encrypt_cert_data = 108;
-    mcp_assist.Config mcp_assist_config = 109;
+    mcp.Config mcp_config = 109;
     opa.OpaPolicy opa_opa_policy = 110;
     policy.Config policy_config = 111;
     policysim.Config policysim_config = 112;

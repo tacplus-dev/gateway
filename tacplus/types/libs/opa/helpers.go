@@ -265,16 +265,16 @@ func ValidateOpaPolicy(m *OpaPolicy) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Source exceeds max size of 1048576 bytes, got: %d", len(m.Source))
 	}
 
-	// Validate Issuer (assert_required)
-	if m.Issuer == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
-	}
-
 	// Validate Issuer (assert_url: URL_SCHEME_HTTPS)
 	if m.Issuer != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.Issuer); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field Issuer URL validation failed")
 		}
+	}
+
+	// Validate Issuer (assert_required)
+	if m.Issuer == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
 	}
 
 	// Validate EntryPoint (default max size: 32768 bytes)
@@ -360,8 +360,8 @@ func OpaPolicyLlmTypeDescriptor() string {
       "type": "string",
       "description": "bundle contains the base64-encoded OPA policy bundle (tar.gz format).\n Optional — policies can be provided as raw source instead.",
       "constraints": [
-        "must be a valid OPA/Rego policy",
-        "must be base64 encoded"
+        "must be base64 encoded",
+        "must be a valid OPA/Rego policy"
       ]
     },
     {
@@ -369,8 +369,8 @@ func OpaPolicyLlmTypeDescriptor() string {
       "type": "int64",
       "description": "created is the Unix epoch timestamp (seconds) when the policy was created.",
       "constraints": [
-        "must be \u003e= 1735689600",
-        "must be \u003c= 8045740800"
+        "must be \u003c= 8045740800",
+        "must be \u003e= 1735689600"
       ]
     },
     {

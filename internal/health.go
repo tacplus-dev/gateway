@@ -44,19 +44,37 @@ func (hw *HealthWatcher) OnChange(fn func()) {
 }
 
 // GetEndpoints returns the gRPC endpoints (host:port) for healthy instances
-// of the given service_id.
-func (hw *HealthWatcher) GetEndpoints(serviceID string) []string {
+// of the given service_id. If labels is non-empty, only instances whose labels
+// contain all the specified key-value pairs are returned.
+func (hw *HealthWatcher) GetEndpoints(serviceID string, labels map[string]string) []string {
 	hw.mu.RLock()
 	defer hw.mu.RUnlock()
 	instances := hw.services[serviceID]
 	endpoints := make([]string, 0, len(instances))
 	for _, inst := range instances {
+		if !matchLabels(inst, labels) {
+			continue
+		}
 		ep := inst.GetGrpcEndpoint()
-		if ep != "" {
-			endpoints = append(endpoints, ep)
+		if ep != nil && ep.Host != "" {
+			endpoints = append(endpoints, fmt.Sprintf("%s:%d", ep.Host, ep.Port))
 		}
 	}
 	return endpoints
+}
+
+// matchLabels returns true if the instance's labels contain all required key-value pairs.
+func matchLabels(inst *healthreport_pb.ServiceInstanceHealth, required map[string]string) bool {
+	if len(required) == 0 {
+		return true
+	}
+	instLabels := inst.GetLabels()
+	for k, v := range required {
+		if instLabels[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // receiveLoop reads from the WatchInstances stream and rebuilds the services map.
@@ -97,8 +115,8 @@ func (hw *HealthWatcher) processEntries(entries map[string]*healthreport_pb.Serv
 		eps := make([]string, 0, len(instances))
 		for _, inst := range instances {
 			ep := inst.GetGrpcEndpoint()
-			if ep != "" {
-				eps = append(eps, ep)
+			if ep != nil && ep.Host != "" {
+				eps = append(eps, fmt.Sprintf("%s:%d", ep.Host, ep.Port))
 			}
 		}
 		zap.L().Info("Health update",

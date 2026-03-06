@@ -22,7 +22,7 @@ import (
 	identity "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/identity"
 	kernel "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/kernel"
 	letsencrypt "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/letsencrypt"
-	mcp_assist "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/mcp_assist"
+	mcp "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/mcp"
 	policy "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/policy"
 	policysim "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/policysim"
 	sentinel "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/sentinel"
@@ -152,7 +152,7 @@ type KitchenSink struct {
 	//	*KitchenSink_KernelConfig
 	//	*KitchenSink_LetsencryptConfig
 	//	*KitchenSink_LetsencryptLetsEncryptCertData
-	//	*KitchenSink_McpAssistConfig
+	//	*KitchenSink_McpConfig
 	//	*KitchenSink_OpaOpaPolicy
 	//	*KitchenSink_PolicyConfig
 	//	*KitchenSink_PolicysimConfig
@@ -337,10 +337,10 @@ func (x *KitchenSink) GetLetsencryptLetsEncryptCertData() *letsencrypt.LetsEncry
 	return nil
 }
 
-func (x *KitchenSink) GetMcpAssistConfig() *mcp_assist.Config {
+func (x *KitchenSink) GetMcpConfig() *mcp.Config {
 	if x != nil {
-		if x, ok := x.Payload.(*KitchenSink_McpAssistConfig); ok {
-			return x.McpAssistConfig
+		if x, ok := x.Payload.(*KitchenSink_McpConfig); ok {
+			return x.McpConfig
 		}
 	}
 	return nil
@@ -620,8 +620,8 @@ type KitchenSink_LetsencryptLetsEncryptCertData struct {
 	LetsencryptLetsEncryptCertData *letsencrypt.LetsEncryptCertData `protobuf:"bytes,108,opt,name=letsencrypt_lets_encrypt_cert_data,json=letsencryptLetsEncryptCertData,proto3,oneof"`
 }
 
-type KitchenSink_McpAssistConfig struct {
-	McpAssistConfig *mcp_assist.Config `protobuf:"bytes,109,opt,name=mcp_assist_config,json=mcpAssistConfig,proto3,oneof"`
+type KitchenSink_McpConfig struct {
+	McpConfig *mcp.Config `protobuf:"bytes,109,opt,name=mcp_config,json=mcpConfig,proto3,oneof"`
 }
 
 type KitchenSink_OpaOpaPolicy struct {
@@ -746,7 +746,7 @@ func (*KitchenSink_LetsencryptConfig) isKitchenSink_Payload() {}
 
 func (*KitchenSink_LetsencryptLetsEncryptCertData) isKitchenSink_Payload() {}
 
-func (*KitchenSink_McpAssistConfig) isKitchenSink_Payload() {}
+func (*KitchenSink_McpConfig) isKitchenSink_Payload() {}
 
 func (*KitchenSink_OpaOpaPolicy) isKitchenSink_Payload() {}
 
@@ -872,7 +872,7 @@ var File_services_kitchen_sink_proto protoreflect.FileDescriptor
 
 const file_services_kitchen_sink_proto_rawDesc = "" +
 	"\n" +
-	"\x1bservices/kitchen_sink.proto\x12\fkitchen_sink\x1a\x17libs/healthreport.proto\x1a\x0elibs/jwk.proto\x1a\x0elibs/opa.proto\x1a\x0flibs/x509.proto\x1a\x16services/gateway.proto\x1a\x17services/identity.proto\x1a\x15services/kernel.proto\x1a\x1aservices/letsencrypt.proto\x1a\x19services/mcp_assist.proto\x1a\x15services/policy.proto\x1a\x18services/policysim.proto\x1a\x17services/sentinel.proto\x1a\x15services/snoopy.proto\x1a\x18services/woodstock.proto\"\xaf\x18\n" +
+	"\x1bservices/kitchen_sink.proto\x12\fkitchen_sink\x1a\x17libs/healthreport.proto\x1a\x0elibs/jwk.proto\x1a\x0elibs/opa.proto\x1a\x0flibs/x509.proto\x1a\x16services/gateway.proto\x1a\x17services/identity.proto\x1a\x15services/kernel.proto\x1a\x1aservices/letsencrypt.proto\x1a\x12services/mcp.proto\x1a\x15services/policy.proto\x1a\x18services/policysim.proto\x1a\x17services/sentinel.proto\x1a\x15services/snoopy.proto\x1a\x18services/woodstock.proto\"\x9b\x18\n" +
 	"\vKitchenSink\x12\x19\n" +
 	"\bmap_name\x18\x01 \x01(\tR\amapName\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12$\n" +
@@ -887,8 +887,9 @@ const file_services_kitchen_sink_proto_rawDesc = "" +
 	"\ajwk_jwk\x18i \x01(\v2\b.jwk.JwkH\x00R\x06jwkJwk\x125\n" +
 	"\rkernel_config\x18j \x01(\v2\x0e.kernel.ConfigH\x00R\fkernelConfig\x12D\n" +
 	"\x12letsencrypt_config\x18k \x01(\v2\x13.letsencrypt.ConfigH\x00R\x11letsencryptConfig\x12n\n" +
-	"\"letsencrypt_lets_encrypt_cert_data\x18l \x01(\v2 .letsencrypt.LetsEncryptCertDataH\x00R\x1eletsencryptLetsEncryptCertData\x12@\n" +
-	"\x11mcp_assist_config\x18m \x01(\v2\x12.mcp_assist.ConfigH\x00R\x0fmcpAssistConfig\x126\n" +
+	"\"letsencrypt_lets_encrypt_cert_data\x18l \x01(\v2 .letsencrypt.LetsEncryptCertDataH\x00R\x1eletsencryptLetsEncryptCertData\x12,\n" +
+	"\n" +
+	"mcp_config\x18m \x01(\v2\v.mcp.ConfigH\x00R\tmcpConfig\x126\n" +
 	"\x0eopa_opa_policy\x18n \x01(\v2\x0e.opa.OpaPolicyH\x00R\fopaOpaPolicy\x125\n" +
 	"\rpolicy_config\x18o \x01(\v2\x0e.policy.ConfigH\x00R\fpolicyConfig\x12>\n" +
 	"\x10policysim_config\x18p \x01(\v2\x11.policysim.ConfigH\x00R\x0fpolicysimConfig\x12a\n" +
@@ -957,7 +958,7 @@ var file_services_kitchen_sink_proto_goTypes = []any{
 	(*kernel.Config)(nil),                      // 10: kernel.Config
 	(*letsencrypt.Config)(nil),                 // 11: letsencrypt.Config
 	(*letsencrypt.LetsEncryptCertData)(nil),    // 12: letsencrypt.LetsEncryptCertData
-	(*mcp_assist.Config)(nil),                  // 13: mcp_assist.Config
+	(*mcp.Config)(nil),                         // 13: mcp.Config
 	(*opa.OpaPolicy)(nil),                      // 14: opa.OpaPolicy
 	(*policy.Config)(nil),                      // 15: policy.Config
 	(*policysim.Config)(nil),                   // 16: policysim.Config
@@ -997,7 +998,7 @@ var file_services_kitchen_sink_proto_depIdxs = []int32{
 	10, // 8: kitchen_sink.KitchenSink.kernel_config:type_name -> kernel.Config
 	11, // 9: kitchen_sink.KitchenSink.letsencrypt_config:type_name -> letsencrypt.Config
 	12, // 10: kitchen_sink.KitchenSink.letsencrypt_lets_encrypt_cert_data:type_name -> letsencrypt.LetsEncryptCertData
-	13, // 11: kitchen_sink.KitchenSink.mcp_assist_config:type_name -> mcp_assist.Config
+	13, // 11: kitchen_sink.KitchenSink.mcp_config:type_name -> mcp.Config
 	14, // 12: kitchen_sink.KitchenSink.opa_opa_policy:type_name -> opa.OpaPolicy
 	15, // 13: kitchen_sink.KitchenSink.policy_config:type_name -> policy.Config
 	16, // 14: kitchen_sink.KitchenSink.policysim_config:type_name -> policysim.Config
@@ -1047,7 +1048,7 @@ func file_services_kitchen_sink_proto_init() {
 		(*KitchenSink_KernelConfig)(nil),
 		(*KitchenSink_LetsencryptConfig)(nil),
 		(*KitchenSink_LetsencryptLetsEncryptCertData)(nil),
-		(*KitchenSink_McpAssistConfig)(nil),
+		(*KitchenSink_McpConfig)(nil),
 		(*KitchenSink_OpaOpaPolicy)(nil),
 		(*KitchenSink_PolicyConfig)(nil),
 		(*KitchenSink_PolicysimConfig)(nil),

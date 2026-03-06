@@ -133,9 +133,9 @@ func run() error {
 	}
 
 	// 11. Resolve listen address.
-	listenAddr := cfg.GetListenAddress()
-	if listenAddr == "" {
-		listenAddr = ":8443"
+	listenAddr := ":8443"
+	if la := cfg.GetListenAddress(); la != nil {
+		listenAddr = fmt.Sprintf("%s:%d", la.Host, la.Port)
 	}
 
 	enableTCP := gatewayCfg.GetEnableTcp()

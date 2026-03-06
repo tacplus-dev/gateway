@@ -611,13 +611,13 @@ func ValidateRetryConfig(m *RetryConfig) error {
 		return nil
 	}
 
-	// Validate MaxRetries (assert_le: 10)
-	if m.MaxRetries > 10 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field MaxRetries must be <= 10, got: %v", m.MaxRetries)
-	}
 	// Validate MaxRetries (assert_ge: 0)
 	if m.MaxRetries < 0 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field MaxRetries must be >= 0, got: %v", m.MaxRetries)
+	}
+	// Validate MaxRetries (assert_le: 10)
+	if m.MaxRetries > 10 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field MaxRetries must be <= 10, got: %v", m.MaxRetries)
 	}
 	// Validate InitialBackoffMs (assert_duration: POSITIVE)
 	if m.InitialBackoffMs <= 0 {
@@ -894,8 +894,8 @@ func HttpClientConfigLlmTypeDescriptor() string {
             "type": "int32",
             "description": "MaxRetries is the maximum number of retry attempts after the initial request.\n A value of 0 means no retries (only the initial request is made).\n Default: 3",
             "constraints": [
-              "must be \u003c= 10",
-              "must be \u003e= 0"
+              "must be \u003e= 0",
+              "must be \u003c= 10"
             ]
           },
           {
