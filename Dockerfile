@@ -22,6 +22,7 @@ RUN apk add --no-cache ca-certificates tzdata && \
 WORKDIR /app
 
 COPY --from=builder /gateway /app/gateway
+COPY dist/ /app/dist/
 
 USER gateway
 
