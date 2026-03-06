@@ -8265,14 +8265,14 @@ func ValidateConfig(m *Config) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field KeyLifetimeSeconds must be >= 3600, got: %d", m.KeyLifetimeSeconds)
 	}
 
-	// Validate NonceExpireSeconds (assert_duration_min: 1)
-	if m.NonceExpireSeconds < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field NonceExpireSeconds must be >= 1, got: %d", m.NonceExpireSeconds)
-	}
-
 	// Validate NonceExpireSeconds (assert_duration: POSITIVE)
 	if m.NonceExpireSeconds <= 0 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field NonceExpireSeconds must be positive (> 0), got: %d", m.NonceExpireSeconds)
+	}
+
+	// Validate NonceExpireSeconds (assert_duration_min: 1)
+	if m.NonceExpireSeconds < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field NonceExpireSeconds must be >= 1, got: %d", m.NonceExpireSeconds)
 	}
 
 	// Validate Issuer (assert_required)
@@ -8337,16 +8337,16 @@ func ValidateProviderConfig(m *ProviderConfig) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Name must be at least 1 characters, got: %d", len(m.Name))
 	}
 
+	// Validate Issuer (assert_required)
+	if m.Issuer == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
+	}
+
 	// Validate Issuer (assert_url: URL_SCHEME_HTTPS)
 	if m.Issuer != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.Issuer); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field Issuer URL validation failed")
 		}
-	}
-
-	// Validate Issuer (assert_required)
-	if m.Issuer == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
 	}
 
 	// Validate ClientId (assert_required)
@@ -8538,14 +8538,14 @@ func ValidateProviderInfo(m *ProviderInfo) error {
 		return nil
 	}
 
-	// Validate Name (assert_min_length: 1)
-	if len(m.Name) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Name must be at least 1 characters, got: %d", len(m.Name))
-	}
-
 	// Validate Name (assert_required)
 	if m.Name == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Name is required")
+	}
+
+	// Validate Name (assert_min_length: 1)
+	if len(m.Name) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Name must be at least 1 characters, got: %d", len(m.Name))
 	}
 
 	// Validate ProviderIndex (assert_ge: 0)
@@ -8655,14 +8655,14 @@ func ValidateCallbackResponse(m *CallbackResponse) error {
 		return nil
 	}
 
-	// Validate RefreshToken (assert_min_length: 1)
-	if len(m.RefreshToken) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken must be at least 1 characters, got: %d", len(m.RefreshToken))
-	}
-
 	// Validate RefreshToken (assert_required)
 	if m.RefreshToken == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken is required")
+	}
+
+	// Validate RefreshToken (assert_min_length: 1)
+	if len(m.RefreshToken) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken must be at least 1 characters, got: %d", len(m.RefreshToken))
 	}
 
 	// Validate AccessToken (assert_required)
@@ -8745,14 +8745,14 @@ func ValidateRefreshTokenResponse(m *RefreshTokenResponse) error {
 		return nil
 	}
 
-	// Validate AccessToken (assert_min_length: 1)
-	if len(m.AccessToken) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
-	}
-
 	// Validate AccessToken (assert_required)
 	if m.AccessToken == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
+	}
+
+	// Validate AccessToken (assert_min_length: 1)
+	if len(m.AccessToken) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
 	}
 
 	// Validate ExpiresIn (assert_gt: 0)
@@ -8828,14 +8828,14 @@ func ValidateExchangeTokenRequest(m *ExchangeTokenRequest) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
 	}
 
-	// Validate Audience (assert_min_length: 1)
-	if len(m.Audience) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Audience must be at least 1 characters, got: %d", len(m.Audience))
-	}
-
 	// Validate Audience (assert_required)
 	if m.Audience == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Audience is required")
+	}
+
+	// Validate Audience (assert_min_length: 1)
+	if len(m.Audience) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Audience must be at least 1 characters, got: %d", len(m.Audience))
 	}
 
 	// Validate AccessToken (default max size: 32768 bytes)
@@ -8858,14 +8858,14 @@ func ValidateExchangeTokenResponse(m *ExchangeTokenResponse) error {
 		return nil
 	}
 
-	// Validate AccessToken (assert_min_length: 1)
-	if len(m.AccessToken) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
-	}
-
 	// Validate AccessToken (assert_required)
 	if m.AccessToken == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
+	}
+
+	// Validate AccessToken (assert_min_length: 1)
+	if len(m.AccessToken) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
 	}
 
 	// Validate ExpiresIn (assert_gt: 0)

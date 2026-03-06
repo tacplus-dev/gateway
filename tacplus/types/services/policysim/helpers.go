@@ -966,14 +966,14 @@ func ValidateSimulateEntitlementsRequest(m *SimulateEntitlementsRequest) error {
 		return nil
 	}
 
-	// Validate ClaimsJson (assert_required)
-	if m.ClaimsJson == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field ClaimsJson is required")
-	}
-
 	// Validate ClaimsJson (assert_max_length: 65536)
 	if len(m.ClaimsJson) > 65536 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ClaimsJson must be at most 65536 characters, got: %d", len(m.ClaimsJson))
+	}
+
+	// Validate ClaimsJson (assert_required)
+	if m.ClaimsJson == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field ClaimsJson is required")
 	}
 
 	// Validate ClaimsJson (default max size: 32768 bytes)
@@ -1017,14 +1017,14 @@ func ValidateEvaluatePolicyRequest(m *EvaluatePolicyRequest) error {
 		return nil
 	}
 
-	// Validate RegoSource (assert_max_length: 65536)
-	if len(m.RegoSource) > 65536 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field RegoSource must be at most 65536 characters, got: %d", len(m.RegoSource))
-	}
-
 	// Validate RegoSource (assert_required)
 	if m.RegoSource == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RegoSource is required")
+	}
+
+	// Validate RegoSource (assert_max_length: 65536)
+	if len(m.RegoSource) > 65536 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field RegoSource must be at most 65536 characters, got: %d", len(m.RegoSource))
 	}
 
 	// Validate InputJson (assert_required)

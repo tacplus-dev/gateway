@@ -1179,14 +1179,14 @@ func ValidateJwk(m *Jwk) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Alg must be at least 1 characters, got: %d", len(m.Alg))
 	}
 
-	// Validate Kid (assert_min_length: 1)
-	if len(m.Kid) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Kid must be at least 1 characters, got: %d", len(m.Kid))
-	}
-
 	// Validate Kid (assert_required)
 	if m.Kid == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Kid is required")
+	}
+
+	// Validate Kid (assert_min_length: 1)
+	if len(m.Kid) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Kid must be at least 1 characters, got: %d", len(m.Kid))
 	}
 
 	// Validate E (assert_base64)
@@ -1217,13 +1217,13 @@ func ValidateJwk(m *Jwk) error {
 		}
 	}
 
-	// Validate Created (assert_ge: 1735689600)
-	if m.Created < 1735689600 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be >= 1735689600, got: %v", m.Created)
-	}
 	// Validate Created (assert_le: 8045740800)
 	if m.Created > 8045740800 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be <= 8045740800, got: %v", m.Created)
+	}
+	// Validate Created (assert_ge: 1735689600)
+	if m.Created < 1735689600 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be >= 1735689600, got: %v", m.Created)
 	}
 	// Validate Alg (default max size: 32768 bytes)
 	if len(m.Alg) > 32768 {

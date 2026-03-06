@@ -33477,21 +33477,16 @@ func ValidateBootstrapConfig(m *BootstrapConfig) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ClusterName is required")
 	}
 
-	// Validate Listener (assert_listen_addr)
-	if m.Listener != "" {
-		if err := utils.ValidateAssertListenAddr(m.Listener); err != nil {
-			return protoerrors.NewErrMissingInvalidData(err, "field Listener listen address validation failed")
-		}
-	}
-
 	// Validate Listener (assert_required)
 	if m.Listener == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Listener is required")
 	}
 
-	// Validate Members (assert_required)
-	if len(m.Members) == 0 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Members is required")
+	// Validate Listener (assert_listen_addr)
+	if m.Listener != "" {
+		if err := utils.ValidateAssertListenAddr(m.Listener); err != nil {
+			return protoerrors.NewErrMissingInvalidData(err, "field Listener listen address validation failed")
+		}
 	}
 
 	// Validate Members (assert_listen_addr)
@@ -33506,6 +33501,11 @@ func ValidateBootstrapConfig(m *BootstrapConfig) error {
 	// Validate Members (assert_max_items: 32)
 	if len(m.Members) > 32 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Members exceeds max items of 32, got: %d", len(m.Members))
+	}
+
+	// Validate Members (assert_required)
+	if len(m.Members) == 0 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Members is required")
 	}
 
 	// Validate NodeCount (assert_gt: 0)
