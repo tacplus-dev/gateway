@@ -683,14 +683,14 @@ func ValidateServiceEntitlement(m *ServiceEntitlement) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ServiceName must be at most 128 characters, got: %d", len(m.ServiceName))
 	}
 
-	// Validate AllowedRpcs (assert_required)
-	if len(m.AllowedRpcs) == 0 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AllowedRpcs is required")
-	}
-
 	// Validate AllowedRpcs (assert_max_items: 256)
 	if len(m.AllowedRpcs) > 256 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AllowedRpcs exceeds max items of 256, got: %d", len(m.AllowedRpcs))
+	}
+
+	// Validate AllowedRpcs (assert_required)
+	if len(m.AllowedRpcs) == 0 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AllowedRpcs is required")
 	}
 
 	// Validate ServiceName (default max size: 32768 bytes)
@@ -753,14 +753,14 @@ func ValidateIdentityProfile(m *IdentityProfile) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Id must be at most 128 characters, got: %d", len(m.Id))
 	}
 
-	// Validate Entitlements (assert_max_items: 64)
-	if len(m.Entitlements) > 64 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Entitlements exceeds max items of 64, got: %d", len(m.Entitlements))
-	}
-
 	// Validate Entitlements (assert_required)
 	if len(m.Entitlements) == 0 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Entitlements is required")
+	}
+
+	// Validate Entitlements (assert_max_items: 64)
+	if len(m.Entitlements) > 64 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Entitlements exceeds max items of 64, got: %d", len(m.Entitlements))
 	}
 
 	// Validate Id (default max size: 32768 bytes)

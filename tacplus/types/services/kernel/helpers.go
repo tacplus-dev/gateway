@@ -33489,6 +33489,11 @@ func ValidateBootstrapConfig(m *BootstrapConfig) error {
 		}
 	}
 
+	// Validate Members (assert_required)
+	if len(m.Members) == 0 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Members is required")
+	}
+
 	// Validate Members (assert_listen_addr)
 	for _, v := range m.Members {
 		if v != "" {
@@ -33501,11 +33506,6 @@ func ValidateBootstrapConfig(m *BootstrapConfig) error {
 	// Validate Members (assert_max_items: 32)
 	if len(m.Members) > 32 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Members exceeds max items of 32, got: %d", len(m.Members))
-	}
-
-	// Validate Members (assert_required)
-	if len(m.Members) == 0 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Members is required")
 	}
 
 	// Validate NodeCount (assert_gt: 0)

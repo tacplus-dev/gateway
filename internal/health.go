@@ -52,8 +52,8 @@ func (hw *HealthWatcher) GetEndpoints(serviceID string) []string {
 	endpoints := make([]string, 0, len(instances))
 	for _, inst := range instances {
 		ep := inst.GetGrpcEndpoint()
-		if ep != nil && ep.GetHost() != "" && ep.GetPort() > 0 {
-			endpoints = append(endpoints, fmt.Sprintf("%s:%d", ep.GetHost(), ep.GetPort()))
+		if ep != "" {
+			endpoints = append(endpoints, ep)
 		}
 	}
 	return endpoints
@@ -97,8 +97,8 @@ func (hw *HealthWatcher) processEntries(entries map[string]*healthreport_pb.Serv
 		eps := make([]string, 0, len(instances))
 		for _, inst := range instances {
 			ep := inst.GetGrpcEndpoint()
-			if ep != nil {
-				eps = append(eps, fmt.Sprintf("%s:%d", ep.GetHost(), ep.GetPort()))
+			if ep != "" {
+				eps = append(eps, ep)
 			}
 		}
 		zap.L().Info("Health update",

@@ -8571,16 +8571,16 @@ func ValidateAuthorizeRequest(m *AuthorizeRequest) error {
 	if m.ProviderIndex < 0 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ProviderIndex must be >= 0, got: %v", m.ProviderIndex)
 	}
-	// Validate CallbackUrl (assert_required)
-	if m.CallbackUrl == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field CallbackUrl is required")
-	}
-
 	// Validate CallbackUrl (assert_url: URL_SCHEME_HTTPS)
 	if m.CallbackUrl != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.CallbackUrl); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field CallbackUrl URL validation failed")
 		}
+	}
+
+	// Validate CallbackUrl (assert_required)
+	if m.CallbackUrl == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field CallbackUrl is required")
 	}
 
 	// Validate CallbackUrl (default max size: 32768 bytes)
@@ -8665,14 +8665,14 @@ func ValidateCallbackResponse(m *CallbackResponse) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken must be at least 1 characters, got: %d", len(m.RefreshToken))
 	}
 
-	// Validate AccessToken (assert_required)
-	if m.AccessToken == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
-	}
-
 	// Validate AccessToken (assert_min_length: 1)
 	if len(m.AccessToken) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
+	}
+
+	// Validate AccessToken (assert_required)
+	if m.AccessToken == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
 	}
 
 	// Validate CallbackUrl (assert_required)
@@ -8858,14 +8858,14 @@ func ValidateExchangeTokenResponse(m *ExchangeTokenResponse) error {
 		return nil
 	}
 
-	// Validate AccessToken (assert_required)
-	if m.AccessToken == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
-	}
-
 	// Validate AccessToken (assert_min_length: 1)
 	if len(m.AccessToken) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
+	}
+
+	// Validate AccessToken (assert_required)
+	if m.AccessToken == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
 	}
 
 	// Validate ExpiresIn (assert_gt: 0)
