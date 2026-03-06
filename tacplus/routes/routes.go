@@ -10,6 +10,7 @@ import (
 
 	identity_gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/identity"
 	policy_gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/policy"
+	policysim_gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/policysim"
 	sentinel_gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/sentinel"
 )
 
@@ -33,6 +34,10 @@ var GatewayRoutes = []Route{
 		ServiceID:    "policy",
 	},
 	{
+		RegisterFunc: policysim_gw.RegisterPolicySimServiceHandlerFromEndpoint,
+		ServiceID:    "policysim",
+	},
+	{
 		RegisterFunc: sentinel_gw.RegisterSentinelServiceHandlerFromEndpoint,
 		ServiceID:    "sentinel",
 	},
@@ -43,5 +48,6 @@ var GatewayRoutes = []Route{
 var ProxyServiceMapping = map[string]string{
 	"identity": "identity",
 	"policy": "policy",
+	"policysim": "policysim",
 	"sentinel": "sentinel",
 }
