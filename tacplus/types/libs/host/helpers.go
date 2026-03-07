@@ -196,11 +196,6 @@ func ValidateHost(m *Host) error {
 		return nil
 	}
 
-	// Validate Host (assert_required)
-	if m.Host == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Host is required")
-	}
-
 	// Validate Host (assert_host: IP address or FQDN)
 	if m.Host != "" {
 		if ip := net.ParseIP(m.Host); ip == nil {
@@ -208,6 +203,11 @@ func ValidateHost(m *Host) error {
 				return protoerrors.NewErrMissingInvalidData(nil, "field Host must be a valid IP address or FQDN, got: %s", m.Host)
 			}
 		}
+	}
+
+	// Validate Host (assert_required)
+	if m.Host == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Host is required")
 	}
 
 	// Validate Port (assert_net_port)
@@ -229,6 +229,27 @@ func ValidateHost(m *Host) error {
 const (
 	MaxSizeHostHost int = 32768
 )
+
+// ============================================================
+// TypeDefaults: Host
+// ============================================================
+// HostDefaults applies field-level default values to zero-valued fields.
+func HostDefaults(v *Host) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeUndefaults: Host
+// ============================================================
+// HostUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func HostUndefaults(v *Host) {
+	if v == nil {
+		return
+	}
+}
 
 // ============================================================
 // Merge: Host

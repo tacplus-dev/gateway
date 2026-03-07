@@ -3,8 +3,8 @@
 
 syntax = "proto3";
 
-package config_holder;
-option go_package = "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/config_holder";
+package generated;
+option go_package = "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/generated";
 
 import "services/sentinel.proto";
 import "services/identity.proto";
@@ -13,8 +13,9 @@ import "services/letsencrypt.proto";
 import "services/policy.proto";
 import "services/policysim.proto";
 import "services/mcp.proto";
+import "services/dgraph.proto";
 
-message ConfigHolder {
+message Services {
   sentinel.Config sentinel_config = 5;
   identity.Config identity_config = 6;
   gateway.Config gateway_config = 7;
@@ -22,4 +23,5 @@ message ConfigHolder {
   policy.Config policy_config = 10;
   policysim.Config policysim_config = 11;
   mcp.Config mcp_config = 12;
+  dgraph.Config dgraph_config = 13;
 }

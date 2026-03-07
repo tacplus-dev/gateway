@@ -1147,14 +1147,14 @@ func ValidateX509CertRequest(m *X509CertRequest) error {
 		return nil
 	}
 
-	// Validate Exp (assert_duration: POSITIVE)
-	if m.Exp <= 0 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Exp must be positive (> 0), got: %d", m.Exp)
-	}
-
 	// Validate Exp (assert_required: must be > 0)
 	if m.Exp <= 0 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Exp is required and must be greater than zero")
+	}
+
+	// Validate Exp (assert_duration: POSITIVE)
+	if m.Exp <= 0 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Exp must be positive (> 0), got: %d", m.Exp)
 	}
 
 	// Validate ExtKeyUsage (assert_max_items: 16)
@@ -1189,6 +1189,69 @@ const (
 	MaxItemsX509certrequestExtKeyUsage int = 16
 	MaxSizeX509certrequestIssuer       int = 32768
 )
+
+// ============================================================
+// TypeDefaults: X509Cert
+// ============================================================
+// X509CertDefaults applies field-level default values to zero-valued fields.
+func X509CertDefaults(v *X509Cert) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeDefaults: X509CertPair
+// ============================================================
+// X509CertPairDefaults applies field-level default values to zero-valued fields.
+func X509CertPairDefaults(v *X509CertPair) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeDefaults: X509CertRequest
+// ============================================================
+// X509CertRequestDefaults applies field-level default values to zero-valued fields.
+func X509CertRequestDefaults(v *X509CertRequest) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeUndefaults: X509Cert
+// ============================================================
+// X509CertUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func X509CertUndefaults(v *X509Cert) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeUndefaults: X509CertPair
+// ============================================================
+// X509CertPairUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func X509CertPairUndefaults(v *X509CertPair) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeUndefaults: X509CertRequest
+// ============================================================
+// X509CertRequestUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func X509CertRequestUndefaults(v *X509CertRequest) {
+	if v == nil {
+		return
+	}
+}
 
 // ============================================================
 // Merge: X509Cert

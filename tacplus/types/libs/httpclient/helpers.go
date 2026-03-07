@@ -650,6 +650,48 @@ const (
 )
 
 // ============================================================
+// TypeDefaults: HttpClientConfig
+// ============================================================
+// HttpClientConfigDefaults applies field-level default values to zero-valued fields.
+func HttpClientConfigDefaults(v *HttpClientConfig) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeDefaults: RetryConfig
+// ============================================================
+// RetryConfigDefaults applies field-level default values to zero-valued fields.
+func RetryConfigDefaults(v *RetryConfig) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeUndefaults: HttpClientConfig
+// ============================================================
+// HttpClientConfigUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func HttpClientConfigUndefaults(v *HttpClientConfig) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeUndefaults: RetryConfig
+// ============================================================
+// RetryConfigUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func RetryConfigUndefaults(v *RetryConfig) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
 // Merge: HttpClientConfig
 // ============================================================
 // MergeHttpClientConfig fills zero-valued fields in dst from src.
@@ -809,8 +851,8 @@ func HttpClientConfigLlmTypeDescriptor() string {
                   "description": "Created is the Unix epoch timestamp (seconds) when the key was created\n Valid range: 1735689600 (2025-01-01) to 8045740800 (2225-01-01)",
                   "required": true,
                   "constraints": [
-                    "must be \u003e= 1735689600",
-                    "must be \u003c= 8045740800"
+                    "must be \u003c= 8045740800",
+                    "must be \u003e= 1735689600"
                   ]
                 }
               ]

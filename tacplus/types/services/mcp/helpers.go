@@ -1481,13 +1481,13 @@ func ValidateConfig(m *Config) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AnthropicApiKey is required")
 	}
 
-	// Validate MaxRetries (assert_le: 10)
-	if m.MaxRetries > 10 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field MaxRetries must be <= 10, got: %v", m.MaxRetries)
-	}
 	// Validate MaxRetries (assert_ge: 1)
 	if m.MaxRetries < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field MaxRetries must be >= 1, got: %v", m.MaxRetries)
+	}
+	// Validate MaxRetries (assert_le: 10)
+	if m.MaxRetries > 10 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field MaxRetries must be <= 10, got: %v", m.MaxRetries)
 	}
 	// Validate SessionTtlSeconds (assert_duration: POSITIVE)
 	if m.SessionTtlSeconds <= 0 {
@@ -1665,6 +1665,9 @@ const (
 // ============================================================
 // ConfigDefaults applies field-level default values to zero-valued fields.
 func ConfigDefaults(v *Config) {
+	if v == nil {
+		return
+	}
 	if v.Model == "" {
 		v.Model = DefaultModel
 	}
@@ -1677,12 +1680,75 @@ func ConfigDefaults(v *Config) {
 }
 
 // ============================================================
+// TypeDefaults: ToolAuthorization
+// ============================================================
+// ToolAuthorizationDefaults applies field-level default values to zero-valued fields.
+func ToolAuthorizationDefaults(v *ToolAuthorization) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeDefaults: AgentToken
+// ============================================================
+// AgentTokenDefaults applies field-level default values to zero-valued fields.
+func AgentTokenDefaults(v *AgentToken) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeDefaults: AssistToolRequest
+// ============================================================
+// AssistToolRequestDefaults applies field-level default values to zero-valued fields.
+func AssistToolRequestDefaults(v *AssistToolRequest) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeDefaults: AssistRequest
+// ============================================================
+// AssistRequestDefaults applies field-level default values to zero-valued fields.
+func AssistRequestDefaults(v *AssistRequest) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeDefaults: AssistResponse
+// ============================================================
+// AssistResponseDefaults applies field-level default values to zero-valued fields.
+func AssistResponseDefaults(v *AssistResponse) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
 // TypeDefaults: McpConfigState
 // ============================================================
 // McpConfigStateDefaults applies field-level default values to zero-valued fields.
 func McpConfigStateDefaults(v *McpConfigState) {
+	if v == nil {
+		return
+	}
 	if v.Config != nil {
 		ConfigDefaults(v.Config)
+	}
+}
+
+// ============================================================
+// TypeDefaults: MapEmpty
+// ============================================================
+// MapEmptyDefaults applies field-level default values to zero-valued fields.
+func MapEmptyDefaults(v *MapEmpty) {
+	if v == nil {
+		return
 	}
 }
 
@@ -1692,6 +1758,9 @@ func McpConfigStateDefaults(v *McpConfigState) {
 // ConfigUndefaults resets fields that match their default values back to zero.
 // Use before persisting to store only explicit user overrides.
 func ConfigUndefaults(v *Config) {
+	if v == nil {
+		return
+	}
 	if v.Model == DefaultModel {
 		v.Model = ""
 	}
@@ -1704,13 +1773,82 @@ func ConfigUndefaults(v *Config) {
 }
 
 // ============================================================
+// TypeUndefaults: ToolAuthorization
+// ============================================================
+// ToolAuthorizationUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func ToolAuthorizationUndefaults(v *ToolAuthorization) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeUndefaults: AgentToken
+// ============================================================
+// AgentTokenUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func AgentTokenUndefaults(v *AgentToken) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeUndefaults: AssistToolRequest
+// ============================================================
+// AssistToolRequestUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func AssistToolRequestUndefaults(v *AssistToolRequest) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeUndefaults: AssistRequest
+// ============================================================
+// AssistRequestUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func AssistRequestUndefaults(v *AssistRequest) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeUndefaults: AssistResponse
+// ============================================================
+// AssistResponseUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func AssistResponseUndefaults(v *AssistResponse) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
 // TypeUndefaults: McpConfigState
 // ============================================================
 // McpConfigStateUndefaults resets fields that match their default values back to zero.
 // Use before persisting to store only explicit user overrides.
 func McpConfigStateUndefaults(v *McpConfigState) {
+	if v == nil {
+		return
+	}
 	if v.Config != nil {
 		ConfigUndefaults(v.Config)
+	}
+}
+
+// ============================================================
+// TypeUndefaults: MapEmpty
+// ============================================================
+// MapEmptyUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func MapEmptyUndefaults(v *MapEmpty) {
+	if v == nil {
+		return
 	}
 }
 

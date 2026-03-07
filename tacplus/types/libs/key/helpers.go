@@ -596,16 +596,16 @@ func ValidatePublicKey(m *PublicKey) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Id must be at least 1 characters, got: %d", len(m.Id))
 	}
 
+	// Validate Base64 (assert_required)
+	if m.Base64 == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Base64 is required")
+	}
+
 	// Validate Base64 (assert_base64)
 	if m.Base64 != "" {
 		if err := utils.ValidateAssertBase64(m.Base64); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field Base64 base64 validation failed")
 		}
-	}
-
-	// Validate Base64 (assert_required)
-	if m.Base64 == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Base64 is required")
 	}
 
 	// Validate Created (assert_required: must be > 0)
@@ -949,6 +949,48 @@ const (
 	MaxSizeKeyId           int = 32768
 	MaxSizeKeyBase64       int = 32768
 )
+
+// ============================================================
+// TypeDefaults: PublicKey
+// ============================================================
+// PublicKeyDefaults applies field-level default values to zero-valued fields.
+func PublicKeyDefaults(v *PublicKey) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeDefaults: Key
+// ============================================================
+// KeyDefaults applies field-level default values to zero-valued fields.
+func KeyDefaults(v *Key) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeUndefaults: PublicKey
+// ============================================================
+// PublicKeyUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func PublicKeyUndefaults(v *PublicKey) {
+	if v == nil {
+		return
+	}
+}
+
+// ============================================================
+// TypeUndefaults: Key
+// ============================================================
+// KeyUndefaults resets fields that match their default values back to zero.
+// Use before persisting to store only explicit user overrides.
+func KeyUndefaults(v *Key) {
+	if v == nil {
+		return
+	}
+}
 
 // ============================================================
 // Merge: PublicKey
