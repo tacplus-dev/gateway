@@ -5,7 +5,8 @@ RUN apk add --no-cache ca-certificates tzdata && \
 
 WORKDIR /app
 
-COPY bin/gateway /app/gateway
+ARG TARGETARCH
+COPY bin/gateway-${TARGETARCH} /app/gateway
 COPY dist/ /app/dist/
 
 USER gateway
