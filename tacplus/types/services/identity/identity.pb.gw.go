@@ -16,6 +16,7 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/utilities"
+	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/common/tokenrequest"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/grpclog"
@@ -140,7 +141,7 @@ func local_request_IdentityService_RefreshToken_0(ctx context.Context, marshaler
 
 func request_IdentityService_ExchangeToken_0(ctx context.Context, marshaler runtime.Marshaler, client IdentityServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq ExchangeTokenRequest
+		protoReq tokenrequest.TokenRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -155,7 +156,7 @@ func request_IdentityService_ExchangeToken_0(ctx context.Context, marshaler runt
 
 func local_request_IdentityService_ExchangeToken_0(ctx context.Context, marshaler runtime.Marshaler, server IdentityServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq ExchangeTokenRequest
+		protoReq tokenrequest.TokenRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -189,6 +190,33 @@ func local_request_IdentityService_Logout_0(ctx context.Context, marshaler runti
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.Logout(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+func request_IdentityService_AuthenticateApiKey_0(ctx context.Context, marshaler runtime.Marshaler, client IdentityServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq AuthenticateApiKeyRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	msg, err := client.AuthenticateApiKey(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_IdentityService_AuthenticateApiKey_0(ctx context.Context, marshaler runtime.Marshaler, server IdentityServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq AuthenticateApiKeyRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.AuthenticateApiKey(ctx, &protoReq)
 	return msg, metadata, err
 }
 
@@ -317,6 +345,26 @@ func RegisterIdentityServiceHandlerServer(ctx context.Context, mux *runtime.Serv
 			return
 		}
 		forward_IdentityService_Logout_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPost, pattern_IdentityService_AuthenticateApiKey_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/identity.IdentityService/AuthenticateApiKey", runtime.WithHTTPPathPattern("/api/identity/v1/apikey"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_IdentityService_AuthenticateApiKey_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_IdentityService_AuthenticateApiKey_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 
 	return nil
@@ -460,23 +508,42 @@ func RegisterIdentityServiceHandlerClient(ctx context.Context, mux *runtime.Serv
 		}
 		forward_IdentityService_Logout_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_IdentityService_AuthenticateApiKey_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/identity.IdentityService/AuthenticateApiKey", runtime.WithHTTPPathPattern("/api/identity/v1/apikey"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_IdentityService_AuthenticateApiKey_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_IdentityService_AuthenticateApiKey_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	return nil
 }
 
 var (
-	pattern_IdentityService_ListProviders_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "providers"}, ""))
-	pattern_IdentityService_Authorize_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "authorize"}, ""))
-	pattern_IdentityService_Callback_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "callback"}, ""))
-	pattern_IdentityService_RefreshToken_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "refresh"}, ""))
-	pattern_IdentityService_ExchangeToken_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "exchange"}, ""))
-	pattern_IdentityService_Logout_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "logout"}, ""))
+	pattern_IdentityService_ListProviders_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "providers"}, ""))
+	pattern_IdentityService_Authorize_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "authorize"}, ""))
+	pattern_IdentityService_Callback_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "callback"}, ""))
+	pattern_IdentityService_RefreshToken_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "refresh"}, ""))
+	pattern_IdentityService_ExchangeToken_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "exchange"}, ""))
+	pattern_IdentityService_Logout_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "logout"}, ""))
+	pattern_IdentityService_AuthenticateApiKey_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "identity", "v1", "apikey"}, ""))
 )
 
 var (
-	forward_IdentityService_ListProviders_0 = runtime.ForwardResponseMessage
-	forward_IdentityService_Authorize_0     = runtime.ForwardResponseMessage
-	forward_IdentityService_Callback_0      = runtime.ForwardResponseMessage
-	forward_IdentityService_RefreshToken_0  = runtime.ForwardResponseMessage
-	forward_IdentityService_ExchangeToken_0 = runtime.ForwardResponseMessage
-	forward_IdentityService_Logout_0        = runtime.ForwardResponseMessage
+	forward_IdentityService_ListProviders_0      = runtime.ForwardResponseMessage
+	forward_IdentityService_Authorize_0          = runtime.ForwardResponseMessage
+	forward_IdentityService_Callback_0           = runtime.ForwardResponseMessage
+	forward_IdentityService_RefreshToken_0       = runtime.ForwardResponseMessage
+	forward_IdentityService_ExchangeToken_0      = runtime.ForwardResponseMessage
+	forward_IdentityService_Logout_0             = runtime.ForwardResponseMessage
+	forward_IdentityService_AuthenticateApiKey_0 = runtime.ForwardResponseMessage
 )

@@ -642,14 +642,14 @@ func ValidateFile(m *File) error {
 		return nil
 	}
 
-	// Validate Name (assert_max_length: 255)
-	if len(m.Name) > 255 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Name must be at most 255 characters, got: %d", len(m.Name))
-	}
-
 	// Validate Name (assert_required)
 	if m.Name == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Name is required")
+	}
+
+	// Validate Name (assert_max_length: 255)
+	if len(m.Name) > 255 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Name must be at most 255 characters, got: %d", len(m.Name))
 	}
 
 	// Validate Content (assert_max_size: 10485760 bytes)

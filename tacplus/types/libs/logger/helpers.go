@@ -536,11 +536,6 @@ func ValidateLoggerConfig(m *LoggerConfig) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field OutputPaths exceeds max items of 8, got: %d", len(m.OutputPaths))
 	}
 
-	// Validate ErrorOutputPaths (assert_max_items: 8)
-	if len(m.ErrorOutputPaths) > 8 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field ErrorOutputPaths exceeds max items of 8, got: %d", len(m.ErrorOutputPaths))
-	}
-
 	// Validate ErrorOutputPaths (assert_file_path: PATH_ANY)
 	for i, path := range m.ErrorOutputPaths {
 		if path != "" {
@@ -548,6 +543,11 @@ func ValidateLoggerConfig(m *LoggerConfig) error {
 				return protoerrors.NewErrMissingInvalidData(err, "field ErrorOutputPaths[%d] file path validation failed", i)
 			}
 		}
+	}
+
+	// Validate ErrorOutputPaths (assert_max_items: 8)
+	if len(m.ErrorOutputPaths) > 8 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field ErrorOutputPaths exceeds max items of 8, got: %d", len(m.ErrorOutputPaths))
 	}
 
 	// Validate Name (default max size: 32768 bytes)

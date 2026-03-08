@@ -1881,14 +1881,14 @@ func ValidateClusterInfo(m *ClusterInfo) error {
 		return nil
 	}
 
-	// Validate OrgId (assert_required)
-	if m.OrgId == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field OrgId is required")
-	}
-
 	// Validate OrgId (assert_max_length: 128)
 	if len(m.OrgId) > 128 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field OrgId must be at most 128 characters, got: %d", len(m.OrgId))
+	}
+
+	// Validate OrgId (assert_required)
+	if m.OrgId == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field OrgId is required")
 	}
 
 	// Validate Region (assert_required)

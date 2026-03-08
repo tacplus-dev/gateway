@@ -238,13 +238,13 @@ func ValidateOpaPolicy(m *OpaPolicy) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field EntryPoint must be at most 256 characters, got: %d", len(m.EntryPoint))
 	}
 
-	// Validate Created (assert_le: 8045740800)
-	if m.Created > 8045740800 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be <= 8045740800, got: %v", m.Created)
-	}
 	// Validate Created (assert_ge: 1735689600)
 	if m.Created < 1735689600 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be >= 1735689600, got: %v", m.Created)
+	}
+	// Validate Created (assert_le: 8045740800)
+	if m.Created > 8045740800 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be <= 8045740800, got: %v", m.Created)
 	}
 	// Validate Version (assert_semver)
 	if m.Version != "" {
