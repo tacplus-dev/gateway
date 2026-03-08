@@ -26,6 +26,7 @@ type serviceInfo struct {
 	ServiceName  string // e.g., "SentinelService"
 	GoImportPath string // e.g., "gitlab.com/.../tacplus/types/services/sentinel"
 	GoAlias      string // e.g., "sentinel_gw"
+	DisableAuth  bool   // true if service has option (spec.disable_auth) = true
 }
 
 func main() {
@@ -51,6 +52,25 @@ func main() {
 	services, err := findAnnotatedServices(protoDir)
 	if err != nil {
 		log.Fatalf("scanning protos: %v", err)
+	}
+
+	// Scan shared protos (../proto/services/) for disable_auth annotations.
+	// The gateway's local protos are stripped copies; the shared protos have
+	// the spec.disable_auth annotations that indicate public services.
+	// The shared proto repo sits alongside the gateway service directory.
+	// Resolve the tacplus dir to an absolute path, then navigate up two levels
+	// (tacplus → gateway → services root) to find proto/services/.
+	absTacplus, _ := filepath.Abs(tacplusDir)
+	sharedProtoDir := filepath.Join(filepath.Dir(filepath.Dir(absTacplus)), "proto", "services")
+	noAuthPkgs, err := findNoAuthPackages(sharedProtoDir)
+	if err != nil {
+		log.Printf("bufgen: warning: could not scan shared protos for disable_auth: %v", err)
+	}
+	for i := range services {
+		if noAuthPkgs[services[i].ProtoPackage] {
+			services[i].DisableAuth = true
+			fmt.Printf("bufgen: %s marked as no-auth (disable_auth annotation)\n", services[i].ProtoPackage)
+		}
 	}
 
 	if len(services) == 0 {
@@ -287,7 +307,55 @@ var ProxyServiceMapping = map[string]string{
 	"{{.ProtoPackage}}": "{{.ProtoPackage}}",
 {{- end}}
 }
+
+// NoAuthServices lists proto packages where all RPCs skip authentication.
+// These services have option (spec.disable_auth) = true in their proto definition.
+// The gateway skips token pre-validation for requests to these services.
+var NoAuthServices = map[string]bool{
+{{- range .}}{{if .DisableAuth}}
+	"{{.ProtoPackage}}": true,
+{{- end}}{{end}}
+}
 `))
+
+// findNoAuthPackages scans a proto directory for service-level
+// option (spec.disable_auth) = true annotations and returns a set of
+// proto package names that should skip authentication.
+func findNoAuthPackages(protoDir string) (map[string]bool, error) {
+	if _, err := os.Stat(protoDir); os.IsNotExist(err) {
+		return nil, fmt.Errorf("shared proto directory not found: %s", protoDir)
+	}
+
+	packageRe := regexp.MustCompile(`^package\s+(\w+)\s*;`)
+	disableAuthRe := regexp.MustCompile(`option\s+\(spec\.disable_auth\)\s*=\s*true`)
+
+	result := make(map[string]bool)
+	err := filepath.Walk(protoDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".proto") {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		if !disableAuthRe.Match(data) {
+			return nil
+		}
+
+		// Find the proto package name.
+		scanner := bufio.NewScanner(strings.NewReader(string(data)))
+		for scanner.Scan() {
+			if m := packageRe.FindStringSubmatch(strings.TrimSpace(scanner.Text())); len(m) > 1 {
+				result[m[1]] = true
+				break
+			}
+		}
+		return nil
+	})
+	return result, err
+}
 
 func writeRoutesGo(path string, services []serviceInfo) error {
 	f, err := os.Create(path)

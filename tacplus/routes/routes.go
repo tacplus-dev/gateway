@@ -51,3 +51,10 @@ var ProxyServiceMapping = map[string]string{
 	"policysim": "policysim",
 	"sentinel": "sentinel",
 }
+
+// NoAuthServices lists proto packages where all RPCs skip authentication.
+// These services have option (spec.disable_auth) = true in their proto definition.
+// The gateway skips token pre-validation for requests to these services.
+var NoAuthServices = map[string]bool{
+	"identity": true,
+}

@@ -96,18 +96,22 @@ func run() error {
 	// 6. Create health-aware gRPC resolver.
 	resolver := gw.NewHealthResolver(hw)
 
-	// 7. Create grpc-gateway mux for REST→gRPC transcoding (from generated routes).
+	// 7. Create gateway token pre-validator (signature + expiry only).
+	// Uses the same JWK view watch stream as backend frontendserver authorizers.
+	gatewayAuth := gw.NewGatewayAuth(ctx, sc.Conn())
+
+	// 8. Create grpc-gateway mux for REST→gRPC transcoding (from generated routes).
 	gwMux, err := gw.NewGateway(ctx, routes.GatewayRoutes)
 	if err != nil {
 		return fmt.Errorf("gateway: %w", err)
 	}
 
-	// 8. Create gRPC server with transparent proxy for unknown services.
+	// 9. Create gRPC server with transparent proxy for unknown services.
 	grpcServer := grpc.NewServer(
-		grpc.UnknownServiceHandler(gw.TransparentHandler(resolver)),
+		grpc.UnknownServiceHandler(gw.TransparentHandler(resolver, gatewayAuth)),
 	)
 
-	// 9. Build combined HTTP handler: /api/* → gateway, everything else → SPA.
+	// 10. Build combined HTTP handler: /api/* → gateway, everything else → SPA.
 	var webContent fs.FS
 	if webRoot := os.Getenv("WEB_ROOT"); webRoot != "" {
 		webContent = os.DirFS(webRoot)
@@ -119,9 +123,9 @@ func run() error {
 		}
 		zap.L().Info("Serving webapp from embedded filesystem")
 	}
-	httpHandler := buildHandler(gwMux, webContent)
+	httpHandler := gw.AuthMiddleware(buildHandler(gwMux, webContent), gatewayAuth)
 
-	// 10. Load TLS from service_config.
+	// 11. Load TLS from service_config.
 	certPair, err := x509wrapper.NewImmutableX509CertPair(cfg.GetTlsCert())
 	if err != nil {
 		return fmt.Errorf("tls cert: %w", err)
@@ -132,7 +136,7 @@ func run() error {
 		MinVersion:   tls.VersionTLS12,
 	}
 
-	// 11. Resolve listen address.
+	// 12. Resolve listen address.
 	listenAddr := ":8443"
 	if la := cfg.GetListenAddress(); la != nil {
 		listenAddr = fmt.Sprintf("%s:%d", la.Host, la.Port)
@@ -149,7 +153,7 @@ func run() error {
 		zap.Bool("tcp", enableTCP),
 		zap.Bool("quic", enableQUIC))
 
-	// 12. HTTP/3 (QUIC) server for REST and SPA — same port, UDP.
+	// 13. HTTP/3 (QUIC) server for REST and SPA — same port, UDP.
 	var h3Server *http3.Server
 	if enableQUIC {
 		h3Server = &http3.Server{
@@ -159,7 +163,7 @@ func run() error {
 		}
 	}
 
-	// 13. HTTP/1.1 and HTTP/2 server — multiplexes gRPC and HTTP by content type.
+	// 14. HTTP/1.1 and HTTP/2 server — multiplexes gRPC and HTTP by content type.
 	// When QUIC is enabled, sets Alt-Svc header to advertise HTTP/3.
 	httpServer := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

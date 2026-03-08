@@ -20,12 +20,21 @@ import (
 // service_id from the method name and uses the health resolver to find healthy
 // backend endpoints.
 //
-// Auth metadata is passed through as-is — gateway does not inspect tokens.
-func TransparentHandler(hr *HealthResolver) grpc.StreamHandler {
+// Token pre-validation: if auth is non-nil, requests to authenticated services
+// must carry a valid JWT (signature + expiry checked). No-auth services
+// (e.g., identity) are passed through without inspection.
+func TransparentHandler(hr *HealthResolver, auth *GatewayAuth) grpc.StreamHandler {
 	return func(srv interface{}, serverStream grpc.ServerStream) error {
 		fullMethod, ok := grpc.MethodFromServerStream(serverStream)
 		if !ok {
 			return status.Error(codes.Internal, "failed to get method from stream")
+		}
+
+		// Pre-validate token before forwarding to backend.
+		if auth != nil {
+			if err := auth.ValidateToken(serverStream.Context(), fullMethod); err != nil {
+				return err
+			}
 		}
 
 		serviceID, err := resolveServiceID(fullMethod)
