@@ -80,24 +80,22 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("health watcher: %w", err)
 	}
+	_ = hw // retained for future use (health UI endpoint)
 
-	// 5. Create health-aware gRPC resolver.
-	resolver := gw.NewHealthResolver(hw)
-
-	// 6. Create gateway token pre-validator (signature + expiry only).
+	// 5. Create gateway token pre-validator (signature + expiry only).
 	// Uses the same JWK view watch stream as backend frontendserver authorizers.
 	gatewayAuth := gw.NewGatewayAuth(ctx, svcMgr.Conn())
 
-	// 8. Create grpc-gateway mux for REST→gRPC transcoding (from generated routes).
+	// 6. Create grpc-gateway mux for REST→gRPC transcoding (from generated routes).
 	gwMux, err := gw.NewGateway(ctx, routes.GatewayRoutes)
 	if err != nil {
 		return fmt.Errorf("gateway: %w", err)
 	}
 
-	// 9. Create gRPC server with transparent proxy for unknown services.
-	grpcServer := grpc.NewServer(
-		grpc.UnknownServiceHandler(gw.TransparentHandler(resolver, gatewayAuth)),
-	)
+	// 7. Create gRPC server with typed passthrough handlers for all frontend services.
+	// Each handler: Authorize (entitlement check) → forward via typed frontend client.
+	grpcServer := grpc.NewServer()
+	svcMgr.RegisterPassthrough(grpcServer)
 
 	// 10. Build combined HTTP handler: /api/* → gateway, everything else → SPA.
 	var webContent fs.FS

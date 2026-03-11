@@ -379,8 +379,8 @@ func OpaPolicyLlmTypeDescriptor() string {
                   "type": "uint32",
                   "description": "group permission bits (0-7)",
                   "constraints": [
-                    "must be \u003e= 0",
-                    "must be \u003c= 7"
+                    "must be \u003c= 7",
+                    "must be \u003e= 0"
                   ]
                 },
                 {
@@ -441,8 +441,8 @@ func OpaPolicyLlmTypeDescriptor() string {
       "type": "int64",
       "description": "created is the Unix epoch timestamp (seconds) when the policy was created.",
       "constraints": [
-        "must be \u003c= 8045740800",
-        "must be \u003e= 1735689600"
+        "must be \u003e= 1735689600",
+        "must be \u003c= 8045740800"
       ]
     },
     {

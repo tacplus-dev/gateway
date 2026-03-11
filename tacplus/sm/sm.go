@@ -25,6 +25,10 @@ import (
 
 	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/sm/internal/backend_clients"
 
+	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/sm/internal/frontend_clients"
+
+	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/sm/internal/passthrough"
+
 	serviceconfig_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/serviceconfig"
 )
 
@@ -39,11 +43,13 @@ type ServiceManager struct {
 
 	bc *backends.Backends
 
+	fc *grpcclients.GrpcClients
+
 	authorizeFunc func(ctx context.Context, fullMethod string, req any) error
 }
 
 // New creates a ServiceManager: loads bootstrap config, creates the
-// ServiceManager connection pool, Backends, and Authorizer.
+// ServiceManager connection pool, Backends, FrontendClients, and Authorizer.
 func New() (*ServiceManager, error) {
 	cfg, err := serviceconfig.LoadBootstrapConfig()
 	if err != nil {
@@ -65,6 +71,8 @@ func New() (*ServiceManager, error) {
 		return nil, fmt.Errorf("backendclients: %w", err)
 	}
 
+	fc := grpcclients.NewGrpcClients(sc.Conn(), false)
+
 	auth, err := frontendserver.NewAuthorizer(ctx, sc.Conn(), "gateway")
 	if err != nil {
 
@@ -82,6 +90,8 @@ func New() (*ServiceManager, error) {
 		sc:   sc,
 
 		bc: bc,
+
+		fc: fc,
 
 		authorizeFunc: auth.Authorize,
 	}, nil
@@ -112,6 +122,18 @@ func (sm *ServiceManager) Close() {
 // BackendClients returns the backend client instances.
 func (sm *ServiceManager) BackendClients() *backends.Backends {
 	return sm.bc
+}
+
+// FrontendClients returns the typed gRPC client wrappers for S2S calls.
+func (sm *ServiceManager) FrontendClients() *grpcclients.GrpcClients {
+	return sm.fc
+}
+
+// RegisterPassthrough registers typed proxy handlers for all frontend services on srv.
+// Each handler enforces: Authorize → ValidateAll → forward via frontend client.
+// Call this in gateway/proxy entrypoints instead of implementing a Handler.
+func (sm *ServiceManager) RegisterPassthrough(srv grpc.ServiceRegistrar) {
+	passthrough.RegisterAll(srv, sm.fc, sm.authorizeFunc)
 }
 
 // Run starts the service lifecycle with the given handler: subscribes to

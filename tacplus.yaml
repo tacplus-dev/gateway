@@ -1,5 +1,6 @@
 language: go
 pkg: gitlab.com/secondstarcavalier/controlplane/services/gateway
+all-frontends: true
 backends:
   - services/kernel.ServiceHealthState:ro
 post-gen:

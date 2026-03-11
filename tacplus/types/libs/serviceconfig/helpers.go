@@ -1916,14 +1916,14 @@ func ValidateClusterInfo(m *ClusterInfo) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Zone must be at most 64 characters, got: %d", len(m.Zone))
 	}
 
-	// Validate ClusterName (assert_max_length: 128)
-	if len(m.ClusterName) > 128 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field ClusterName must be at most 128 characters, got: %d", len(m.ClusterName))
-	}
-
 	// Validate ClusterName (assert_required)
 	if m.ClusterName == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ClusterName is required")
+	}
+
+	// Validate ClusterName (assert_max_length: 128)
+	if len(m.ClusterName) > 128 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field ClusterName must be at most 128 characters, got: %d", len(m.ClusterName))
 	}
 
 	// Validate Members (assert_max_items: 64)

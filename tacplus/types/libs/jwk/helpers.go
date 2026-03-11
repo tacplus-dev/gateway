@@ -1012,24 +1012,24 @@ func ValidateJwk(m *Jwk) error {
 		return nil
 	}
 
-	// Validate Alg (assert_min_length: 1)
-	if len(m.Alg) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Alg must be at least 1 characters, got: %d", len(m.Alg))
-	}
-
 	// Validate Alg (assert_required)
 	if m.Alg == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Alg is required")
 	}
 
-	// Validate Kid (assert_required)
-	if m.Kid == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Kid is required")
+	// Validate Alg (assert_min_length: 1)
+	if len(m.Alg) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Alg must be at least 1 characters, got: %d", len(m.Alg))
 	}
 
 	// Validate Kid (assert_min_length: 1)
 	if len(m.Kid) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Kid must be at least 1 characters, got: %d", len(m.Kid))
+	}
+
+	// Validate Kid (assert_required)
+	if m.Kid == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Kid is required")
 	}
 
 	// Validate E (assert_base64)
@@ -1179,16 +1179,16 @@ func ValidateOpenIdConfiguration(m *OpenIdConfiguration) error {
 		}
 	}
 
+	// Validate JwksUri (assert_required)
+	if m.JwksUri == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field JwksUri is required")
+	}
+
 	// Validate JwksUri (assert_url: URL_SCHEME_HTTPS)
 	if m.JwksUri != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.JwksUri); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field JwksUri URL validation failed")
 		}
-	}
-
-	// Validate JwksUri (assert_required)
-	if m.JwksUri == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field JwksUri is required")
 	}
 
 	// Validate ResponseTypesSupported (assert_max_items: 32)

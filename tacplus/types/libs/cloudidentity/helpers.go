@@ -393,14 +393,14 @@ func ValidatePresignedHttpRequest(m *PresignedHttpRequest) error {
 		return nil
 	}
 
-	// Validate Method (assert_required)
-	if m.Method == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Method is required")
-	}
-
 	// Validate Method (assert_max_length: 16)
 	if len(m.Method) > 16 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Method must be at most 16 characters, got: %d", len(m.Method))
+	}
+
+	// Validate Method (assert_required)
+	if m.Method == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Method is required")
 	}
 
 	// Validate Url (assert_required)

@@ -8775,24 +8775,24 @@ func ValidateConfig(m *Config) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshTokenLifetimeSeconds must be positive (> 0), got: %d", m.RefreshTokenLifetimeSeconds)
 	}
 
-	// Validate KeyLifetimeSeconds (assert_duration_min: 3600)
-	if m.KeyLifetimeSeconds < 3600 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field KeyLifetimeSeconds must be >= 3600, got: %d", m.KeyLifetimeSeconds)
-	}
-
 	// Validate KeyLifetimeSeconds (assert_duration: POSITIVE)
 	if m.KeyLifetimeSeconds <= 0 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field KeyLifetimeSeconds must be positive (> 0), got: %d", m.KeyLifetimeSeconds)
 	}
 
-	// Validate NonceExpireSeconds (assert_duration: POSITIVE)
-	if m.NonceExpireSeconds <= 0 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field NonceExpireSeconds must be positive (> 0), got: %d", m.NonceExpireSeconds)
+	// Validate KeyLifetimeSeconds (assert_duration_min: 3600)
+	if m.KeyLifetimeSeconds < 3600 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field KeyLifetimeSeconds must be >= 3600, got: %d", m.KeyLifetimeSeconds)
 	}
 
 	// Validate NonceExpireSeconds (assert_duration_min: 1)
 	if m.NonceExpireSeconds < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field NonceExpireSeconds must be >= 1, got: %d", m.NonceExpireSeconds)
+	}
+
+	// Validate NonceExpireSeconds (assert_duration: POSITIVE)
+	if m.NonceExpireSeconds <= 0 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field NonceExpireSeconds must be positive (> 0), got: %d", m.NonceExpireSeconds)
 	}
 
 	// Validate Issuer (assert_required)
@@ -8879,14 +8879,14 @@ func ValidateProviderConfig(m *ProviderConfig) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ClientId must be at least 1 characters, got: %d", len(m.ClientId))
 	}
 
-	// Validate ClientSecret (assert_required)
-	if m.ClientSecret == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field ClientSecret is required")
-	}
-
 	// Validate ClientSecret (assert_min_length: 1)
 	if len(m.ClientSecret) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ClientSecret must be at least 1 characters, got: %d", len(m.ClientSecret))
+	}
+
+	// Validate ClientSecret (assert_required)
+	if m.ClientSecret == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field ClientSecret is required")
 	}
 
 	// Validate AuthorizationEndpoint (assert_url: URL_SCHEME_HTTPS)
@@ -8997,14 +8997,14 @@ func ValidateExternalJwk(m *ExternalJwk) error {
 		return nil
 	}
 
-	// Validate Kid (assert_required)
-	if m.Kid == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Kid is required")
-	}
-
 	// Validate Kid (assert_min_length: 1)
 	if len(m.Kid) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Kid must be at least 1 characters, got: %d", len(m.Kid))
+	}
+
+	// Validate Kid (assert_required)
+	if m.Kid == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Kid is required")
 	}
 
 	// Validate Key (assert_required)
@@ -9092,16 +9092,16 @@ func ValidateAuthorizeRequest(m *AuthorizeRequest) error {
 	if m.ProviderIndex < 0 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ProviderIndex must be >= 0, got: %v", m.ProviderIndex)
 	}
-	// Validate CallbackUrl (assert_required)
-	if m.CallbackUrl == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field CallbackUrl is required")
-	}
-
 	// Validate CallbackUrl (assert_url: URL_SCHEME_HTTPS)
 	if m.CallbackUrl != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.CallbackUrl); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field CallbackUrl URL validation failed")
 		}
+	}
+
+	// Validate CallbackUrl (assert_required)
+	if m.CallbackUrl == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field CallbackUrl is required")
 	}
 
 	// Validate CallbackUrl (default max size: 32768 bytes)
@@ -9119,16 +9119,16 @@ func ValidateAuthorizeResponse(m *AuthorizeResponse) error {
 		return nil
 	}
 
-	// Validate RedirectUrl (assert_required)
-	if m.RedirectUrl == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field RedirectUrl is required")
-	}
-
 	// Validate RedirectUrl (assert_url: URL_SCHEME_HTTPS)
 	if m.RedirectUrl != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.RedirectUrl); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field RedirectUrl URL validation failed")
 		}
+	}
+
+	// Validate RedirectUrl (assert_required)
+	if m.RedirectUrl == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field RedirectUrl is required")
 	}
 
 	// Validate RedirectUrl (default max size: 32768 bytes)
@@ -9186,14 +9186,19 @@ func ValidateCallbackResponse(m *CallbackResponse) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken must be at least 1 characters, got: %d", len(m.RefreshToken))
 	}
 
+	// Validate AccessToken (assert_required)
+	if m.AccessToken == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
+	}
+
 	// Validate AccessToken (assert_min_length: 1)
 	if len(m.AccessToken) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
 	}
 
-	// Validate AccessToken (assert_required)
-	if m.AccessToken == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
+	// Validate CallbackUrl (assert_required)
+	if m.CallbackUrl == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field CallbackUrl is required")
 	}
 
 	// Validate CallbackUrl (assert_url: URL_SCHEME_HTTPS)
@@ -9201,11 +9206,6 @@ func ValidateCallbackResponse(m *CallbackResponse) error {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.CallbackUrl); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field CallbackUrl URL validation failed")
 		}
-	}
-
-	// Validate CallbackUrl (assert_required)
-	if m.CallbackUrl == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field CallbackUrl is required")
 	}
 
 	// Validate AccessTokenExpiresIn (assert_gt: 0)
@@ -9344,14 +9344,14 @@ func ValidateExchangeTokenResponse(m *ExchangeTokenResponse) error {
 		return nil
 	}
 
-	// Validate AccessToken (assert_min_length: 1)
-	if len(m.AccessToken) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
-	}
-
 	// Validate AccessToken (assert_required)
 	if m.AccessToken == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
+	}
+
+	// Validate AccessToken (assert_min_length: 1)
+	if len(m.AccessToken) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
 	}
 
 	// Validate ExpiresIn (assert_gt: 0)
@@ -11846,8 +11846,8 @@ func ConfigLlmTypeDescriptor() string {
             "type": "string",
             "description": "entry_point specifies the main package/decision point for policy evaluation.",
             "constraints": [
-              "maximum length: 256",
-              "minimum length: 1"
+              "minimum length: 1",
+              "maximum length: 256"
             ]
           },
           {
@@ -11882,8 +11882,8 @@ func ConfigLlmTypeDescriptor() string {
                         "type": "uint32",
                         "description": "owner permission bits (0-7)",
                         "constraints": [
-                          "must be \u003c= 7",
-                          "must be \u003e= 0"
+                          "must be \u003e= 0",
+                          "must be \u003c= 7"
                         ]
                       },
                       {
@@ -11962,8 +11962,8 @@ func ConfigLlmTypeDescriptor() string {
             "type": "string",
             "description": "version is an optional version string for this policy (e.g., \"1.0.0\").",
             "constraints": [
-              "maximum length: 64",
-              "must be a valid semantic version"
+              "must be a valid semantic version",
+              "maximum length: 64"
             ]
           }
         ]
