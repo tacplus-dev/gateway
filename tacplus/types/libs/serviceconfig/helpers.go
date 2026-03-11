@@ -1822,6 +1822,16 @@ func ValidateConfig(m *Config) error {
 		return nil
 	}
 
+	// Validate ListenAddress (assert_required)
+	if m.ListenAddress == nil {
+		return protoerrors.NewErrMissingInvalidData(nil, "field ListenAddress is required")
+	}
+
+	// Validate TlsCert (assert_required)
+	if m.TlsCert == nil {
+		return protoerrors.NewErrMissingInvalidData(nil, "field TlsCert is required")
+	}
+
 	// Validate MaxRequestSize (assert_gt: 0)
 	if m.MaxRequestSize <= 0 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field MaxRequestSize must be > 0, got: %v", m.MaxRequestSize)
@@ -1881,14 +1891,14 @@ func ValidateClusterInfo(m *ClusterInfo) error {
 		return nil
 	}
 
-	// Validate OrgId (assert_max_length: 128)
-	if len(m.OrgId) > 128 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field OrgId must be at most 128 characters, got: %d", len(m.OrgId))
-	}
-
 	// Validate OrgId (assert_required)
 	if m.OrgId == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field OrgId is required")
+	}
+
+	// Validate OrgId (assert_max_length: 128)
+	if len(m.OrgId) > 128 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field OrgId must be at most 128 characters, got: %d", len(m.OrgId))
 	}
 
 	// Validate Region (assert_required)
@@ -1906,14 +1916,14 @@ func ValidateClusterInfo(m *ClusterInfo) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Zone must be at most 64 characters, got: %d", len(m.Zone))
 	}
 
-	// Validate ClusterName (assert_required)
-	if m.ClusterName == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field ClusterName is required")
-	}
-
 	// Validate ClusterName (assert_max_length: 128)
 	if len(m.ClusterName) > 128 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field ClusterName must be at most 128 characters, got: %d", len(m.ClusterName))
+	}
+
+	// Validate ClusterName (assert_required)
+	if m.ClusterName == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field ClusterName is required")
 	}
 
 	// Validate Members (assert_max_items: 64)
@@ -1996,7 +2006,6 @@ func ValidateMapEmpty(m *MapEmpty) error {
 // ============================================================
 const (
 	BootstrapConfigEnv                  = "BOOTSTRAP_CONFIG"
-	AuthIssuer                          = "backend"
 	DefaultPingIntervalMs         int64 = 5000
 	DefaultRebalanceIntervalMs    int64 = 10000
 	DefaultMaxRequestSize         int64 = 10485760

@@ -1,4 +1,3 @@
-proto_dir := "../proto"
 proto_repo := "git@gitlab.com:secondstarcavalier/controlplane/services/proto.git"
 webapp_dir := "../webapp"
 dist_dir := webapp_dir / "dist"
@@ -21,6 +20,6 @@ build:
   fi
   rm -rf dist
   cp -r {{dist_dir}} dist
-  tacplus build -c tacplus-local.yaml
+  tacplus build --src ../proto
   go build -ldflags="-s -w" ./...
   docker build --secret id=netrc,src=$HOME/.netrc -t $(basename $PWD) .

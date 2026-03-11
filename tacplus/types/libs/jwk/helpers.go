@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 	protoerrors "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/errors"
@@ -1021,14 +1022,14 @@ func ValidateJwk(m *Jwk) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Alg must be at least 1 characters, got: %d", len(m.Alg))
 	}
 
-	// Validate Kid (assert_required)
-	if m.Kid == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Kid is required")
-	}
-
 	// Validate Kid (assert_min_length: 1)
 	if len(m.Kid) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Kid must be at least 1 characters, got: %d", len(m.Kid))
+	}
+
+	// Validate Kid (assert_required)
+	if m.Kid == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Kid is required")
 	}
 
 	// Validate E (assert_base64)
@@ -1059,13 +1060,24 @@ func ValidateJwk(m *Jwk) error {
 		}
 	}
 
-	// Validate Created (assert_ge: 1735689600)
-	if m.Created < 1735689600 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be >= 1735689600, got: %v", m.Created)
+	// Validate Exp (epoch_expiration)
+	if m.Exp != 0 {
+		now := time.Now().Unix()
+		if m.Exp <= now {
+			return protoerrors.NewErrMissingInvalidData(nil, "field Exp must be a future epoch timestamp, got: %d (now: %d)", m.Exp, now)
+		}
+		if m.Exp > now+31536000 {
+			return protoerrors.NewErrMissingInvalidData(nil, "field Exp must be within 1 year from now, got: %d (max: %d)", m.Exp, now+31536000)
+		}
 	}
+
 	// Validate Created (assert_le: 8045740800)
 	if m.Created > 8045740800 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be <= 8045740800, got: %v", m.Created)
+	}
+	// Validate Created (assert_ge: 1735689600)
+	if m.Created < 1735689600 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be >= 1735689600, got: %v", m.Created)
 	}
 	// Validate Alg (default max size: 32768 bytes)
 	if len(m.Alg) > 32768 {
@@ -1167,16 +1179,16 @@ func ValidateOpenIdConfiguration(m *OpenIdConfiguration) error {
 		}
 	}
 
+	// Validate JwksUri (assert_required)
+	if m.JwksUri == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field JwksUri is required")
+	}
+
 	// Validate JwksUri (assert_url: URL_SCHEME_HTTPS)
 	if m.JwksUri != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.JwksUri); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field JwksUri URL validation failed")
 		}
-	}
-
-	// Validate JwksUri (assert_required)
-	if m.JwksUri == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field JwksUri is required")
 	}
 
 	// Validate ResponseTypesSupported (assert_max_items: 32)

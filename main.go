@@ -136,61 +136,70 @@ func run() error {
 		MinVersion:   tls.VersionTLS12,
 	}
 
-	// 12. Resolve listen address.
-	listenAddr := ":8443"
+	// 12. Resolve listen addresses.
+	host := ""
 	if la := cfg.GetListenAddress(); la != nil {
-		listenAddr = fmt.Sprintf("%s:%d", la.Host, la.Port)
+		host = la.Host
 	}
+	tcpAddr := fmt.Sprintf("%s:%d", host, gatewayCfg.GetTcpPort())
+	udpAddr := fmt.Sprintf("%s:%d", host, gatewayCfg.GetUdpPort())
 
-	enableTCP := gatewayCfg.GetEnableTcp()
-	enableQUIC := gatewayCfg.GetEnableQuic()
-	if !enableTCP && !enableQUIC {
-		return fmt.Errorf("at least one of enable_tcp or enable_quic must be true")
+	enableHTTP := gatewayCfg.GetEnableHttp()
+	enableHTTP3 := gatewayCfg.GetEnableHttp3()
+	enableGRPC := gatewayCfg.GetEnableGrpc()
+	if !enableHTTP && !enableHTTP3 && !enableGRPC {
+		return fmt.Errorf("at least one of enable_http, enable_http3, or enable_grpc must be true")
 	}
 
 	zap.L().Info("Starting gateway",
-		zap.String("addr", listenAddr),
-		zap.Bool("tcp", enableTCP),
-		zap.Bool("quic", enableQUIC))
+		zap.String("tcp_addr", tcpAddr),
+		zap.String("udp_addr", udpAddr),
+		zap.Bool("http", enableHTTP),
+		zap.Bool("http3", enableHTTP3),
+		zap.Bool("grpc", enableGRPC))
 
-	// 13. HTTP/3 (QUIC) server for REST and SPA — same port, UDP.
+	// 13. HTTP/3 (QUIC) server for REST and SPA — UDP port.
 	var h3Server *http3.Server
-	if enableQUIC {
+	if enableHTTP3 {
 		h3Server = &http3.Server{
-			Addr:      listenAddr,
+			Addr:      udpAddr,
 			TLSConfig: tlsConfig,
 			Handler:   httpHandler,
 		}
 	}
 
-	// 14. HTTP/1.1 and HTTP/2 server — multiplexes gRPC and HTTP by content type.
-	// When QUIC is enabled, sets Alt-Svc header to advertise HTTP/3.
+	// 14. HTTP/1.1, HTTP/2, and gRPC server — TCP port.
+	// Multiplexes gRPC and HTTP by content type based on enabled protocols.
+	// When HTTP/3 is enabled, sets Alt-Svc header to advertise it.
+	needsTCP := enableHTTP || enableGRPC
 	httpServer := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.ProtoMajor == 2 && strings.HasPrefix(r.Header.Get("Content-Type"), "application/grpc") {
+			if enableGRPC && r.ProtoMajor == 2 && strings.HasPrefix(r.Header.Get("Content-Type"), "application/grpc") {
 				grpcServer.ServeHTTP(w, r)
-			} else {
+			} else if enableHTTP {
 				if h3Server != nil {
 					if err := h3Server.SetQUICHeaders(w.Header()); err != nil {
 						zap.L().Debug("Failed to set Alt-Svc header", zap.Error(err))
 					}
 				}
 				httpHandler.ServeHTTP(w, r)
+			} else {
+				http.Error(w, "HTTP not enabled", http.StatusServiceUnavailable)
 			}
 		}),
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
 
-	if enableTCP {
-		lis, err := tls.Listen("tcp", listenAddr, tlsConfig)
+	if needsTCP {
+		lis, err := tls.Listen("tcp", tcpAddr, tlsConfig)
 		if err != nil {
-			return fmt.Errorf("tcp listen %s: %w", listenAddr, err)
+			return fmt.Errorf("tcp listen %s: %w", tcpAddr, err)
 		}
 		defer lis.Close()
 
 		g.Go(func() error {
-			zap.L().Info("Serving TLS (TCP)", zap.String("addr", listenAddr))
+			zap.L().Info("Serving TLS (TCP)", zap.String("addr", tcpAddr))
 			if err := httpServer.Serve(lis); err != nil && err != http.ErrServerClosed {
 				return fmt.Errorf("serve tcp: %w", err)
 			}
@@ -198,15 +207,15 @@ func run() error {
 		})
 	}
 
-	if enableQUIC {
-		udpConn, err := net.ListenPacket("udp", listenAddr)
+	if enableHTTP3 {
+		udpConn, err := net.ListenPacket("udp", udpAddr)
 		if err != nil {
-			return fmt.Errorf("udp listen %s: %w", listenAddr, err)
+			return fmt.Errorf("udp listen %s: %w", udpAddr, err)
 		}
 		defer udpConn.Close()
 
 		g.Go(func() error {
-			zap.L().Info("Serving HTTP/3 (QUIC/UDP)", zap.String("addr", listenAddr))
+			zap.L().Info("Serving HTTP/3 (QUIC/UDP)", zap.String("addr", udpAddr))
 			if err := h3Server.Serve(udpConn); err != nil && err != http.ErrServerClosed {
 				return fmt.Errorf("serve quic: %w", err)
 			}
@@ -227,13 +236,15 @@ func run() error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 
-		grpcServer.GracefulStop()
+		if enableGRPC {
+			grpcServer.GracefulStop()
+		}
 		if h3Server != nil {
 			if err := h3Server.Close(); err != nil {
 				zap.L().Warn("HTTP/3 server close error", zap.Error(err))
 			}
 		}
-		if enableTCP {
+		if needsTCP {
 			if err := httpServer.Shutdown(shutdownCtx); err != nil {
 				zap.L().Warn("HTTP server shutdown error", zap.Error(err))
 			}

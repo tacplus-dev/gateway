@@ -3488,6 +3488,10 @@ func IdentityConfigStateToTOML(v *IdentityConfigState) ([]byte, error) {
 // QueryValueJSON represents QueryValue in external JSON format (with string enums)
 // MARKER: JSON helper struct generated from serial.go
 type queryvalueJSON struct {
+	StringValue *string  `json:"string_value,omitempty"`
+	IntValue    *int64   `json:"int_value,omitempty"`
+	DoubleValue *float64 `json:"double_value,omitempty"`
+	BoolValue   *bool    `json:"bool_value,omitempty"`
 }
 
 // QueryValueToJSON converts QueryValue to JSON bytes.
@@ -3497,7 +3501,24 @@ func QueryValueToJSON(v *QueryValue) ([]byte, error) {
 		return nil, protoerrors.NewErrMissingInvalidData(nil, "queryvalue is nil")
 	}
 	// Convert to JSON helper struct with string enums
-	helper := queryvalueJSON{}
+	helper := queryvalueJSON{
+		StringValue: func() *string {
+			val := v.GetStringValue()
+			return &val
+		}(),
+		IntValue: func() *int64 {
+			val := v.GetIntValue()
+			return &val
+		}(),
+		DoubleValue: func() *float64 {
+			val := v.GetDoubleValue()
+			return &val
+		}(),
+		BoolValue: func() *bool {
+			val := v.GetBoolValue()
+			return &val
+		}(),
+	}
 	return json.Marshal(helper)
 }
 
@@ -3561,6 +3582,22 @@ func QueryValueFromJSON(data []byte) (*QueryValue, error) {
 	}
 	// Build result with parsed enums
 	result := &QueryValue{}
+	// Parse oneof scalar field: StringValue
+	if raw.StringValue != nil {
+		result.Value = &QueryValue_StringValue{StringValue: *raw.StringValue}
+	}
+	// Parse oneof scalar field: IntValue
+	if raw.IntValue != nil {
+		result.Value = &QueryValue_IntValue{IntValue: *raw.IntValue}
+	}
+	// Parse oneof scalar field: DoubleValue
+	if raw.DoubleValue != nil {
+		result.Value = &QueryValue_DoubleValue{DoubleValue: *raw.DoubleValue}
+	}
+	// Parse oneof scalar field: BoolValue
+	if raw.BoolValue != nil {
+		result.Value = &QueryValue_BoolValue{BoolValue: *raw.BoolValue}
+	}
 	return result, nil
 }
 
@@ -8820,16 +8857,16 @@ func ValidateProviderConfig(m *ProviderConfig) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Name must be at least 1 characters, got: %d", len(m.Name))
 	}
 
+	// Validate Issuer (assert_required)
+	if m.Issuer == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
+	}
+
 	// Validate Issuer (assert_url: URL_SCHEME_HTTPS)
 	if m.Issuer != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.Issuer); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field Issuer URL validation failed")
 		}
-	}
-
-	// Validate Issuer (assert_required)
-	if m.Issuer == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
 	}
 
 	// Validate ClientId (assert_required)
@@ -8949,6 +8986,7 @@ func ValidateIdentityStateInternal(m *IdentityStateInternal) error {
 		return nil
 	}
 
+	// No field validations defined
 	return nil
 }
 
@@ -8959,14 +8997,14 @@ func ValidateExternalJwk(m *ExternalJwk) error {
 		return nil
 	}
 
-	// Validate Kid (assert_min_length: 1)
-	if len(m.Kid) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Kid must be at least 1 characters, got: %d", len(m.Kid))
-	}
-
 	// Validate Kid (assert_required)
 	if m.Kid == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Kid is required")
+	}
+
+	// Validate Kid (assert_min_length: 1)
+	if len(m.Kid) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Kid must be at least 1 characters, got: %d", len(m.Kid))
 	}
 
 	// Validate Key (assert_required)
@@ -9158,16 +9196,16 @@ func ValidateCallbackResponse(m *CallbackResponse) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
 	}
 
-	// Validate CallbackUrl (assert_required)
-	if m.CallbackUrl == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field CallbackUrl is required")
-	}
-
 	// Validate CallbackUrl (assert_url: URL_SCHEME_HTTPS)
 	if m.CallbackUrl != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.CallbackUrl); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field CallbackUrl URL validation failed")
 		}
+	}
+
+	// Validate CallbackUrl (assert_required)
+	if m.CallbackUrl == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field CallbackUrl is required")
 	}
 
 	// Validate AccessTokenExpiresIn (assert_gt: 0)
@@ -9228,14 +9266,14 @@ func ValidateRefreshTokenResponse(m *RefreshTokenResponse) error {
 		return nil
 	}
 
-	// Validate AccessToken (assert_min_length: 1)
-	if len(m.AccessToken) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
-	}
-
 	// Validate AccessToken (assert_required)
 	if m.AccessToken == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
+	}
+
+	// Validate AccessToken (assert_min_length: 1)
+	if len(m.AccessToken) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
 	}
 
 	// Validate ExpiresIn (assert_gt: 0)
@@ -9350,14 +9388,14 @@ func ValidateApiKey(m *ApiKey) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field CredPairs exceeds max items of 8, got: %d", len(m.CredPairs))
 	}
 
-	// Validate Profile (assert_min_length: 1)
-	if len(m.Profile) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Profile must be at least 1 characters, got: %d", len(m.Profile))
-	}
-
 	// Validate Profile (assert_required)
 	if m.Profile == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Profile is required")
+	}
+
+	// Validate Profile (assert_min_length: 1)
+	if len(m.Profile) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Profile must be at least 1 characters, got: %d", len(m.Profile))
 	}
 
 	// Validate Name (default max size: 32768 bytes)
@@ -11853,8 +11891,8 @@ func ConfigLlmTypeDescriptor() string {
                         "type": "uint32",
                         "description": "group permission bits (0-7)",
                         "constraints": [
-                          "must be \u003e= 0",
-                          "must be \u003c= 7"
+                          "must be \u003c= 7",
+                          "must be \u003e= 0"
                         ]
                       },
                       {
@@ -12226,7 +12264,7 @@ func ConfigLlmTypeDescriptor() string {
                 {
                   "name": "exp",
                   "type": "int64",
-                  "description": "Exp is the expiration in epoch seconds. This is not part of the JWK spec as the spec does\n not specify how to handle public key expiration."
+                  "description": "Exp is the expiration in epoch seconds. This is not part of the JWK spec as the spec does\n not specify how to handle public key expiration.\n When stored in a collection with epoch_expiration, Hazelcast computes TTL = exp - now\n and auto-evicts the entry on expiry."
                 },
                 {
                   "name": "created",
