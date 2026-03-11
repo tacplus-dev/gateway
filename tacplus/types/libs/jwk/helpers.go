@@ -1012,24 +1012,24 @@ func ValidateJwk(m *Jwk) error {
 		return nil
 	}
 
-	// Validate Alg (assert_required)
-	if m.Alg == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Alg is required")
-	}
-
 	// Validate Alg (assert_min_length: 1)
 	if len(m.Alg) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Alg must be at least 1 characters, got: %d", len(m.Alg))
 	}
 
-	// Validate Kid (assert_min_length: 1)
-	if len(m.Kid) < 1 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Kid must be at least 1 characters, got: %d", len(m.Kid))
+	// Validate Alg (assert_required)
+	if m.Alg == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Alg is required")
 	}
 
 	// Validate Kid (assert_required)
 	if m.Kid == "" {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Kid is required")
+	}
+
+	// Validate Kid (assert_min_length: 1)
+	if len(m.Kid) < 1 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Kid must be at least 1 characters, got: %d", len(m.Kid))
 	}
 
 	// Validate E (assert_base64)
@@ -1071,13 +1071,13 @@ func ValidateJwk(m *Jwk) error {
 		}
 	}
 
-	// Validate Created (assert_le: 8045740800)
-	if m.Created > 8045740800 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be <= 8045740800, got: %v", m.Created)
-	}
 	// Validate Created (assert_ge: 1735689600)
 	if m.Created < 1735689600 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be >= 1735689600, got: %v", m.Created)
+	}
+	// Validate Created (assert_le: 8045740800)
+	if m.Created > 8045740800 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Created must be <= 8045740800, got: %v", m.Created)
 	}
 	// Validate Alg (default max size: 32768 bytes)
 	if len(m.Alg) > 32768 {
@@ -1139,16 +1139,16 @@ func ValidateOpenIdConfiguration(m *OpenIdConfiguration) error {
 		return nil
 	}
 
-	// Validate Issuer (assert_required)
-	if m.Issuer == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
-	}
-
 	// Validate Issuer (assert_url: URL_SCHEME_HTTPS)
 	if m.Issuer != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.Issuer); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field Issuer URL validation failed")
 		}
+	}
+
+	// Validate Issuer (assert_required)
+	if m.Issuer == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Issuer is required")
 	}
 
 	// Validate AuthorizationEndpoint (assert_url: URL_SCHEME_HTTPS)
@@ -1179,16 +1179,16 @@ func ValidateOpenIdConfiguration(m *OpenIdConfiguration) error {
 		}
 	}
 
-	// Validate JwksUri (assert_required)
-	if m.JwksUri == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field JwksUri is required")
-	}
-
 	// Validate JwksUri (assert_url: URL_SCHEME_HTTPS)
 	if m.JwksUri != "" {
 		if err := utils.ValidateAssertURL_URL_SCHEME_HTTPS(m.JwksUri); err != nil {
 			return protoerrors.NewErrMissingInvalidData(err, "field JwksUri URL validation failed")
 		}
+	}
+
+	// Validate JwksUri (assert_required)
+	if m.JwksUri == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field JwksUri is required")
 	}
 
 	// Validate ResponseTypesSupported (assert_max_items: 32)

@@ -12,7 +12,7 @@ import (
 	"fmt"
 
 	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/servicemanager"
-	service_health_state_backend "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/wrappers/backends/services/service_health_state"
+	service_health_state_backend "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/sm/internal/backend_clients/services/service_health_state"
 )
 
 // Backends provides typed access to per-service backend clients in the services group.

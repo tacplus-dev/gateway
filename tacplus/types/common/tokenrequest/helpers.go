@@ -234,6 +234,11 @@ func ValidateTokenRequest(m *TokenRequest) error {
 		return nil
 	}
 
+	// Validate InputToken (assert_required)
+	if m.InputToken == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field InputToken is required")
+	}
+
 	// Validate InputToken (assert_min_length: 1)
 	if len(m.InputToken) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field InputToken must be at least 1 characters, got: %d", len(m.InputToken))
@@ -242,11 +247,6 @@ func ValidateTokenRequest(m *TokenRequest) error {
 	// Validate InputToken (assert_max_size: 65536 bytes)
 	if len(m.InputToken) > 65536 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field InputToken exceeds max size of 65536 bytes, got: %d", len(m.InputToken))
-	}
-
-	// Validate InputToken (assert_required)
-	if m.InputToken == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field InputToken is required")
 	}
 
 	// Validate Aud (assert_required)

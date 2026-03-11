@@ -34183,14 +34183,14 @@ func ValidateBootstrapConfig(m *BootstrapConfig) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Listener is required")
 	}
 
-	// Validate Members (assert_required)
-	if len(m.Members) == 0 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Members is required")
-	}
-
 	// Validate Members (assert_max_items: 32)
 	if len(m.Members) > 32 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Members exceeds max items of 32, got: %d", len(m.Members))
+	}
+
+	// Validate Members (assert_required)
+	if len(m.Members) == 0 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Members is required")
 	}
 
 	// Validate NodeCount (assert_gt: 0)
@@ -43760,8 +43760,8 @@ func ConfigLlmTypeDescriptor() string {
                         "type": "string",
                         "description": "entry_point specifies the main package/decision point for policy evaluation.",
                         "constraints": [
-                          "minimum length: 1",
-                          "maximum length: 256"
+                          "maximum length: 256",
+                          "minimum length: 1"
                         ]
                       },
                       {
@@ -43814,8 +43814,8 @@ func ConfigLlmTypeDescriptor() string {
                                     "type": "uint32",
                                     "description": "other permission bits (0-7)",
                                     "constraints": [
-                                      "must be \u003e= 0",
-                                      "must be \u003c= 7"
+                                      "must be \u003c= 7",
+                                      "must be \u003e= 0"
                                     ]
                                   }
                                 ]

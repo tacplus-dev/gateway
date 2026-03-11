@@ -936,8 +936,8 @@ func HttpClientConfigLlmTypeDescriptor() string {
             "type": "int32",
             "description": "MaxRetries is the maximum number of retry attempts after the initial request.\n A value of 0 means no retries (only the initial request is made).\n Default: 3",
             "constraints": [
-              "must be \u003c= 10",
-              "must be \u003e= 0"
+              "must be \u003e= 0",
+              "must be \u003c= 10"
             ]
           },
           {

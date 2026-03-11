@@ -8775,14 +8775,14 @@ func ValidateConfig(m *Config) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshTokenLifetimeSeconds must be positive (> 0), got: %d", m.RefreshTokenLifetimeSeconds)
 	}
 
-	// Validate KeyLifetimeSeconds (assert_duration: POSITIVE)
-	if m.KeyLifetimeSeconds <= 0 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field KeyLifetimeSeconds must be positive (> 0), got: %d", m.KeyLifetimeSeconds)
-	}
-
 	// Validate KeyLifetimeSeconds (assert_duration_min: 3600)
 	if m.KeyLifetimeSeconds < 3600 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field KeyLifetimeSeconds must be >= 3600, got: %d", m.KeyLifetimeSeconds)
+	}
+
+	// Validate KeyLifetimeSeconds (assert_duration: POSITIVE)
+	if m.KeyLifetimeSeconds <= 0 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field KeyLifetimeSeconds must be positive (> 0), got: %d", m.KeyLifetimeSeconds)
 	}
 
 	// Validate NonceExpireSeconds (assert_duration: POSITIVE)
@@ -9186,14 +9186,14 @@ func ValidateCallbackResponse(m *CallbackResponse) error {
 		return protoerrors.NewErrMissingInvalidData(nil, "field RefreshToken must be at least 1 characters, got: %d", len(m.RefreshToken))
 	}
 
-	// Validate AccessToken (assert_required)
-	if m.AccessToken == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
-	}
-
 	// Validate AccessToken (assert_min_length: 1)
 	if len(m.AccessToken) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
+	}
+
+	// Validate AccessToken (assert_required)
+	if m.AccessToken == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
 	}
 
 	// Validate CallbackUrl (assert_url: URL_SCHEME_HTTPS)
@@ -9344,14 +9344,14 @@ func ValidateExchangeTokenResponse(m *ExchangeTokenResponse) error {
 		return nil
 	}
 
-	// Validate AccessToken (assert_required)
-	if m.AccessToken == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
-	}
-
 	// Validate AccessToken (assert_min_length: 1)
 	if len(m.AccessToken) < 1 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken must be at least 1 characters, got: %d", len(m.AccessToken))
+	}
+
+	// Validate AccessToken (assert_required)
+	if m.AccessToken == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field AccessToken is required")
 	}
 
 	// Validate ExpiresIn (assert_gt: 0)
@@ -11846,8 +11846,8 @@ func ConfigLlmTypeDescriptor() string {
             "type": "string",
             "description": "entry_point specifies the main package/decision point for policy evaluation.",
             "constraints": [
-              "minimum length: 1",
-              "maximum length: 256"
+              "maximum length: 256",
+              "minimum length: 1"
             ]
           },
           {
@@ -11882,8 +11882,8 @@ func ConfigLlmTypeDescriptor() string {
                         "type": "uint32",
                         "description": "owner permission bits (0-7)",
                         "constraints": [
-                          "must be \u003e= 0",
-                          "must be \u003c= 7"
+                          "must be \u003c= 7",
+                          "must be \u003e= 0"
                         ]
                       },
                       {
@@ -11891,8 +11891,8 @@ func ConfigLlmTypeDescriptor() string {
                         "type": "uint32",
                         "description": "group permission bits (0-7)",
                         "constraints": [
-                          "must be \u003c= 7",
-                          "must be \u003e= 0"
+                          "must be \u003e= 0",
+                          "must be \u003c= 7"
                         ]
                       },
                       {
@@ -11962,8 +11962,8 @@ func ConfigLlmTypeDescriptor() string {
             "type": "string",
             "description": "version is an optional version string for this policy (e.g., \"1.0.0\").",
             "constraints": [
-              "must be a valid semantic version",
-              "maximum length: 64"
+              "maximum length: 64",
+              "must be a valid semantic version"
             ]
           }
         ]

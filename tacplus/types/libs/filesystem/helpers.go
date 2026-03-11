@@ -608,13 +608,13 @@ func ValidatePermission(m *Permission) error {
 		return nil
 	}
 
-	// Validate Owner (assert_le: 7)
-	if m.Owner > 7 {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Owner must be <= 7, got: %v", m.Owner)
-	}
 	// Validate Owner (assert_ge: 0)
 	if m.Owner < 0 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Owner must be >= 0, got: %v", m.Owner)
+	}
+	// Validate Owner (assert_le: 7)
+	if m.Owner > 7 {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Owner must be <= 7, got: %v", m.Owner)
 	}
 	// Validate Group (assert_ge: 0)
 	if m.Group < 0 {
@@ -642,14 +642,14 @@ func ValidateFile(m *File) error {
 		return nil
 	}
 
-	// Validate Name (assert_required)
-	if m.Name == "" {
-		return protoerrors.NewErrMissingInvalidData(nil, "field Name is required")
-	}
-
 	// Validate Name (assert_max_length: 255)
 	if len(m.Name) > 255 {
 		return protoerrors.NewErrMissingInvalidData(nil, "field Name must be at most 255 characters, got: %d", len(m.Name))
+	}
+
+	// Validate Name (assert_required)
+	if m.Name == "" {
+		return protoerrors.NewErrMissingInvalidData(nil, "field Name is required")
 	}
 
 	// Validate Content (assert_max_size: 10485760 bytes)

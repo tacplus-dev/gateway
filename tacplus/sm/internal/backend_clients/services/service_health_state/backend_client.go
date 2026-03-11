@@ -54,8 +54,6 @@ func NewBackend(ctx context.Context, sc *servicemanager.ServiceManager,
 
 	// Start per-boundary server-streaming Watch connections (skipped for uncached boundaries)
 
-	// Start leader election watch streams and auto-elect for leader-enabled boundaries
-
 	return c, nil
 }
 

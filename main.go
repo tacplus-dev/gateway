@@ -19,12 +19,11 @@ import (
 	gw "gitlab.com/secondstarcavalier/controlplane/services/gateway/internal"
 	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/logger"
 	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/serviceconfig"
-	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/servicemanager"
+	sm "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/sm"
 	x509wrapper "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/x509"
 	serviceconfig_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/serviceconfig"
 	gateway_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/gateway"
 	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/routes"
-	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/wrappers/backends"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
@@ -41,11 +40,6 @@ func main() {
 
 func run() error {
 	// 1. Load serviceconfig via generated loaders (-c/--config flag or BOOTSTRAP_CONFIG env var).
-	bsCfg, err := serviceconfig.LoadBootstrapConfig()
-	if err != nil {
-		return fmt.Errorf("bootstrap config: %w", err)
-	}
-
 	cfg, _ := serviceconfig.LoadLocalConfig()
 	if cfg == nil {
 		cfg = &serviceconfig_pb.Config{}
@@ -55,6 +49,7 @@ func run() error {
 	configData, _ := readConfigFile()
 	gatewayCfg := &gateway_pb.Config{}
 	if configData != nil {
+		var err error
 		gatewayCfg, err = gateway_pb.ConfigFromBytes(configData)
 		if err != nil {
 			return fmt.Errorf("gateway config: %w", err)
@@ -73,32 +68,25 @@ func run() error {
 	}
 
 	// 3. Connect to kernel via ServiceManager.
-	sc, err := servicemanager.NewServiceManager(ctx, bsCfg)
+	svcMgr, err := sm.New()
 	if err != nil {
 		return fmt.Errorf("servicemanager: %w", err)
 	}
-	defer sc.Close()
+	defer svcMgr.Close()
 
-	// 4. Create backend clients.
-	bc, err := backends.NewBackends(ctx, sc)
-	if err != nil {
-		return fmt.Errorf("backends: %w", err)
-	}
-	defer bc.Close()
-
-	// 5. Start HealthWatcher (watches ServiceHealthState.instances).
-	healthBackend := bc.Services().ServiceHealthState()
+	// 4. Start HealthWatcher (watches ServiceHealthState.instances).
+	healthBackend := svcMgr.BackendClients().Services().ServiceHealthState()
 	hw, err := gw.NewHealthWatcher(ctx, healthBackend.BackendStub())
 	if err != nil {
 		return fmt.Errorf("health watcher: %w", err)
 	}
 
-	// 6. Create health-aware gRPC resolver.
+	// 5. Create health-aware gRPC resolver.
 	resolver := gw.NewHealthResolver(hw)
 
-	// 7. Create gateway token pre-validator (signature + expiry only).
+	// 6. Create gateway token pre-validator (signature + expiry only).
 	// Uses the same JWK view watch stream as backend frontendserver authorizers.
-	gatewayAuth := gw.NewGatewayAuth(ctx, sc.Conn())
+	gatewayAuth := gw.NewGatewayAuth(ctx, svcMgr.Conn())
 
 	// 8. Create grpc-gateway mux for REST→gRPC transcoding (from generated routes).
 	gwMux, err := gw.NewGateway(ctx, routes.GatewayRoutes)
