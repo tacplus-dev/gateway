@@ -32,6 +32,9 @@ import (
 //go:embed dist
 var webFS embed.FS
 
+//go:embed tacplus/registry.json tacplus/registry.schema.json tacplus/AGENT.md
+var registryFS embed.FS
+
 func main() {
 	if err := run(); err != nil {
 		log.Fatalf("gateway: %v", err)
@@ -263,13 +266,19 @@ func readConfigFile() ([]byte, error) {
 
 // buildHandler returns an HTTP handler that routes:
 //   - /api/* → grpc-gateway mux (REST API)
-//   - everything else → embedded SPA (with fallback to index.html for client-side routing)
+//   - /registry/* → embedded registry files (always from embed, independent of WEB_ROOT)
+//   - everything else → SPA (with fallback to index.html for client-side routing)
 func buildHandler(gwMux http.Handler, webContent fs.FS) http.Handler {
 	fileServer := http.FileServer(http.FS(webContent))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			gwMux.ServeHTTP(w, r)
+			return
+		}
+
+		if strings.HasPrefix(r.URL.Path, "/registry/") {
+			serveRegistryFile(w, r)
 			return
 		}
 
@@ -284,5 +293,33 @@ func buildHandler(gwMux http.Handler, webContent fs.FS) http.Handler {
 		}
 		fileServer.ServeHTTP(w, r)
 	})
+}
+
+// serveRegistryFile serves embedded registry files independently of WEB_ROOT.
+// Files are always served from the compiled-in registryFS embed.
+func serveRegistryFile(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimPrefix(r.URL.Path, "/registry/")
+
+	allowed := map[string]string{
+		"registry.json":        "application/json",
+		"registry.schema.json": "application/json",
+		"AGENT.md":             "text/markdown; charset=utf-8",
+	}
+
+	contentType, ok := allowed[name]
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	data, err := fs.ReadFile(registryFS, "tacplus/"+name)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.Write(data)
 }
 
