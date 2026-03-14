@@ -245,7 +245,7 @@ func run() error {
 
 // hostAddr resolves a host.Host listener address with a fallback.
 // If the listener has a port set, it wins. Otherwise falls back to the
-// serviceconfig listen_address. If neither is set, uses DEFAULT_PORT.
+// serviceconfig listen_address. If neither is set, uses default 8443.
 func hostAddr(h *host_pb.Host, fallback *host_pb.Host) string {
 	if h != nil && h.Port != 0 {
 		return fmt.Sprintf("%s:%d", h.Host, h.Port)
@@ -253,7 +253,7 @@ func hostAddr(h *host_pb.Host, fallback *host_pb.Host) string {
 	if fallback != nil {
 		return fmt.Sprintf("%s:%d", fallback.Host, fallback.Port)
 	}
-	return fmt.Sprintf(":%d", gateway_pb.DefaultPort)
+	return ":8443"
 }
 
 // readConfigFile reads the config file from -c/--config flag or BOOTSTRAP_CONFIG env var.
