@@ -21,6 +21,7 @@ import (
 	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/serviceconfig"
 	sm "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/sm"
 	x509wrapper "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/libs/x509"
+	host_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/host"
 	serviceconfig_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/libs/serviceconfig"
 	gateway_pb "gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/types/services/gateway"
 	"gitlab.com/secondstarcavalier/controlplane/services/gateway/tacplus/routes"
@@ -126,12 +127,8 @@ func run() error {
 	}
 
 	// 12. Resolve listen addresses.
-	host := ""
-	if la := cfg.GetListenAddress(); la != nil {
-		host = la.Host
-	}
-	tcpAddr := fmt.Sprintf("%s:%d", host, gatewayCfg.GetTcpPort())
-	udpAddr := fmt.Sprintf("%s:%d", host, gatewayCfg.GetUdpPort())
+	tcpAddr := hostAddr(gatewayCfg.GetTcpListener(), cfg.GetListenAddress())
+	udpAddr := hostAddr(gatewayCfg.GetQuicListener(), cfg.GetListenAddress())
 
 	enableHTTP := gatewayCfg.GetEnableHttp()
 	enableHTTP3 := gatewayCfg.GetEnableHttp3()
@@ -244,6 +241,19 @@ func run() error {
 	})
 
 	return g.Wait()
+}
+
+// hostAddr resolves a host.Host listener address with a fallback.
+// If the listener has a port set, it wins. Otherwise falls back to the
+// serviceconfig listen_address. If neither is set, uses DEFAULT_PORT.
+func hostAddr(h *host_pb.Host, fallback *host_pb.Host) string {
+	if h != nil && h.Port != 0 {
+		return fmt.Sprintf("%s:%d", h.Host, h.Port)
+	}
+	if fallback != nil {
+		return fmt.Sprintf("%s:%d", fallback.Host, fallback.Port)
+	}
+	return fmt.Sprintf(":%d", gateway_pb.DefaultPort)
 }
 
 // readConfigFile reads the config file from -c/--config flag or BOOTSTRAP_CONFIG env var.
