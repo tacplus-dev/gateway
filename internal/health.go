@@ -21,7 +21,7 @@ type HealthWatcher struct {
 
 // NewHealthWatcher creates a HealthWatcher and starts watching the
 // ServiceHealthState instances collection via the WatchInstances stream.
-func NewHealthWatcher(ctx context.Context, stub kernel_pb.ServiceHealthStateBackendServiceClient) (*HealthWatcher, error) {
+func NewHealthWatcher(ctx context.Context, stub kernel_pb.ServiceHealthStateStateServiceClient) (*HealthWatcher, error) {
 	hw := &HealthWatcher{
 		services: make(map[string][]*healthreport_pb.ServiceInstanceHealth),
 	}
@@ -78,7 +78,7 @@ func matchLabels(inst *healthreport_pb.ServiceInstanceHealth, required map[strin
 }
 
 // receiveLoop reads from the WatchInstances stream and rebuilds the services map.
-func (hw *HealthWatcher) receiveLoop(stream kernel_pb.ServiceHealthStateBackendService_WatchInstancesClient) {
+func (hw *HealthWatcher) receiveLoop(stream kernel_pb.ServiceHealthStateStateService_WatchInstancesClient) {
 	zap.L().Info("WatchInstances receive loop started")
 	for {
 		msg, err := stream.Recv()

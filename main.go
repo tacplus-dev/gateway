@@ -80,8 +80,8 @@ func run() error {
 	defer svcMgr.Close()
 
 	// 4. Start HealthWatcher (watches ServiceHealthState.instances).
-	healthBackend := svcMgr.BackendClients().Services().ServiceHealthState()
-	hw, err := gw.NewHealthWatcher(ctx, healthBackend.BackendStub())
+	healthBackend := svcMgr.StateClients().Services().ServiceHealthState()
+	hw, err := gw.NewHealthWatcher(ctx, healthBackend.StateStub())
 	if err != nil {
 		return fmt.Errorf("health watcher: %w", err)
 	}
