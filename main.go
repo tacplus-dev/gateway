@@ -28,6 +28,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 //go:embed dist
@@ -84,7 +85,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("health watcher: %w", err)
 	}
-	_ = hw // retained for future use (health UI endpoint)
+	_ = gw.NewHealthResolver(hw) // register health:/// resolver for service routing
 
 	// 5. Create gateway token pre-validator (signature + expiry only).
 	// Uses the same JWK view watch stream as backend frontendserver authorizers.
@@ -97,9 +98,25 @@ func run() error {
 	}
 
 	// 7. Create gRPC server with typed passthrough handlers for all frontend services.
-	// Each handler: Authorize (entitlement check) → forward via typed frontend client.
+	// Each handler: Authorize → validate types → forward via per-service connection.
+	// Uses the health resolver to route to the correct service (identity, sentinel, etc.).
 	grpcServer := grpc.NewServer()
-	svcMgr.RegisterPassthrough(grpcServer)
+	dialService := func(serviceID string) (grpc.ClientConnInterface, error) {
+		target := fmt.Sprintf("%s:///%s", gw.ResolverScheme, serviceID)
+		zap.L().Info("Passthrough dialing service", zap.String("service", serviceID), zap.String("target", target))
+		return grpc.NewClient(target,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`),
+		)
+	}
+	// Gateway auth: validate token signature + expiry only (no audience check).
+	// The target service's own authorizer will check audience and entitlements.
+	passthroughAuth := func(ctx context.Context, fullMethod string, _ any) error {
+		return gatewayAuth.ValidateToken(ctx, fullMethod)
+	}
+	if err := svcMgr.RegisterPassthrough(grpcServer, dialService, passthroughAuth); err != nil {
+		return fmt.Errorf("passthrough: %w", err)
+	}
 
 	// 10. Build combined HTTP handler: /api/* → gateway, everything else → SPA.
 	var webContent fs.FS

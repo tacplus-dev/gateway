@@ -22,7 +22,7 @@ func NewGateway(ctx context.Context, gwRoutes []routes.Route) (*runtime.ServeMux
 	}
 
 	for _, route := range gwRoutes {
-		target := fmt.Sprintf("%s:///%s", resolverScheme, route.ServiceID)
+		target := fmt.Sprintf("%s:///%s", ResolverScheme, route.ServiceID)
 		if err := route.RegisterFunc(ctx, mux, target, dialOpts); err != nil {
 			return nil, fmt.Errorf("register gateway handler for %s: %w", route.ServiceID, err)
 		}

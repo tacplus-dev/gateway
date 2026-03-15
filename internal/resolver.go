@@ -8,7 +8,8 @@ import (
 	"google.golang.org/grpc/resolver"
 )
 
-const resolverScheme = "health"
+// ResolverScheme is the gRPC resolver scheme used to route to services via health endpoints.
+const ResolverScheme = "health"
 
 // HealthResolver implements grpc/resolver.Builder and integrates with
 // HealthWatcher to push healthy endpoints to gRPC's built-in load balancer.
@@ -73,7 +74,7 @@ func (hr *HealthResolver) Build(target resolver.Target, cc resolver.ClientConn, 
 
 // Scheme implements resolver.Builder.
 func (hr *HealthResolver) Scheme() string {
-	return resolverScheme
+	return ResolverScheme
 }
 
 // pushAll pushes updated addresses to all active resolver instances.

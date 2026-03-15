@@ -42,7 +42,7 @@ func TransparentHandler(hr *HealthResolver, auth *GatewayAuth) grpc.StreamHandle
 			return status.Errorf(codes.Unimplemented, "unknown service: %s", fullMethod)
 		}
 
-		target := fmt.Sprintf("%s:///%s", resolverScheme, serviceID)
+		target := fmt.Sprintf("%s:///%s", ResolverScheme, serviceID)
 		conn, err := grpc.NewClient(target,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`),
