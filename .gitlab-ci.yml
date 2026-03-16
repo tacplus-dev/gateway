@@ -8,7 +8,6 @@ variables:
   GONOSUMCHECK: "gitlab.com/secondstarcavalier/*"
   CGO_ENABLED: "0"
   TACPLUS_IMAGE: "${CI_REGISTRY}/secondstarcavalier/controlplane/services/tacplus/tacplus-1-1:latest"
-  PROTO_REPO: https://gitlab.com/secondstarcavalier/controlplane/services/proto.git
   WEBAPP_PROJECT_ID: "${WEBAPP_PROJECT_ID}"
 
 .parse-version: &parse-version
@@ -59,8 +58,7 @@ build:
   before_script:
     - *setup-netrc
     - GOBIN=/usr/local/bin go install github.com/bufbuild/buf/cmd/buf@latest
-    - git clone --depth 1 "$PROTO_REPO" /tmp/proto
-    - tacplus build --src /tmp/proto
+    - tacplus build --no-container
   script:
     - |
       for target in linux/amd64 linux/arm64; do
