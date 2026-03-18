@@ -14,7 +14,7 @@ use axum::routing::get;
 use axum::Router;
 use tracing_subscriber::EnvFilter;
 
-use gateway_tacplus::sm::ServiceManager;
+use gateway_tacplus::s2sm::ServiceManager;
 
 use crate::config::GatewayConfig;
 use crate::health::TokenProvider;
@@ -53,6 +53,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         Some(root) => tracing::info!(web_root = %root.display(), "SPA: serving from disk (WEB_ROOT)"),
         None => tracing::info!("SPA: serving from embedded assets"),
     }
+
+    // Initialize bootstrap config for SPA — webapp reads window.__CAVALIER__ for gateway URL.
+    // Empty string = same origin (webapp is served by the gateway itself).
+    spa::init_bootstrap("");
 
     if !cfg.enable_http && !cfg.enable_http3 && !cfg.enable_grpc {
         return Err("at least one of enable_http, enable_http3, or enable_grpc must be true".into());
@@ -106,7 +110,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     #[allow(deprecated)]
     let grpc_router = {
         let server = tonic::transport::Server::builder();
-        let tonic_router = gateway_tacplus::sm::internal::passthrough::passthrough::register_all(
+        let tonic_router = gateway_tacplus::s2sm::internal::passthrough::passthrough::register_all(
             server,
             |service_id| resolver_for_dial.dial(service_id),
             auth_fn,

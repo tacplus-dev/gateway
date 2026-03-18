@@ -6,6 +6,41 @@ use axum::response::{IntoResponse, Response};
 
 use crate::registry::Registry;
 
+/// Bootstrap config injected into index.html as `window.__CAVALIER__`.
+/// Web clients (w2sm) read this to discover the gateway URL for gRPC-over-REST.
+static BOOTSTRAP_SCRIPT: OnceLock<String> = OnceLock::new();
+
+/// Initialize the bootstrap config script tag. Call once at startup.
+pub fn init_bootstrap(gateway_url: &str) {
+    let json = serde_json::json!({
+        "gatewayUrl": gateway_url,
+    });
+    let script = format!(
+        "<script>window.__CAVALIER__={}</script>",
+        serde_json::to_string(&json).unwrap()
+    );
+    BOOTSTRAP_SCRIPT.set(script).ok();
+}
+
+/// Inject bootstrap config into HTML by inserting before </head>.
+fn inject_bootstrap(html: &[u8]) -> Vec<u8> {
+    let script = match BOOTSTRAP_SCRIPT.get() {
+        Some(s) => s,
+        None => return html.to_vec(),
+    };
+    let html_str = String::from_utf8_lossy(html);
+    match html_str.find("</head>") {
+        Some(pos) => {
+            let mut out = String::with_capacity(html_str.len() + script.len());
+            out.push_str(&html_str[..pos]);
+            out.push_str(script);
+            out.push_str(&html_str[pos..]);
+            out.into_bytes()
+        }
+        None => html.to_vec(),
+    }
+}
+
 /// Embedded web assets from dist/ directory.
 /// In development, this may be empty — SPA will return a placeholder.
 #[derive(rust_embed::Embed)]
@@ -49,7 +84,7 @@ async fn serve_from_disk(root: &PathBuf, path: &str) -> Response {
             .into_response();
     }
 
-    // SPA fallback: serve index.html
+    // SPA fallback: serve index.html with injected bootstrap config
     let index_path = root.join("index.html");
     if let Ok(data) = tokio::fs::read(&index_path).await {
         return (
@@ -58,7 +93,7 @@ async fn serve_from_disk(root: &PathBuf, path: &str) -> Response {
                 (header::CONTENT_TYPE, "text/html; charset=utf-8".to_string()),
                 (header::CACHE_CONTROL, "no-cache".to_string()),
             ],
-            data,
+            inject_bootstrap(&data),
         )
             .into_response();
     }
@@ -81,12 +116,12 @@ fn serve_from_embedded(path: &str) -> Response {
             .into_response();
     }
 
-    // SPA fallback: serve index.html for all unmatched routes
+    // SPA fallback: serve index.html for all unmatched routes, with bootstrap config
     if let Some(index) = WebAssets::get("index.html") {
         return (
             StatusCode::OK,
             [(header::CONTENT_TYPE, "text/html; charset=utf-8".to_string())],
-            index.data.to_vec(),
+            inject_bootstrap(&index.data),
         )
             .into_response();
     }

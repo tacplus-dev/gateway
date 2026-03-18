@@ -8,5 +8,5 @@ RUN cargo build --release
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates netcat-openbsd && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /build/target/release/gateway /app/gateway
-ENTRYPOINT ["/app/gateway"]
+COPY --from=builder /build/target/release/gateway /usr/bin/gateway
+ENTRYPOINT ["gateway"]
