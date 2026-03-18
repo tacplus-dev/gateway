@@ -1,14 +1,12 @@
-FROM alpine:3.21
+FROM rust:1.88-bookworm AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    protobuf-compiler libprotobuf-dev \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+COPY . .
+RUN cargo build --release
 
-RUN apk add --no-cache ca-certificates tzdata && \
-    addgroup -S gateway && adduser -S gateway -G gateway
-
-WORKDIR /app
-
-ARG TARGETARCH
-COPY bin/gateway-${TARGETARCH} /app/gateway
-COPY dist/ /app/dist/
-
-USER gateway
-
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates netcat-openbsd && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /build/target/release/gateway /app/gateway
 ENTRYPOINT ["/app/gateway"]

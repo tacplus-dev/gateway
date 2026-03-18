@@ -1,8 +1,5 @@
-language: go
-pkg: gitlab.com/secondstarcavalier/controlplane/services/gateway
+language: rust
+pkg: gateway
 all-grpc: true
-backends:
-  - services/kernel.ServiceHealthState:ro
-post-gen:
-  - cmd: go
-    args: ["run", "./bufgen"]
+states:
+  - services/kernel.ServiceHealth:ro
