@@ -1,6 +1,8 @@
 mod auth;
 mod config;
+mod grpc_dispatch;
 mod health;
+mod mint;
 mod registry;
 mod resolver;
 mod rest;
@@ -11,7 +13,6 @@ use std::sync::Arc;
 
 use axum::http::StatusCode;
 use axum::routing::get;
-use axum::Router;
 use tracing_subscriber::EnvFilter;
 
 use gateway_tacplus::s2sm::ServiceManager;
@@ -103,7 +104,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         token_provider,
     ));
 
-    // 7. Build gRPC passthrough router using generated register_all().
+    // 7. Build gateway MintService (local OIDC/JWKS, delegates TokenMint/X509Mint to kernel).
+    let mint_service = mint::GatewayMintService::new(
+        kernel_channel.clone(),
+        Arc::clone(&gateway_auth),
+        String::new(), // issuer URL — empty = same origin
+    );
+
+    // 8. Build gRPC router: passthrough services + gateway MintService.
     let resolver_for_dial = Arc::clone(&resolver);
     let auth_fn = gateway_auth.auth_fn();
 
@@ -115,14 +123,18 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             |service_id| resolver_for_dial.dial(service_id),
             auth_fn,
         );
+        // Register gateway's MintService alongside passthrough services.
+        use gateway_tacplus::types::services::gateway::gateway::mint_service_server::MintServiceServer;
+        let tonic_router = tonic_router.add_service(MintServiceServer::new(mint_service));
         tonic_router.into_router()
     };
 
-    // 8. Build HTTP router.
+    // 9. Build HTTP router.
     let rest_state = Arc::new(rest::AppState {
         resolver: Arc::clone(&resolver),
         auth: Arc::clone(&gateway_auth),
         registry: Arc::clone(&registry),
+        kernel_channel: kernel_channel.clone(),
     });
 
     // Layer the routers: gRPC routes first, then HTTP routes, then REST + SPA fallback.
@@ -138,11 +150,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Everything else falls through to the REST/SPA layer.
     let app = grpc_router.fallback_service(spa_and_rest);
 
-    // 9. Build TLS config.
+    // 10. Build TLS config.
     let tls_config = tls::build_server_config(&cfg)?;
     let tls_acceptor = axum_server::tls_rustls::RustlsConfig::from_config(Arc::new(tls_config));
 
-    // 10. Start TLS listener — serves both HTTP and gRPC on the same port.
+    // 11. Start TLS listener — serves both HTTP and gRPC on the same port.
     let tcp_addr = cfg.tcp_listener;
     tracing::info!(addr = %tcp_addr, "listening (TLS, HTTP+gRPC)");
 

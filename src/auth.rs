@@ -29,9 +29,11 @@ pub struct GatewayClaims {
 
 /// Gateway token pre-validator.
 /// Watches JWK verifying keys from kernel and validates JWT signature + expiry.
+/// Also stores raw JWK protos for the JWKS endpoint.
 #[derive(Clone)]
 pub struct GatewayAuth {
     keys: Arc<RwLock<Vec<DecodingKey>>>,
+    raw_jwks: Arc<RwLock<Vec<Jwk>>>,
     registry: Arc<Registry>,
 }
 
@@ -41,6 +43,7 @@ impl GatewayAuth {
     pub fn new(channel: Channel, registry: Arc<Registry>, token_provider: TokenProvider) -> Self {
         let auth = Self {
             keys: Arc::new(RwLock::new(Vec::new())),
+            raw_jwks: Arc::new(RwLock::new(Vec::new())),
             registry,
         };
 
@@ -177,11 +180,13 @@ impl GatewayAuth {
 
     fn process_jwk_entries(&self, entries_response: &VerifyingKeysEntriesResponse) {
         let mut new_keys = Vec::new();
+        let mut new_raw = Vec::new();
 
         for (kid, jwk) in &entries_response.entries {
             match jwk_to_decoding_key(jwk) {
                 Ok(key) => {
                     new_keys.push(key);
+                    new_raw.push(jwk.clone());
                 }
                 Err(e) => {
                     tracing::warn!(kid = %kid, error = %e, "skipping invalid JWK");
@@ -190,10 +195,15 @@ impl GatewayAuth {
         }
 
         let count = new_keys.len();
-        let mut keys = self.keys.write().unwrap();
-        *keys = new_keys;
+        *self.keys.write().unwrap() = new_keys;
+        *self.raw_jwks.write().unwrap() = new_raw;
 
         tracing::info!(count, "JWK keys updated");
+    }
+
+    /// Returns a clone of the raw JWK protos for the JWKS endpoint.
+    pub fn get_raw_jwks(&self) -> Vec<Jwk> {
+        self.raw_jwks.read().unwrap().clone()
     }
 }
 

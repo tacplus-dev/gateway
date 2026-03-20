@@ -19,17 +19,6 @@ impl Resolver {
         }
     }
 
-    /// Resolve a single healthy backend address for the given service.
-    /// Uses round-robin across healthy instances.
-    pub fn resolve_addr(&self, service_id: &str) -> Option<String> {
-        let endpoints = self.health.get_endpoints(service_id);
-        if endpoints.is_empty() {
-            return None;
-        }
-        let idx = self.counter.fetch_add(1, Ordering::Relaxed) % endpoints.len();
-        Some(endpoints[idx].clone())
-    }
-
     /// Create a tonic Channel to the given service_id.
     /// Connects to a healthy backend endpoint via the health resolver.
     pub fn dial(&self, service_id: &str) -> Channel {

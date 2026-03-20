@@ -4,7 +4,7 @@ registry := "registry.gitlab.com/secondstarcavalier/controlplane/services/gatewa
 
 default: binary container
 
-generate:
+binary:
   #!/usr/bin/env bash
   set -euo pipefail
   if [ -d "../proto" ]; then
@@ -12,11 +12,9 @@ generate:
   else
     tacplus build
   fi
-
-binary: generate
   cargo build --release
 
-container: generate
+container: binary
   #!/usr/bin/env bash
   set -euo pipefail
   tag=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')

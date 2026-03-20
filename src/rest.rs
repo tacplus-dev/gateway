@@ -6,8 +6,12 @@ use axum::http::{HeaderMap, Request, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::any;
 use axum::Router;
+use tonic::transport::Channel;
+
+use gateway_tacplus::types::libs::jwk::jwk::{Jwks, OpenIdConfiguration};
 
 use crate::auth::GatewayAuth;
+use crate::grpc_dispatch;
 use crate::registry::Registry;
 use crate::resolver::Resolver;
 
@@ -16,6 +20,7 @@ pub struct AppState {
     pub resolver: Arc<Resolver>,
     pub auth: Arc<GatewayAuth>,
     pub registry: Arc<Registry>,
+    pub kernel_channel: Channel,
 }
 
 /// Build the REST router.
@@ -28,14 +33,13 @@ pub fn router(state: Arc<AppState>) -> Router {
 
 /// Registry-driven REST handler.
 /// Looks up the request path in the registry route table, authenticates,
-/// resolves the backend, and forwards the request.
+/// resolves the backend, and dispatches the request as a gRPC call.
 async fn rest_handler(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     request: Request<Body>,
 ) -> Response {
     let path = request.uri().path().to_string();
-    let query = request.uri().query().map(|q| q.to_string());
     let req_method = request.method().clone();
 
     // Look up route in registry
@@ -74,59 +78,48 @@ async fn rest_handler(
         }
     }
 
-    // Resolve backend
-    let backend = match state.resolver.resolve_addr(&route.service_id) {
-        Some(addr) => addr,
-        None => {
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                format!(
-                    "{{\"error\":\"no healthy backend for service: {}\"}}",
-                    route.service_id
-                ),
-            )
-                .into_response();
-        }
+    // Handle gateway-local OIDC/JWKS endpoints directly (no backend needed).
+    if route.grpc_path == "/gateway.MintService/OpenIdConfig" {
+        let host = headers
+            .get("host")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("localhost");
+        let base = format!("https://{}", host);
+        let config = OpenIdConfiguration {
+            issuer: base.clone(),
+            jwks_uri: format!("{}/api/v1/.well-known/jwks.json", base),
+            token_endpoint: format!("{}/api/v1/Mint/TokenMint", base),
+            subject_types_supported: vec!["public".to_string()],
+            id_token_signing_alg_values_supported: vec!["EdDSA".to_string()],
+            response_types_supported: vec!["token".to_string()],
+            grant_types_supported: vec![
+                "urn:ietf:params:oauth:grant-type:token-exchange".to_string(),
+            ],
+            ..Default::default()
+        };
+        return json_response(&config);
+    }
+    if route.grpc_path == "/gateway.MintService/Jwks" {
+        let jwks = Jwks {
+            keys: state.auth.get_raw_jwks(),
+        };
+        return json_response(&jwks);
+    }
+
+    // Resolve a gRPC channel to the backend service.
+    // Gateway-local routes (TokenMint, X509Mint) use the direct kernel channel.
+    let channel = if route.service_id == "gateway" {
+        state.kernel_channel.clone()
+    } else {
+        state.resolver.dial(&route.service_id)
     };
 
-    // Build target URL — forward to backend using the same http_path
-    let target_url = if let Some(ref q) = query {
-        format!("http://{}{}?{}", backend, path, q)
+    // Read request body (empty for GET)
+    let body_bytes = if req_method == axum::http::Method::GET {
+        Vec::new()
     } else {
-        format!("http://{}{}", backend, path)
-    };
-
-    let client = reqwest::Client::new();
-
-    if req_method == axum::http::Method::GET {
-        // GET: no body, forward query params
-        let mut req_builder = client.get(&target_url);
-        for (name, value) in headers.iter() {
-            if let Ok(v) = value.to_str() {
-                match name.as_str() {
-                    "authorization" | "accept" | "x-request-id" => {
-                        req_builder = req_builder.header(name.as_str(), v);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        forward_response(req_builder.send().await).await
-    } else {
-        // POST: forward body
-        let mut req_builder = client.post(&target_url);
-        for (name, value) in headers.iter() {
-            if let Ok(v) = value.to_str() {
-                match name.as_str() {
-                    "authorization" | "content-type" | "accept" | "x-request-id" => {
-                        req_builder = req_builder.header(name.as_str(), v);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        let body_bytes = match axum::body::to_bytes(request.into_body(), 10 * 1024 * 1024).await {
-            Ok(b) => b,
+        match axum::body::to_bytes(request.into_body(), 10 * 1024 * 1024).await {
+            Ok(b) => b.to_vec(),
             Err(e) => {
                 return (
                     StatusCode::BAD_REQUEST,
@@ -134,42 +127,33 @@ async fn rest_handler(
                 )
                     .into_response();
             }
-        };
-        req_builder = req_builder.body(body_bytes.to_vec());
-        forward_response(req_builder.send().await).await
+        }
+    };
+
+    // Dispatch REST→gRPC
+    match grpc_dispatch::dispatch(&route.grpc_path, &body_bytes, channel).await {
+        Ok(json) => (
+            StatusCode::OK,
+            [(axum::http::header::CONTENT_TYPE, "application/json".to_string())],
+            json,
+        )
+            .into_response(),
+        Err((status, body)) => (status, body).into_response(),
     }
 }
 
-/// Forward a backend response back to the client.
-async fn forward_response(result: Result<reqwest::Response, reqwest::Error>) -> Response {
-    match result {
-        Ok(resp) => {
-            let status = StatusCode::from_u16(resp.status().as_u16())
-                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-            let content_type = resp
-                .headers()
-                .get("content-type")
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("application/json")
-                .to_string();
-
-            match resp.bytes().await {
-                Ok(body) => (
-                    status,
-                    [(axum::http::header::CONTENT_TYPE, content_type)],
-                    body.to_vec(),
-                )
-                    .into_response(),
-                Err(e) => (
-                    StatusCode::BAD_GATEWAY,
-                    format!("{{\"error\":\"failed to read backend response: {}\"}}", e),
-                )
-                    .into_response(),
-            }
-        }
+/// Serialize a value to a JSON response.
+fn json_response<T: serde::Serialize>(value: &T) -> Response {
+    match serde_json::to_string(value) {
+        Ok(json) => (
+            StatusCode::OK,
+            [(axum::http::header::CONTENT_TYPE, "application/json".to_string())],
+            json,
+        )
+            .into_response(),
         Err(e) => (
-            StatusCode::BAD_GATEWAY,
-            format!("{{\"error\":\"backend request failed: {}\"}}", e),
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("{{\"error\":\"failed to serialize response: {}\"}}", e),
         )
             .into_response(),
     }

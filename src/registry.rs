@@ -11,6 +11,7 @@ const AGENT_MD: &str = include_str!("../tacplus/AGENT.md");
 
 /// A single REST route entry derived from registry.json.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RouteEntry {
     /// Service ID for backend resolution (e.g. "identity", "sentinel").
     pub service_id: String,
