@@ -3,3 +3,11 @@ pkg: gateway
 all-grpc: true
 states:
   - services/kernel.ServiceHealth:ro
+  - services/kernel.GatewayTlsState:ro
+post-gen:
+  - cmd: mkdir
+    args: [-p, dist]
+  - cmd: cargo
+    args: [build, --release]
+container:
+  image: registry.gitlab.com/secondstarcavalier/controlplane/services/gateway/gateway

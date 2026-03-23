@@ -10,6 +10,8 @@ use crate::registry::Registry;
 /// Web clients (w2sm) read this to discover the gateway URL for gRPC-over-REST.
 static BOOTSTRAP_SCRIPT: OnceLock<String> = OnceLock::new();
 
+// TODO: Support dynamic gateway URL discovery for load balancer/proxy scenarios.
+
 /// Initialize the bootstrap config script tag. Call once at startup.
 pub fn init_bootstrap(gateway_url: &str) {
     let json = serde_json::json!({

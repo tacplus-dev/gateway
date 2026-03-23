@@ -2,11 +2,10 @@ use std::sync::Arc;
 
 use tonic::transport::Channel;
 
-use gateway_tacplus::types::common::tokenrequest::{TokenMintRequest, X509MintRequest};
+use gateway_tacplus::types::common::tokenrequest::{TokenMintRequest, TokenMintResponse, X509MintRequest};
 use gateway_tacplus::types::libs::jwk::jwk::{Jwks, OpenIdConfiguration};
-use gateway_tacplus::types::libs::token::token::Token;
 use gateway_tacplus::types::libs::x509::x509::X509CertChain;
-use gateway_tacplus::types::services::kernel::kernel::mint_service_client::MintServiceClient;
+use gateway_tacplus::types::services::kernel::kernel::kernel_mint_service_client::KernelMintServiceClient;
 
 use crate::auth::GatewayAuth;
 
@@ -33,8 +32,8 @@ impl GatewayMintService {
         let base = &self.issuer_url;
         OpenIdConfiguration {
             issuer: base.clone(),
-            jwks_uri: format!("{}/api/v1/.well-known/jwks.json", base),
-            token_endpoint: format!("{}/api/v1/Mint/TokenMint", base),
+            jwks_uri: format!("{}{}/.well-known/jwks.json", base, crate::rest_dispatch::REST_ROOT_PATH),
+            token_endpoint: format!("{}{}/Mint/TokenMint", base, crate::rest_dispatch::REST_ROOT_PATH),
             subject_types_supported: vec!["public".to_string()],
             id_token_signing_alg_values_supported: vec!["EdDSA".to_string()],
             response_types_supported: vec!["token".to_string()],
@@ -79,8 +78,8 @@ impl gateway_tacplus::types::services::gateway::gateway::mint_service_server::Mi
     async fn token_mint(
         &self,
         request: tonic::Request<TokenMintRequest>,
-    ) -> Result<tonic::Response<Token>, tonic::Status> {
-        let mut client = MintServiceClient::new(self.kernel_channel.clone());
+    ) -> Result<tonic::Response<TokenMintResponse>, tonic::Status> {
+        let mut client = KernelMintServiceClient::new(self.kernel_channel.clone());
         client.token_mint(request).await
     }
 
@@ -88,7 +87,7 @@ impl gateway_tacplus::types::services::gateway::gateway::mint_service_server::Mi
         &self,
         request: tonic::Request<X509MintRequest>,
     ) -> Result<tonic::Response<X509CertChain>, tonic::Status> {
-        let mut client = MintServiceClient::new(self.kernel_channel.clone());
+        let mut client = KernelMintServiceClient::new(self.kernel_channel.clone());
         client.x509_mint(request).await
     }
 }

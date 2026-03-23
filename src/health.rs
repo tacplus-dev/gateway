@@ -1,16 +1,17 @@
 use std::collections::HashMap;
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::{Arc, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
 
+use tokio::sync::Notify;
 use tokio_stream::StreamExt;
 use tonic::transport::Channel;
 
 use gateway_tacplus::types::services::kernel::kernel::service_health_state_service_client::ServiceHealthStateServiceClient;
 use gateway_tacplus::types::services::kernel::kernel::InstancesEntriesResponse;
 
-/// Token provider: returns a bearer token string.
-pub type TokenProvider = Arc<dyn Fn() -> Pin<Box<dyn Future<Output = Option<String>> + Send>> + Send + Sync>;
+/// Token provider: returns a bearer token or an error.
+/// Re-exported from the generated ServiceManager.
+pub use gateway_tacplus::s2sm::TokenProvider;
 
 /// A healthy service instance endpoint.
 #[derive(Debug, Clone)]
@@ -25,6 +26,8 @@ pub struct ServiceEndpoint {
 #[derive(Clone)]
 pub struct HealthWatcher {
     services: Arc<RwLock<HashMap<String, Vec<ServiceEndpoint>>>>,
+    ready: Arc<Notify>,
+    has_data: Arc<AtomicBool>,
 }
 
 impl HealthWatcher {
@@ -33,6 +36,8 @@ impl HealthWatcher {
     pub fn new(channel: Channel, token_provider: TokenProvider) -> Self {
         let hw = Self {
             services: Arc::new(RwLock::new(HashMap::new())),
+            ready: Arc::new(Notify::new()),
+            has_data: Arc::new(AtomicBool::new(false)),
         };
 
         let hw_clone = hw.clone();
@@ -41,6 +46,14 @@ impl HealthWatcher {
         });
 
         hw
+    }
+
+    /// Waits until the first batch of health data has been received.
+    pub async fn wait_ready(&self) {
+        if self.has_data.load(Ordering::Acquire) {
+            return;
+        }
+        self.ready.notified().await;
     }
 
     /// Returns gRPC endpoints (host:port) for healthy instances of a service.
@@ -74,7 +87,7 @@ impl HealthWatcher {
         let mut client = ServiceHealthStateServiceClient::new(channel);
 
         let mut request = tonic::Request::new(());
-        if let Some(token) = (token_provider)().await {
+        if let Ok(token) = (token_provider)().await {
             let val: tonic::metadata::MetadataValue<tonic::metadata::Ascii> = format!("Bearer {}", token)
                 .parse()
                 .map_err(|_| "invalid token metadata")?;
@@ -135,6 +148,11 @@ impl HealthWatcher {
 
         let mut map = self.services.write().unwrap();
         *map = grouped;
+        drop(map);
+
+        if !self.has_data.swap(true, Ordering::Release) {
+            self.ready.notify_waiters();
+        }
     }
 }
 
