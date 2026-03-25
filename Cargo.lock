@@ -23,6 +23,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "am"
+version = "0.1.0"
+dependencies = [
+ "gateway-tacplus-types",
+ "tonic",
+ "tracing",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -669,11 +678,13 @@ dependencies = [
  "mime_guess",
  "prost",
  "prost-types",
+ "rest-dispatch-gen",
  "rust-embed",
  "rustls 0.23.37",
  "rustls-pemfile 2.2.0",
  "serde",
  "serde_json",
+ "servicemanager",
  "token",
  "tokio",
  "tokio-stream",
@@ -689,6 +700,7 @@ dependencies = [
 name = "gateway-tacplus"
 version = "1.0.0"
 dependencies = [
+ "am",
  "async-trait",
  "axum",
  "base64 0.21.7",
@@ -816,6 +828,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "futures",
+ "gateway-tacplus-types",
  "hyper",
  "hyper-util",
  "jwk",
@@ -823,6 +836,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "servicemanager",
  "thiserror 1.0.69",
  "token",
  "tokio",
@@ -2032,6 +2046,13 @@ dependencies = [
  "wasm-streams",
  "web-sys",
  "webpki-roots 1.0.6",
+]
+
+[[package]]
+name = "rest-dispatch-gen"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

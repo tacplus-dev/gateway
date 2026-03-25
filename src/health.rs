@@ -158,6 +158,9 @@ impl HealthWatcher {
 
 /// Returns true if the instance status is HEALTHY or DEGRADED.
 fn is_routable(status: i32) -> bool {
-    // INSTANCE_STATUS_HEALTHY = 1, INSTANCE_STATUS_DEGRADED = 2
-    status == 1 || status == 2
+    use gateway_tacplus::types::libs::healthreport::healthreport::InstanceStatus;
+    matches!(
+        InstanceStatus::try_from(status),
+        Ok(InstanceStatus::Healthy | InstanceStatus::Degraded)
+    )
 }

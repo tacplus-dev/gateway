@@ -31,7 +31,8 @@ uuid = { version = "1", features = ["v4"] }
 mime_guess = "2"
 gateway-tacplus = { path = "target/generated-sources/tacplus" }
 gateway-jwk = { package = "jwk", path = "target/generated-sources/tacplus/libs/jwk" }
+gateway-servicemanager = { package = "servicemanager", path = "target/generated-sources/tacplus/libs/servicemanager" }
 gateway-token = { package = "token", path = "target/generated-sources/tacplus/libs/token" }
 
 [build-dependencies]
-serde_json = "1"
+rest-dispatch-gen = { path = "../../utils/rest-dispatch-gen" }

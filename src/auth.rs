@@ -10,7 +10,8 @@ use gateway_tacplus::types::services::kernel::kernel::identity_state_service_cli
 use gateway_tacplus::types::services::kernel::kernel::VerifyingKeysEntriesResponse;
 
 // Generated libs for JWT verification
-use gateway_jwk::jwk::{ImmutableJwk, Jwk as LocalJwk};
+use gateway_jwk::jwk::ImmutableJwk;
+use gateway_servicemanager::auth::proto_jwk_to_lib;
 use gateway_token::token::Token;
 
 use crate::health::TokenProvider;
@@ -181,19 +182,15 @@ impl GatewayAuth {
             let kty = KeyType::try_from(proto_jwk.kty).unwrap_or(KeyType::Undefined);
             tracing::info!(kid = %kid, kty = ?kty, x_len = proto_jwk.x.len(), "processing JWK entry");
 
-            match proto_jwk_to_local(proto_jwk) {
-                Ok(local_jwk) => match ImmutableJwk::new(local_jwk) {
-                    Ok(immutable) => {
-                        tracing::info!(kid = %kid, "JWK decoded successfully");
-                        new_keys.insert(kid.clone(), Arc::new(immutable));
-                        new_raw.push(proto_jwk.clone());
-                    }
-                    Err(e) => {
-                        tracing::warn!(kid = %kid, error = %e, "skipping invalid JWK");
-                    }
-                },
+            let local_jwk = proto_jwk_to_lib(proto_jwk);
+            match ImmutableJwk::new(local_jwk) {
+                Ok(immutable) => {
+                    tracing::info!(kid = %kid, "JWK decoded successfully");
+                    new_keys.insert(kid.clone(), Arc::new(immutable));
+                    new_raw.push(proto_jwk.clone());
+                }
                 Err(e) => {
-                    tracing::warn!(kid = %kid, error = %e, "skipping unconvertible JWK");
+                    tracing::warn!(kid = %kid, error = %e, "skipping invalid JWK");
                 }
             }
         }
@@ -218,28 +215,3 @@ fn extract_bearer(header_value: &str) -> Option<&str> {
         .or_else(|| header_value.strip_prefix("bearer "))
 }
 
-/// Convert a proto Jwk to the local jwk::Jwk struct used by the generated
-/// ImmutableJwk constructor.
-fn proto_jwk_to_local(proto: &ProtoJwk) -> Result<LocalJwk, String> {
-    let kty = KeyType::try_from(proto.kty).unwrap_or(KeyType::Undefined);
-    let kty_str = match kty {
-        KeyType::Rsa => "RSA",
-        KeyType::Ec => "EC",
-        KeyType::Okp => "OKP",
-        _ => return Err(format!("unsupported key type: {:?}", kty)),
-    };
-
-    Ok(LocalJwk {
-        kty: kty_str.to_string(),
-        alg: if proto.alg.is_empty() { None } else { Some(proto.alg.clone()) },
-        kid: proto.kid.clone(),
-        key_use: Some("sig".to_string()),
-        n: if proto.n.is_empty() { None } else { Some(proto.n.clone()) },
-        e: if proto.e.is_empty() { None } else { Some(proto.e.clone()) },
-        crv: if proto.crv.is_empty() { None } else { Some(proto.crv.clone()) },
-        x: if proto.x.is_empty() { None } else { Some(proto.x.clone()) },
-        y: if proto.y.is_empty() { None } else { Some(proto.y.clone()) },
-        exp: if proto.exp == 0 { None } else { Some(proto.exp) },
-        created: if proto.created == 0 { None } else { Some(proto.created) },
-    })
-}
