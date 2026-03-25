@@ -15,6 +15,9 @@ tacplus/
 *.swo
 *~
 
+# Windows
+Thumbs.db
+
 # Environment
 .env
 .env.*
