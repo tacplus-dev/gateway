@@ -1,7 +1,9 @@
 language: rust
 pkg: com.gitlab.secondstarcavalier.controlplane.services.gateway
 output-dir: target/generated-sources/tacplus
-all-grpc: true
+grpc-servers:
+  - services/gateway.MintService
+all-grpc-s2s-clients: true
 states:
   - services/kernel.GatewayTlsState:ro
 post-gen:

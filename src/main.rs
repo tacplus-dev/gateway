@@ -1,4 +1,5 @@
 mod auth;
+mod grpc_proxy;
 mod health;
 mod mint;
 mod registry;
@@ -15,6 +16,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use axum::routing::get;
 use tokio::time::{timeout, Duration};
 use tokio_stream::StreamExt;
@@ -102,7 +104,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // 5. Start HealthWatcher (watches ServiceHealthState.instances from kernel).
     let health_watcher = health::HealthWatcher::new(kernel_channel.clone(), token_provider.clone());
 
-    // Wait for initial health data so passthrough channels connect to real endpoints.
+    // Wait for initial health data so gRPC proxy channels connect to real endpoints.
     match timeout(Duration::from_secs(30), health_watcher.wait_ready()).await {
         Ok(()) => tracing::info!("initial health data received"),
         Err(_) => tracing::warn!("timed out waiting for health data, proceeding with available endpoints"),
@@ -128,19 +130,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         String::new(), // issuer URL — empty = same origin
     );
 
-    // 9. Build gRPC router: passthrough services + gateway MintService.
-    let resolver_for_dial = Arc::clone(&resolver);
-    let auth_fn = gateway_auth.auth_fn();
+    // 9. Build gRPC router: MintService (native tonic) + raw proxy for all other services.
+    let proxy_state = Arc::new(grpc_proxy::ProxyState {
+        resolver: Arc::clone(&resolver),
+        auth: Arc::clone(&gateway_auth),
+    });
 
     let grpc_router = {
-        let routes = gateway_tacplus::s2sm::internal::passthrough::passthrough::register_all(
-            |service_id| resolver_for_dial.dial(service_id),
-            auth_fn,
-        );
-        // Register gateway's MintService alongside passthrough services.
         use gateway_tacplus::types::services::gateway::gateway::mint_service_server::MintServiceServer;
-        let routes = routes.add_service(MintServiceServer::new(mint_service));
-        routes.into_axum_router()
+        tonic::service::Routes::new(MintServiceServer::new(mint_service))
+            .into_axum_router()
     };
 
     // 10. Build HTTP router.
@@ -150,9 +149,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         kernel_channel: kernel_channel.clone(),
     });
 
-    // Layer the routers: gRPC routes first, then HTTP routes, then REST + SPA fallback.
-    // Since tonic's into_router() includes a fallback, and rest::router() uses a fallback
-    // for catch-all REST routing, we need to nest them using fallback_service chains.
+    // Layer the routers: MintService (tonic) → gRPC proxy → REST/SPA.
+    // MintService is a native tonic service; all other gRPC requests are proxied
+    // as raw HTTP/2 through the resolver to backend services.
     let registry_route = format!("{}/registry/{{file}}", rest_dispatch::REST_ROOT_PATH);
     let spa_and_rest = rest::router(rest_state)
         .route("/healthz", get(healthz))
@@ -160,9 +159,26 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .route(&registry_route, get(spa::registry_handler))
         .fallback(spa::spa_handler);
 
-    // gRPC requests have content-type application/grpc and match tonic's routes.
-    // Everything else falls through to the REST/SPA layer.
-    let app = grpc_router.fallback_service(spa_and_rest);
+    // Build a fallback that checks content-type: if gRPC, proxy raw; otherwise REST/SPA.
+    let proxy_state_clone = Arc::clone(&proxy_state);
+    let grpc_or_rest = axum::Router::new()
+        .fallback(move |req: axum::http::Request<axum::body::Body>| {
+            let proxy = Arc::clone(&proxy_state_clone);
+            async move {
+                if grpc_proxy::is_grpc(&req) {
+                    grpc_proxy::handle(&proxy, req).await
+                } else {
+                    // Not gRPC — this shouldn't happen since tonic's fallback routes here,
+                    // but return 404 as a safety net. The actual REST/SPA layer is below.
+                    axum::http::StatusCode::NOT_FOUND.into_response()
+                }
+            }
+        });
+
+    // MintService (tonic) handles /gateway.MintService/* methods.
+    // Everything else falls to grpc_or_rest (gRPC proxy) or spa_and_rest (REST/SPA).
+    let app = grpc_router
+        .fallback_service(grpc_or_rest.fallback_service(spa_and_rest));
 
     // 11. Start TLS listener — serves both HTTP and gRPC on the same port.
     tracing::info!(addr = %tcp_addr, "listening (TLS, HTTP+gRPC)");

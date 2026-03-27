@@ -16,9 +16,6 @@ use gateway_token::token::Token;
 
 use crate::health::TokenProvider;
 
-/// Auth function signature matching passthrough handler expectations.
-pub type AuthFn = Arc<dyn Fn(&str, &tonic::metadata::MetadataMap) -> Result<(), tonic::Status> + Send + Sync>;
-
 /// Gateway token pre-validator.
 /// Watches JWK verifying keys from kernel and validates JWT signature + expiry.
 /// Also stores raw JWK protos for the JWKS endpoint.
@@ -43,14 +40,6 @@ impl GatewayAuth {
         });
 
         auth
-    }
-
-    /// Build an AuthFn closure matching the passthrough handler signature.
-    pub fn auth_fn(self: &Arc<Self>) -> AuthFn {
-        let auth = Arc::clone(self);
-        Arc::new(move |method: &str, metadata: &tonic::metadata::MetadataMap| {
-            auth.validate(method, metadata)
-        })
     }
 
     /// Validate a gRPC request: check if auth is needed, then verify token.
