@@ -1,12 +1,43 @@
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::response::{IntoResponse, Response};
 use http::{Request, StatusCode};
-use tower::Service;
+use http_body::Frame;
+use tower::{Service, ServiceExt};
 
 use crate::auth::GatewayAuth;
 use crate::resolver::Resolver;
+
+/// Body wrapper that overrides `is_end_stream()` to always return `false`.
+/// This prevents `tonic::body::Body::new()` from short-circuiting to an empty
+/// body when the underlying HTTP/2 stream has received all data + END_STREAM
+/// but the data hasn't been polled/consumed yet.
+struct StreamingBody(Body);
+
+impl http_body::Body for StreamingBody {
+    type Data = bytes::Bytes;
+    type Error = axum::Error;
+
+    fn poll_frame(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+        // Safety: Body is Unpin (axum::body::Body is Unpin).
+        let inner = Pin::new(&mut self.get_mut().0);
+        inner.poll_frame(cx)
+    }
+
+    fn is_end_stream(&self) -> bool {
+        false // Never short-circuit — always let poll_frame determine EOF.
+    }
+
+    fn size_hint(&self) -> http_body::SizeHint {
+        self.0.size_hint()
+    }
+}
 
 /// Extract the proto package name (service_id) from a gRPC method path.
 /// "/herald.HeraldService/PublishEvents" -> "herald"
@@ -24,9 +55,9 @@ pub struct ProxyState {
 }
 
 /// Handle a gRPC request by forwarding raw bytes to the backend service.
-/// Determines the target service from the gRPC method path, authenticates
-/// via metadata headers, and forwards the raw HTTP/2 frames through a
-/// tonic Channel without deserializing the protobuf body.
+/// Determines the target service from the gRPC method path, enforces
+/// per-route C2S auth using the ROUTES table, and forwards the raw HTTP/2
+/// frames through a tonic Channel without deserializing the protobuf body.
 pub async fn handle(
     proxy: &ProxyState,
     req: Request<Body>,
@@ -44,24 +75,57 @@ pub async fn handle(
         }
     };
 
-    // Gateway's own services (MintService) are handled by tonic routes, not the proxy.
+    // Gateway's own services (Mint) are handled by tonic routes, not the proxy.
     if service_id == "gateway" {
         return StatusCode::NOT_FOUND.into_response();
     }
 
-    // Auth: validate using gRPC metadata (HTTP/2 headers).
-    let metadata = tonic::metadata::MetadataMap::from_headers(req.headers().clone());
-    if let Err(status) = proxy.auth.validate(&path, &metadata) {
-        return tonic_status_to_response(status);
+    // Look up per-route auth policy from the generated ROUTES table.
+    // Default to Entitled (most restrictive) for routes not in the table.
+    let auth_policy = gateway_tacplus::s2sm::rest_dispatch::ROUTES
+        .iter()
+        .find(|r| r.grpc_path == path)
+        .map(|r| r.auth_policy)
+        .unwrap_or(gateway_tacplus::s2sm::rest_dispatch::AuthPolicy::Entitled);
+
+    let auth_header = req
+        .headers()
+        .get("authorization")
+        .and_then(|v| v.to_str().ok());
+
+    if let Err((code, msg)) = proxy
+        .auth
+        .validate_c2s(auth_policy, service_id, &path, auth_header)
+        .await
+    {
+        tracing::warn!(path = %path, error = %msg, "gRPC auth rejected");
+        // Map HTTP status to gRPC status code.
+        let grpc_code = match code {
+            StatusCode::FORBIDDEN => tonic::Code::PermissionDenied,
+            _ => tonic::Code::Unauthenticated,
+        };
+        return tonic_status_to_response(tonic::Status::new(grpc_code, msg));
     }
 
     // Convert axum Body to tonic Body for Channel compatibility.
+    // Wrap in StreamingBody to prevent tonic::body::Body::new() from
+    // short-circuiting on is_end_stream() for bodies that have received
+    // all data but haven't been polled yet (client-streaming gRPC).
     let (parts, body) = req.into_parts();
-    let tonic_body = tonic::body::Body::new(body);
+    let streaming_body = StreamingBody(body);
+    let tonic_body = tonic::body::Body::new(streaming_body);
     let tonic_req = Request::from_parts(parts, tonic_body);
 
     // Forward raw HTTP/2 request through the Channel.
+    // Must call ready() before call() — tower's buffer layer panics otherwise.
     let mut channel = proxy.resolver.dial(service_id);
+    if let Err(e) = channel.ready().await {
+        tracing::error!(error = %e, service = service_id, path = %path, "gRPC proxy channel not ready");
+        return tonic_status_to_response(tonic::Status::unavailable(format!(
+            "backend not ready: {}",
+            e
+        )));
+    }
     match channel.call(tonic_req).await {
         Ok(response) => {
             let (parts, body) = response.into_parts();

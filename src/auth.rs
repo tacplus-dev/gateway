@@ -1,199 +1,210 @@
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
-use tokio_stream::StreamExt;
-use tonic::transport::Channel;
+use http::StatusCode;
 
 use gateway_tacplus::types::libs::jwk::jwk::Jwk as ProtoJwk;
-use gateway_tacplus::types::libs::key::key::KeyType;
-use gateway_tacplus::types::services::kernel::kernel::identity_state_service_client::IdentityStateServiceClient;
-use gateway_tacplus::types::services::kernel::kernel::VerifyingKeysEntriesResponse;
+use gateway_grpcserver::authorizer::{JwkCache, ProfileCache};
 
-// Generated libs for JWT verification
-use gateway_jwk::jwk::ImmutableJwk;
-use gateway_servicemanager::auth::proto_jwk_to_lib;
+// Generated libs for JWT parsing (no crypto needed — authorizer handles verification)
 use gateway_token::token::Token;
 
-use crate::health::TokenProvider;
-
-/// Gateway token pre-validator.
-/// Watches JWK verifying keys from kernel and validates JWT signature + expiry.
-/// Also stores raw JWK protos for the JWKS endpoint.
+/// Gateway C2S authenticator/authorizer.
+///
+/// Uses the decomposed JwkCache and ProfileCache directly (not the Authorizer
+/// wrapper) because the gateway's auth policy differs from standard S2S:
+///   - `aud` must match the **target** service (not "gateway")
+///   - entitlements are checked against the **target** service
 #[derive(Clone)]
 pub struct GatewayAuth {
-    keys: Arc<RwLock<HashMap<String, Arc<ImmutableJwk>>>>,
-    raw_jwks: Arc<RwLock<Vec<ProtoJwk>>>,
+    jwk_cache: Arc<JwkCache>,
+    profile_cache: Arc<ProfileCache>,
 }
 
-#[allow(clippy::result_large_err)]
 impl GatewayAuth {
-    /// Creates a GatewayAuth and starts watching JWK keys from the kernel connection.
-    pub fn new(channel: Channel, token_provider: TokenProvider) -> Self {
-        let auth = Self {
-            keys: Arc::new(RwLock::new(HashMap::new())),
-            raw_jwks: Arc::new(RwLock::new(Vec::new())),
-        };
-
-        let auth_clone = auth.clone();
-        tokio::spawn(async move {
-            auth_clone.watch_keys(channel, token_provider).await;
-        });
-
-        auth
-    }
-
-    /// Validate a gRPC request: check if auth is needed, then verify token.
-    pub fn validate(
-        &self,
-        method: &str,
-        metadata: &tonic::metadata::MetadataMap,
-    ) -> Result<(), tonic::Status> {
-        if crate::rest_dispatch::is_grpc_no_auth(method) {
-            return Ok(());
+    pub fn new(jwk_cache: Arc<JwkCache>, profile_cache: Arc<ProfileCache>) -> Self {
+        Self {
+            jwk_cache,
+            profile_cache,
         }
-
-        let auth_value = metadata
-            .get("authorization")
-            .and_then(|v| v.to_str().ok())
-            .ok_or_else(|| {
-                tonic::Status::unauthenticated("missing authorization header")
-            })?;
-
-        let token_str = extract_bearer(auth_value).ok_or_else(|| {
-            tonic::Status::unauthenticated("invalid authorization header format")
-        })?;
-
-        self.verify_token(token_str)
     }
 
-    /// Validate a REST request token. The caller is responsible for checking
-    /// no_auth via the route entry before calling this.
-    pub fn validate_rest(
+    /// Validate a C2S request against the per-route auth policy.
+    ///
+    /// - `NoAuth`: pass through.
+    /// - `AnyUser`: verify token, check aud==target_service, reject S2S tokens.
+    /// - `Entitled`: AnyUser + check entitlements against `service_id`.
+    pub async fn validate_c2s(
         &self,
-        _path: &str,
+        auth_policy: gateway_tacplus::s2sm::rest_dispatch::AuthPolicy,
+        service_id: &str,
+        grpc_path: &str,
         auth_header: Option<&str>,
-    ) -> Result<(), tonic::Status> {
-        let auth_value = auth_header.ok_or_else(|| {
-            tonic::Status::unauthenticated("missing authorization header")
-        })?;
+    ) -> Result<(), (StatusCode, String)> {
+        use gateway_tacplus::s2sm::rest_dispatch::AuthPolicy;
 
-        let token_str = extract_bearer(auth_value).ok_or_else(|| {
-            tonic::Status::unauthenticated("invalid authorization header format")
-        })?;
-
-        self.verify_token(token_str)
-    }
-
-    fn verify_token(&self, token_str: &str) -> Result<(), tonic::Status> {
-        let keys = self.keys.read().unwrap();
-        if keys.is_empty() {
-            return Err(tonic::Status::unauthenticated("no JWK keys configured"));
-        }
-
-        // Parse the JWT using the generated token library.
-        let tw = Token::parse(token_str).map_err(|e| {
-            tonic::Status::unauthenticated(format!("invalid token: {}", e))
-        })?;
-
-        // Look up the signing key by kid.
-        let kid = tw.kid().ok_or_else(|| {
-            tonic::Status::unauthenticated("token missing key ID (kid)")
-        })?;
-
-        let jwk = keys.get(kid).cloned().ok_or_else(|| {
-            tonic::Status::unauthenticated(format!("unknown signing key: {}", kid))
-        })?;
-
-        // Verify signature and expiry using the generated token library.
-        tw.verify(&jwk).map_err(|e| {
-            tracing::warn!(error = %e, kid = kid, "JWT verification failed");
-            tonic::Status::unauthenticated("invalid or expired token")
-        })
-    }
-
-    /// Watch JWK verifying keys from the kernel's IdentityStateService.
-    async fn watch_keys(&self, channel: Channel, token_provider: TokenProvider) {
-        loop {
-            match self.start_key_watch(channel.clone(), &token_provider).await {
-                Ok(()) => {
-                    tracing::warn!("JWK watch stream ended, reconnecting");
-                }
-                Err(e) => {
-                    tracing::error!(error = %e, "JWK watch failed, retrying in 5s");
-                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                }
+        match auth_policy {
+            AuthPolicy::NoAuth => Ok(()),
+            AuthPolicy::AnyUser => {
+                self.authenticate(service_id, auth_header)?;
+                Ok(())
+            }
+            AuthPolicy::Entitled => {
+                self.authenticate(service_id, auth_header)?;
+                let method = grpc_path.rsplit('/').next().unwrap_or(grpc_path);
+                self.check_entitlements(auth_header.unwrap_or(""), service_id, method)?;
+                Ok(())
             }
         }
     }
 
-    async fn start_key_watch(
+    /// Verify token signature + aud == target_service, then reject S2S tokens.
+    fn authenticate(
         &self,
-        channel: Channel,
-        token_provider: &TokenProvider,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let mut client = IdentityStateServiceClient::new(channel);
+        target_service: &str,
+        auth_header: Option<&str>,
+    ) -> Result<(), (StatusCode, String)> {
+        let token_str = extract_bearer(
+            auth_header.ok_or_else(|| {
+                (StatusCode::UNAUTHORIZED, "missing authorization header".into())
+            })?,
+        )
+        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "invalid authorization header".into()))?;
 
-        let mut request = tonic::Request::new(());
-        if let Ok(token) = (token_provider)().await {
-            let val: tonic::metadata::MetadataValue<tonic::metadata::Ascii> = format!("Bearer {}", token)
-                .parse()
-                .map_err(|_| "invalid token metadata")?;
-            request.metadata_mut().insert("authorization", val);
+        // Parse token
+        let tw = Token::parse(token_str)
+            .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
+
+        // Verify signature using JWK cache
+        let kid = tw
+            .kid()
+            .ok_or_else(|| (StatusCode::UNAUTHORIZED, "token missing key ID (kid)".into()))?;
+
+        let jwk = self.jwk_cache.get(kid).ok_or_else(|| {
+            if self.jwk_cache.has_keys() {
+                (
+                    StatusCode::UNAUTHORIZED,
+                    format!("unknown signing key: {kid}"),
+                )
+            } else {
+                // No keys loaded yet — fail open for gradual rollout
+                (
+                    StatusCode::UNAUTHORIZED,
+                    "no JWK keys loaded yet".into(),
+                )
+            }
+        })?;
+
+        tw.verify(&jwk)
+            .map_err(|e| (StatusCode::UNAUTHORIZED, format!("token verification failed: {e}")))?;
+
+        // Reject refresh tokens — they should only be exchanged at the Mint endpoint.
+        // Check token_use first, fall back to legacy typ for backwards compat.
+        let is_refresh = tw
+            .custom_field("token_use")
+            .and_then(|v| v.as_str())
+            .map(|v| v == "refresh")
+            .unwrap_or_else(|| {
+                tw.custom_field("typ")
+                    .and_then(|v| v.as_str())
+                    .map(|v| v == "refresh")
+                    .unwrap_or(false)
+            });
+        if is_refresh {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                "refresh tokens cannot be used for API access".into(),
+            ));
         }
 
-        let response = client
-            .watch_verifying_keys(request)
-            .await?;
-
-        let mut stream = response.into_inner();
-        tracing::info!("JWK WatchVerifyingKeys stream started");
-
-        while let Some(msg) = stream.next().await {
-            match msg {
-                Ok(entries_response) => {
-                    self.process_jwk_entries(&entries_response);
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "JWK watch stream error");
-                    return Err(e.into());
-                }
-            }
+        // Check aud matches TARGET service (not gateway)
+        let aud = tw.audience().unwrap_or("");
+        if aud != target_service {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                format!(
+                    "token audience \"{}\" does not match target service \"{}\"",
+                    aud, target_service
+                ),
+            ));
         }
 
         Ok(())
     }
 
-    fn process_jwk_entries(&self, entries_response: &VerifyingKeysEntriesResponse) {
-        let mut new_keys = HashMap::new();
-        let mut new_raw = Vec::new();
+    /// Check entitlements against the **target** service (not gateway).
+    fn check_entitlements(
+        &self,
+        auth_header: &str,
+        target_service: &str,
+        method: &str,
+    ) -> Result<(), (StatusCode, String)> {
+        let token_str = extract_bearer(auth_header)
+            .ok_or_else(|| (StatusCode::UNAUTHORIZED, "invalid authorization header".into()))?;
+        let tw = Token::parse(token_str)
+            .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
 
-        for (kid, proto_jwk) in &entries_response.entries {
-            let kty = KeyType::try_from(proto_jwk.kty).unwrap_or(KeyType::Undefined);
-            tracing::info!(kid = %kid, kty = ?kty, x_len = proto_jwk.x.len(), "processing JWK entry");
+        let azp = tw
+            .custom_field("azp")
+            .and_then(|v| v.as_str().map(String::from))
+            .unwrap_or_default();
 
-            let local_jwk = proto_jwk_to_lib(proto_jwk);
-            match ImmutableJwk::new(local_jwk) {
-                Ok(immutable) => {
-                    tracing::info!(kid = %kid, "JWK decoded successfully");
-                    new_keys.insert(kid.clone(), Arc::new(immutable));
-                    new_raw.push(proto_jwk.clone());
+        // Extract profile names from token.
+        let profile_names: Vec<String> = match tw.custom_field("profiles") {
+            Some(serde_json::Value::Array(arr)) => {
+                arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+            }
+            Some(serde_json::Value::String(s)) if !s.is_empty() => {
+                serde_json::from_str(s).unwrap_or_else(|_| {
+                    s.split(',').map(|p| p.trim().to_string()).collect()
+                })
+            }
+            _ => vec![],
+        };
+
+        if profile_names.is_empty() {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "token missing profiles claim".into(),
+            ));
+        }
+
+        // Resolve against cached entitlement profiles.
+        if self.profile_cache.is_empty() {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "no entitlement profiles cached yet".into(),
+            ));
+        }
+
+        for name in &profile_names {
+            if let Some(profile) = self.profile_cache.get(name) {
+                // azp restriction
+                if !profile.azp.is_empty() && !profile.azp.iter().any(|a| a == &azp) {
+                    continue;
                 }
-                Err(e) => {
-                    tracing::warn!(kid = %kid, error = %e, "skipping invalid JWK");
+                // Check RPCs on the TARGET service (not gateway).
+                if let Some(rpcs) = profile.services.get(target_service) {
+                    for rpc in rpcs {
+                        if rpc == "*" || rpc == method {
+                            return Ok(());
+                        }
+                    }
                 }
             }
         }
 
-        let count = new_keys.len();
-        *self.keys.write().unwrap() = new_keys;
-        *self.raw_jwks.write().unwrap() = new_raw;
-
-        tracing::info!(count, "JWK keys updated");
+        Err((
+            StatusCode::FORBIDDEN,
+            format!(
+                "method \"{}\" not granted by any profile for service \"{}\"",
+                method, target_service
+            ),
+        ))
     }
 
-    /// Returns a clone of the raw JWK protos for the JWKS endpoint.
+    /// Returns raw JWK protos for the JWKS endpoint.
     pub fn get_raw_jwks(&self) -> Vec<ProtoJwk> {
-        self.raw_jwks.read().unwrap().clone()
+        self.jwk_cache.jwk_protos()
     }
 }
 
@@ -203,4 +214,3 @@ fn extract_bearer(header_value: &str) -> Option<&str> {
         .strip_prefix("Bearer ")
         .or_else(|| header_value.strip_prefix("bearer "))
 }
-

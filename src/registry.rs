@@ -16,8 +16,7 @@ impl Registry {
     /// Log the compile-time route table size.
     pub fn load() -> Self {
         tracing::info!(
-            rest_routes = crate::rest_dispatch::ROUTES.len(),
-            no_auth_packages = crate::rest_dispatch::NO_AUTH_PACKAGES.len(),
+            rest_routes = gateway_tacplus::s2sm::rest_dispatch::ROUTES.len(),
             "registry loaded (compile-time route table)"
         );
         Self
