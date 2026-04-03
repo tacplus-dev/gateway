@@ -22,10 +22,13 @@ pub struct ServiceEndpoint {
 
 /// HealthWatcher watches ServiceHealthState.instances from kernel via
 /// WatchInstances streaming RPC and maintains an in-memory map of healthy
-/// endpoints grouped by service_id.
+/// endpoints grouped by service_id and by SPIFFE path.
 #[derive(Clone)]
 pub struct HealthWatcher {
     services: Arc<RwLock<HashMap<String, Vec<ServiceEndpoint>>>>,
+    /// SPIFFE path index: maps the service-relative path segment of a SPIFFE URI
+    /// (e.g., "mud-controller/agent-42") to endpoints. Used for hierarchical routing.
+    spiffe_services: Arc<RwLock<HashMap<String, Vec<ServiceEndpoint>>>>,
     ready: Arc<Notify>,
     has_data: Arc<AtomicBool>,
 }
@@ -36,6 +39,7 @@ impl HealthWatcher {
     pub fn new(channel: Channel, token_provider: TokenProvider) -> Self {
         let hw = Self {
             services: Arc::new(RwLock::new(HashMap::new())),
+            spiffe_services: Arc::new(RwLock::new(HashMap::new())),
             ready: Arc::new(Notify::new()),
             has_data: Arc::new(AtomicBool::new(false)),
         };
@@ -67,6 +71,30 @@ impl HealthWatcher {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// Returns gRPC endpoints for a SPIFFE path with hierarchical fallback.
+    /// The path is the service-relative portion (e.g., "mud-controller/agent-42").
+    /// If no exact match, strips the last segment and retries up the hierarchy.
+    /// This means a parent service is always the backstop for unregistered children.
+    pub fn get_endpoints_by_spiffe_path(&self, path: &str) -> Vec<String> {
+        let map = self.spiffe_services.read().unwrap();
+        let mut candidate = path;
+        loop {
+            if let Some(endpoints) = map.get(candidate) {
+                if !endpoints.is_empty() {
+                    return endpoints
+                        .iter()
+                        .map(|ep| format!("{}:{}", ep.host, ep.port))
+                        .collect();
+                }
+            }
+            // Strip last path segment for fallback.
+            match candidate.rfind('/') {
+                Some(pos) => candidate = &candidate[..pos],
+                None => return Vec::new(),
+            }
+        }
     }
 
     async fn watch_loop(&self, channel: Channel, token_provider: TokenProvider) {
@@ -116,6 +144,7 @@ impl HealthWatcher {
 
     fn process_entries(&self, entries_response: &InstancesEntriesResponse) {
         let mut grouped: HashMap<String, Vec<ServiceEndpoint>> = HashMap::new();
+        let mut spiffe_grouped: HashMap<String, Vec<ServiceEndpoint>> = HashMap::new();
 
         for inst in entries_response.entries.values() {
             if !is_routable(inst.status) {
@@ -124,14 +153,25 @@ impl HealthWatcher {
 
             if let Some(ref ep) = inst.grpc_endpoint {
                 if !ep.host.is_empty() {
-                    let service_id = inst.service_id.clone();
+                    let endpoint = ServiceEndpoint {
+                        host: ep.host.clone(),
+                        port: ep.port,
+                    };
+
                     grouped
-                        .entry(service_id)
+                        .entry(inst.service_id.clone())
                         .or_default()
-                        .push(ServiceEndpoint {
-                            host: ep.host.clone(),
-                            port: ep.port,
-                        });
+                        .push(endpoint.clone());
+
+                    // Index by SPIFFE path if present.
+                    if !inst.spiffe_id.is_empty() {
+                        if let Some(path) = extract_spiffe_service_path(&inst.spiffe_id) {
+                            spiffe_grouped
+                                .entry(path)
+                                .or_default()
+                                .push(endpoint);
+                        }
+                    }
                 }
             }
         }
@@ -146,9 +186,14 @@ impl HealthWatcher {
             );
         }
 
-        let mut map = self.services.write().unwrap();
-        *map = grouped;
-        drop(map);
+        {
+            let mut map = self.services.write().unwrap();
+            *map = grouped;
+        }
+        {
+            let mut map = self.spiffe_services.write().unwrap();
+            *map = spiffe_grouped;
+        }
 
         if !self.has_data.swap(true, Ordering::Release) {
             self.ready.notify_waiters();
@@ -163,4 +208,24 @@ fn is_routable(status: i32) -> bool {
         InstanceStatus::try_from(status),
         Ok(InstanceStatus::Healthy | InstanceStatus::Degraded)
     )
+}
+
+/// Extracts the service-relative path from a SPIFFE URI.
+/// Input:  "spiffe://cavalier/cluster-prod/mud-controller/agent-42"
+/// Output: "mud-controller/agent-42"
+///
+/// The SPIFFE URI format is spiffe://<org>/<cluster>/<service>[/<child>/...].
+/// We strip the first three segments (scheme + org + cluster) since traffic
+/// arriving at the gateway is already cluster-scoped.
+fn extract_spiffe_service_path(spiffe_id: &str) -> Option<String> {
+    let stripped = spiffe_id.strip_prefix("spiffe://")?;
+    // Split: org / cluster / service [/ child / ...]
+    let mut parts = stripped.splitn(3, '/');
+    let _org = parts.next()?;       // e.g., "cavalier"
+    let _cluster = parts.next()?;   // e.g., "cluster-prod"
+    let service_path = parts.next()?; // e.g., "mud-controller/agent-42"
+    if service_path.is_empty() {
+        return None;
+    }
+    Some(service_path.to_string())
 }
