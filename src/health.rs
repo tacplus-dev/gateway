@@ -73,28 +73,19 @@ impl HealthWatcher {
             .unwrap_or_default()
     }
 
-    /// Returns gRPC endpoints for a SPIFFE path with hierarchical fallback.
+    /// Returns gRPC endpoints for an exact SPIFFE path match.
     /// The path is the service-relative portion (e.g., "mud-controller/agent-42").
-    /// If no exact match, strips the last segment and retries up the hierarchy.
-    /// This means a parent service is always the backstop for unregistered children.
+    /// No hierarchical fallback — multi-segment paths must match exactly or fail.
     pub fn get_endpoints_by_spiffe_path(&self, path: &str) -> Vec<String> {
         let map = self.spiffe_services.read().unwrap();
-        let mut candidate = path;
-        loop {
-            if let Some(endpoints) = map.get(candidate) {
-                if !endpoints.is_empty() {
-                    return endpoints
-                        .iter()
-                        .map(|ep| format!("{}:{}", ep.host, ep.port))
-                        .collect();
-                }
-            }
-            // Strip last path segment for fallback.
-            match candidate.rfind('/') {
-                Some(pos) => candidate = &candidate[..pos],
-                None => return Vec::new(),
-            }
-        }
+        map.get(path)
+            .map(|endpoints| {
+                endpoints
+                    .iter()
+                    .map(|ep| format!("{}:{}", ep.host, ep.port))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     async fn watch_loop(&self, channel: Channel, token_provider: TokenProvider) {

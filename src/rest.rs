@@ -74,11 +74,46 @@ async fn rest_handler(
         }
     };
 
-    // Look up route.
+    // Look up route. If not in the proto-defined ROUTES table, try SPIFFE
+    // path routing — workloads register with spiffe_id in their health report
+    // and can be reached by their SPIFFE service path.
     let route = ROUTES.iter().find(|r| r.http_path == path);
     let route = match route {
         Some(r) => r,
         None => {
+            // Try SPIFFE path routing: strip REST_ROOT_PATH prefix and use
+            // the remaining path as a SPIFFE service path for resolution.
+            let spiffe_path = path.strip_prefix(REST_ROOT_PATH)
+                .and_then(|p| p.strip_prefix('/'))
+                .unwrap_or("");
+            if !spiffe_path.is_empty() {
+                let endpoints = state.resolver.health().get_endpoints_by_spiffe_path(spiffe_path);
+                if !endpoints.is_empty() {
+                    let channel = state.resolver.dial_spiffe(spiffe_path);
+                    tracing::info!(
+                        path = %path,
+                        spiffe_path = %spiffe_path,
+                        request_id = %request_id,
+                        "SPIFFE path routing"
+                    );
+                    return match rest_dispatch::dispatch(
+                        &path,
+                        &body_bytes,
+                        channel,
+                        auth_header_value.as_deref(),
+                        &request_id,
+                    )
+                    .await
+                    {
+                        Ok(json) => (
+                            StatusCode::OK,
+                            [(axum::http::header::CONTENT_TYPE, "application/json".to_string())],
+                            json,
+                        ).into_response(),
+                        Err((status, body)) => (status, body).into_response(),
+                    };
+                }
+            }
             tracing::warn!(path = %path, "no route found");
             return (
                 StatusCode::NOT_FOUND,

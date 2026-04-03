@@ -117,8 +117,17 @@ pub async fn handle(
     let tonic_req = Request::from_parts(parts, tonic_body);
 
     // Forward raw HTTP/2 request through the Channel.
+    // Try service_id first (proto-defined services), then fall back to SPIFFE path
+    // routing (workloads that register with a spiffe_id in their health report).
+    let mut channel = {
+        let endpoints = proxy.resolver.health().get_endpoints(service_id);
+        if endpoints.is_empty() {
+            proxy.resolver.dial_spiffe(service_id)
+        } else {
+            proxy.resolver.dial(service_id)
+        }
+    };
     // Must call ready() before call() — tower's buffer layer panics otherwise.
-    let mut channel = proxy.resolver.dial(service_id);
     if let Err(e) = channel.ready().await {
         tracing::error!(error = %e, service = service_id, path = %path, "gRPC proxy channel not ready");
         return tonic_status_to_response(tonic::Status::unavailable(format!(

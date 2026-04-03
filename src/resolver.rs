@@ -21,6 +21,11 @@ impl Resolver {
         }
     }
 
+    /// Returns a reference to the underlying HealthWatcher.
+    pub fn health(&self) -> &HealthWatcher {
+        &self.health
+    }
+
     /// Create a tonic Channel to the given service_id.
     /// Connects to a healthy backend endpoint via TLS.
     pub fn dial(&self, service_id: &str) -> Channel {
