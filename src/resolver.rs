@@ -25,8 +25,20 @@ impl Resolver {
     /// Connects to a healthy backend endpoint via TLS.
     pub fn dial(&self, service_id: &str) -> Channel {
         let endpoints = self.health.get_endpoints(service_id);
+        self.dial_endpoints(service_id, &endpoints)
+    }
+
+    /// Create a tonic Channel to a service identified by its SPIFFE path.
+    /// Uses hierarchical fallback: if "mud-controller/agent-42" has no
+    /// registered endpoints, falls back to "mud-controller" (the parent).
+    pub fn dial_spiffe(&self, spiffe_path: &str) -> Channel {
+        let endpoints = self.health.get_endpoints_by_spiffe_path(spiffe_path);
+        self.dial_endpoints(spiffe_path, &endpoints)
+    }
+
+    fn dial_endpoints(&self, label: &str, endpoints: &[String]) -> Channel {
         if endpoints.is_empty() {
-            tracing::warn!(service = %service_id, "no healthy endpoints, creating placeholder channel");
+            tracing::warn!(service = %label, "no healthy endpoints, creating placeholder channel");
             return Endpoint::from_static("http://[::1]:1")
                 .connect_lazy();
         }
@@ -38,7 +50,7 @@ impl Resolver {
         };
 
         let uri = format!("https://{}", endpoints[idx]);
-        tracing::info!(service = %service_id, endpoint = %uri, "dialing service");
+        tracing::info!(service = %label, endpoint = %uri, "dialing service");
         // Override the TLS domain to "kernel" — all service certs have SAN DNS:kernel
         // because X509Mint uses the kernel's identity as the cert subject.
         let tls = self.tls_config.clone().domain_name("kernel");
