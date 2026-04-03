@@ -4,6 +4,8 @@ stages:
 
 variables:
   TACPLUS_IMAGE: "${CI_REGISTRY}/secondstarcavalier/controlplane/utils/tacplus/tacplus-1-1:latest"
+  WEBAPP_PROJECT_ID: "80522656"
+  WEBAPP_PKG: "webapp-1-1"
 
 .parse-version: &parse-version
   - |
@@ -23,6 +25,14 @@ build:
   before_script:
     - *setup-netrc
     - tacplus build --no-container --skip-post
+    - |
+      echo "Downloading webapp dist..."
+      mkdir -p dist
+      curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        -o webapp.tgz \
+        "${CI_API_V4_URL}/projects/${WEBAPP_PROJECT_ID}/packages/generic/${WEBAPP_PKG}/latest/${WEBAPP_PKG}-latest.tgz"
+      tar -xzf webapp.tgz -C dist
+      rm webapp.tgz
   script:
     - cargo build --release
   artifacts:
