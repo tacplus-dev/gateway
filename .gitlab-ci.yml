@@ -1,0 +1,53 @@
+stages:
+  - build
+  - package
+
+variables:
+  TACPLUS_IMAGE: "${CI_REGISTRY}/secondstarcavalier/controlplane/utils/tacplus/tacplus-1-1:latest"
+
+.parse-version: &parse-version
+  - |
+    V="${CI_COMMIT_TAG#v}"
+    MAJOR="$(echo "$V" | cut -d. -f1)"
+    MINOR="$(echo "$V" | cut -d. -f2)"
+    PATCH="$(echo "$V" | cut -d. -f3)"
+
+.setup-netrc: &setup-netrc
+  - printf "machine gitlab.com\nlogin gitlab-ci-token\npassword %s\n" "$CI_JOB_TOKEN" > ~/.netrc
+
+build:
+  stage: build
+  image: $TACPLUS_IMAGE
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  before_script:
+    - *setup-netrc
+    - tacplus build --no-container
+  script:
+    - cargo build --release
+  artifacts:
+    paths:
+      - target/release/gateway
+    expire_in: 1 hour
+
+package:
+  stage: package
+  image: docker:latest
+  services:
+    - docker:dind
+  needs:
+    - build
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  before_script:
+    - *parse-version
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  script:
+    - |
+      IMAGE="$CI_REGISTRY_IMAGE/gateway-${MAJOR}-${MINOR}"
+      docker build \
+        -t "${IMAGE}:${PATCH}" \
+        -t "${IMAGE}:latest" \
+        .
+      docker push "${IMAGE}:${PATCH}"
+      docker push "${IMAGE}:latest"
