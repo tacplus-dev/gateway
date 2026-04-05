@@ -143,11 +143,15 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             .into_axum_router()
     };
 
-    // 10. Build HTTP router.
+    // 10. Build HTTP router with trace publishing.
+    let trace_publisher = sm.create_trace_publisher().await;
+    let sm_for_trace = Arc::clone(&sm);
     let rest_state = Arc::new(rest::AppState {
         resolver: Arc::clone(&resolver),
         auth: Arc::clone(&gateway_auth),
         kernel_channel: kernel_channel.clone(),
+        trace_publisher,
+        trace_round: Box::new(move || sm_for_trace.trace_round()),
     });
 
     // Layer the routers: Mint (tonic) → gRPC proxy → REST/SPA.
@@ -205,7 +209,7 @@ async fn wait_for_tls_cert(
 ) -> Result<GatewayTlsCert, Box<dyn std::error::Error>> {
     let mut client = GatewayTlsStateServiceClient::new(channel);
 
-    let mut request = tonic::Request::new(());
+    let mut request = tonic::Request::new(Default::default());
     if let Ok(token) = (token_provider)().await {
         let val: tonic::metadata::MetadataValue<tonic::metadata::Ascii> =
             format!("Bearer {}", token).parse()
@@ -275,7 +279,7 @@ async fn watch_cert_updates(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut client = GatewayTlsStateServiceClient::new(channel);
 
-    let mut request = tonic::Request::new(());
+    let mut request = tonic::Request::new(Default::default());
     if let Ok(token) = (token_provider)().await {
         let val: tonic::metadata::MetadataValue<tonic::metadata::Ascii> =
             format!("Bearer {}", token).parse()
@@ -342,7 +346,7 @@ async fn wait_for_ca_certs(
 
     let mut client = CaStateServiceClient::new(channel);
 
-    let mut request = tonic::Request::new(());
+    let mut request = tonic::Request::new(Default::default());
     if let Ok(token) = (token_provider)().await {
         let val: tonic::metadata::MetadataValue<tonic::metadata::Ascii> =
             format!("Bearer {}", token).parse()

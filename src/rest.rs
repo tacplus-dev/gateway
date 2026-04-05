@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use gateway_tacplus::s2sm::rest_dispatch::{self, RouteInfo, ROUTES, REST_ROOT_PATH};
 use gateway_tacplus::types::libs::jwk::jwk::{Jwks, OpenIdConfiguration};
+use gateway_tacplus::types::libs::trace::{TraceEvent, TraceRound};
 use gateway_tacplus::types::services::kernel::kernel::mint_client::MintClient as KernelMintClient;
 
 use crate::auth::GatewayAuth;
@@ -21,6 +22,8 @@ pub struct AppState {
     pub resolver: Arc<Resolver>,
     pub auth: Arc<GatewayAuth>,
     pub kernel_channel: Channel,
+    pub trace_publisher: Arc<dyn Fn(TraceEvent) + Send + Sync>,
+    pub trace_round: Box<dyn Fn() -> TraceRound + Send + Sync>,
 }
 
 /// Build the REST router.
@@ -96,6 +99,19 @@ async fn rest_handler(
                         request_id = %request_id,
                         "SPIFFE path routing"
                     );
+                    // Trace: publish gateway hop for SPIFFE-routed requests.
+                    if let Ok(body_json) = serde_json::from_slice::<serde_json::Value>(&body_bytes) {
+                        if let Some(trace_id) = body_json.get("trace_id").and_then(|v| v.as_str()) {
+                            if !trace_id.is_empty() {
+                                let round = (state.trace_round)();
+                                (state.trace_publisher)(TraceEvent {
+                                    trace_id: trace_id.to_string(),
+                                    round: Some(round),
+                                    message_type: path.clone(),
+                                });
+                            }
+                        }
+                    }
                     return match rest_dispatch::dispatch(
                         &path,
                         &body_bytes,
@@ -151,6 +167,22 @@ async fn rest_handler(
             &headers,
         )
         .await;
+    }
+
+    // Trace: if request body contains a non-empty trace_id, publish a TraceEvent
+    // for the gateway hop before forwarding to the backend service.
+    if let Ok(body_json) = serde_json::from_slice::<serde_json::Value>(&body_bytes) {
+        if let Some(trace_id) = body_json.get("trace_id").and_then(|v| v.as_str()) {
+            if !trace_id.is_empty() {
+                let round = (state.trace_round)();
+                (state.trace_publisher)(TraceEvent {
+                    trace_id: trace_id.to_string(),
+                    round: Some(round),
+                    message_type: route.grpc_path.to_string(),
+                });
+                tracing::debug!(trace_id = %trace_id, grpc_path = %route.grpc_path, "published gateway trace event");
+            }
+        }
     }
 
     // Resolve channel: kernel for gateway service, resolver for others.

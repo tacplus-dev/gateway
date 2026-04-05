@@ -105,7 +105,7 @@ impl HealthWatcher {
     async fn start_watch(&self, channel: Channel, token_provider: &TokenProvider) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut client = ServiceHealthStateServiceClient::new(channel);
 
-        let mut request = tonic::Request::new(());
+        let mut request = tonic::Request::new(Default::default());
         if let Ok(token) = (token_provider)().await {
             let val: tonic::metadata::MetadataValue<tonic::metadata::Ascii> = format!("Bearer {}", token)
                 .parse()

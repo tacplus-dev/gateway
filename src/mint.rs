@@ -4,6 +4,7 @@ use tonic::transport::Channel;
 
 use gateway_tacplus::types::common::tokenrequest::{TokenMintRequest, TokenMintResponse, X509MintRequest};
 use gateway_tacplus::types::libs::jwk::jwk::{Jwks, OpenIdConfiguration};
+use gateway_tacplus::types::libs::trace::trace::TraceRequest;
 use gateway_tacplus::types::libs::x509::x509::X509CertChain;
 use gateway_tacplus::types::services::kernel::kernel::mint_client::MintClient as KernelMintClient;
 
@@ -59,14 +60,14 @@ impl gateway_tacplus::types::services::gateway::gateway::mint_server::Mint
 {
     async fn open_id_config(
         &self,
-        _request: tonic::Request<()>,
+        _request: tonic::Request<TraceRequest>,
     ) -> Result<tonic::Response<OpenIdConfiguration>, tonic::Status> {
         Ok(tonic::Response::new(self.build_openid_config()))
     }
 
     async fn jwks(
         &self,
-        _request: tonic::Request<()>,
+        _request: tonic::Request<TraceRequest>,
     ) -> Result<tonic::Response<Jwks>, tonic::Status> {
         Ok(tonic::Response::new(self.build_jwks()))
     }
