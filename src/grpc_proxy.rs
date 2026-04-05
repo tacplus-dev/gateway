@@ -40,7 +40,7 @@ impl http_body::Body for StreamingBody {
 }
 
 /// Extract the proto package name (service_id) from a gRPC method path.
-/// "/herald.HeraldService/PublishEvents" -> "herald"
+/// "/eventbus.Trace/WatchTrace" -> "eventbus"
 fn extract_service_id(path: &str) -> Option<&str> {
     path.trim_start_matches('/')
         .split('.')
