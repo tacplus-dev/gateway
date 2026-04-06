@@ -149,10 +149,23 @@ impl HealthWatcher {
                         port: ep.port,
                     };
 
+                    // Index by service_id. When service_id is a SPIFFE URI
+                    // (e.g., "spiffe://local/dev/fleetwood"), also index by
+                    // the extracted service path ("fleetwood") so that
+                    // dial("fleetwood") works.
                     grouped
                         .entry(inst.service_id.clone())
                         .or_default()
                         .push(endpoint.clone());
+
+                    if let Some(path) = extract_spiffe_service_path(&inst.service_id) {
+                        if path != inst.service_id {
+                            grouped
+                                .entry(path.clone())
+                                .or_default()
+                                .push(endpoint.clone());
+                        }
+                    }
 
                     // Index by SPIFFE path if present.
                     if !inst.spiffe_id.is_empty() {
