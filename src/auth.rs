@@ -202,6 +202,42 @@ impl GatewayAuth {
         ))
     }
 
+    /// Check whether a bearer token has expired. Used for per-frame expiry
+    #[allow(dead_code)] // TODO: used when per-frame expiry checking is wired for streaming RPCs
+    /// checking on streaming RPCs (validate_c2s checks auth on the first frame;
+    /// this checks expiry on subsequent frames without re-verifying the signature).
+    pub fn check_token_expiry(
+        &self,
+        auth_header: Option<&str>,
+    ) -> Result<(), (StatusCode, String)> {
+        let token_str = extract_bearer(
+            auth_header.ok_or_else(|| {
+                (StatusCode::UNAUTHORIZED, "missing authorization header".into())
+            })?,
+        )
+        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "invalid authorization header".into()))?;
+
+        let tw = Token::parse(token_str)
+            .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
+
+        match tw.expiration() {
+            Some(exp) => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs() as i64;
+                if now >= exp {
+                    return Err((StatusCode::UNAUTHORIZED, "token expired".into()));
+                }
+            }
+            None => {
+                return Err((StatusCode::UNAUTHORIZED, "token missing expiration".into()));
+            }
+        }
+
+        Ok(())
+    }
+
     /// Returns raw JWK protos for the JWKS endpoint.
     pub fn get_raw_jwks(&self) -> Vec<ProtoJwk> {
         self.jwk_cache.jwk_protos()

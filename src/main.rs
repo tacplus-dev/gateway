@@ -1,10 +1,10 @@
 mod auth;
-mod grpc_proxy;
+mod proxy_grpc;
 mod health;
 mod mint;
 mod registry;
 mod resolver;
-mod rest;
+mod rest_translation;
 mod spa;
 mod tls;
 
@@ -126,10 +126,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         String::new(), // issuer URL — empty = same origin
     );
 
-    // 9. Build gRPC router: Mint (native tonic) + raw proxy for all other services.
-    let proxy_state = Arc::new(grpc_proxy::ProxyState {
+    // 9. Create trace publisher (shared between gRPC proxy and REST handler).
+    let trace_publisher = sm.create_trace_publisher().await;
+
+    // 10. Build gRPC router: Mint (native tonic) + raw proxy for all other services.
+    let sm_for_grpc_trace = Arc::clone(&sm);
+    let proxy_state = Arc::new(proxy_grpc::ProxyState {
         resolver: Arc::clone(&resolver),
         auth: Arc::clone(&gateway_auth),
+        trace_publisher: Arc::clone(&trace_publisher),
+        trace_round: Box::new(move || sm_for_grpc_trace.trace_round()),
     });
 
     let grpc_router = {
@@ -143,22 +149,18 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             .into_axum_router()
     };
 
-    // 10. Build HTTP router with trace publishing.
-    let trace_publisher = sm.create_trace_publisher().await;
-    let sm_for_trace = Arc::clone(&sm);
-    let rest_state = Arc::new(rest::AppState {
-        resolver: Arc::clone(&resolver),
-        auth: Arc::clone(&gateway_auth),
+    // 11. Build REST state (shares ProxyState — all auth is in proxy_grpc).
+    let rest_state = Arc::new(rest_translation::RestState {
+        proxy: Arc::clone(&proxy_state),
         kernel_channel: kernel_channel.clone(),
-        trace_publisher,
-        trace_round: Box::new(move || sm_for_trace.trace_round()),
+        auth: Arc::clone(&gateway_auth),
     });
 
-    // Layer the routers: Mint (tonic) → gRPC proxy → REST/SPA.
+    // 12. Layer the routers: Mint (tonic) → gRPC proxy → REST/SPA.
     // Mint is a native tonic service; all other gRPC requests are proxied
     // as raw HTTP/2 through the resolver to backend services.
     let registry_route = format!("{}/registry/{{file}}", gateway_tacplus::s2sm::rest_dispatch::REST_ROOT_PATH);
-    let spa_and_rest = rest::router(rest_state)
+    let spa_and_rest = rest_translation::router(rest_state)
         .route("/healthz", get(healthz))
         .route("/readyz", get(healthz))
         .route(&registry_route, get(spa::registry_handler))
@@ -173,8 +175,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         move |req: axum::extract::Request, next: axum::middleware::Next| {
             let proxy = Arc::clone(&proxy_state_clone);
             async move {
-                if grpc_proxy::is_grpc(&req) {
-                    grpc_proxy::handle(&proxy, req).await
+                if proxy_grpc::is_grpc(&req) {
+                    proxy_grpc::handle(&proxy, req).await
                 } else {
                     next.run(req).await
                 }
@@ -188,7 +190,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let app = grpc_router
         .fallback_service(spa_and_rest.layer(grpc_intercept));
 
-    // 11. Start TLS listener — serves both HTTP and gRPC on the same port.
+    // 13. Start TLS listener — serves both HTTP and gRPC on the same port.
     tracing::info!(addr = %tcp_addr, "listening (TLS, HTTP+gRPC)");
 
     axum_server::bind_rustls(tcp_addr, tls_acceptor)
