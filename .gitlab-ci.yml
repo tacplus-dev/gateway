@@ -40,6 +40,7 @@ build:
     - *setup-netrc
     - tacplus build --no-container --skip-post
     - |
+      set -euo pipefail
       echo "Downloading webapp dist..."
       mkdir -p dist
       curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
