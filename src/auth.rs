@@ -3,29 +3,26 @@ use std::sync::Arc;
 use http::StatusCode;
 
 use gateway_tacplus::types::libs::jwk::jwk::Jwk as ProtoJwk;
-use gateway_grpcserver::authorizer::{JwkCache, ProfileCache};
+use gateway_grpcserver::authorizer::JwkCache;
 
 // Generated libs for JWT parsing (no crypto needed — authorizer handles verification)
 use gateway_token::token::Token;
 
 /// Gateway C2S authenticator/authorizer.
 ///
-/// Uses the decomposed JwkCache and ProfileCache directly (not the Authorizer
-/// wrapper) because the gateway's auth policy differs from standard S2S:
+/// Uses JwkCache for signature verification. Entitlements are read directly
+/// from the `service_entitlements` JWT claim (set by uncleopa at mint time),
+/// so no separate profile cache is needed.
 ///   - `aud` must match the **target** service (not "gateway")
 ///   - entitlements are checked against the **target** service
 #[derive(Clone)]
 pub struct GatewayAuth {
     jwk_cache: Arc<JwkCache>,
-    profile_cache: Arc<ProfileCache>,
 }
 
 impl GatewayAuth {
-    pub fn new(jwk_cache: Arc<JwkCache>, profile_cache: Arc<ProfileCache>) -> Self {
-        Self {
-            jwk_cache,
-            profile_cache,
-        }
+    pub fn new(jwk_cache: Arc<JwkCache>) -> Self {
+        Self { jwk_cache }
     }
 
     /// Validate a C2S request against the per-route auth policy.
@@ -132,6 +129,9 @@ impl GatewayAuth {
     }
 
     /// Check entitlements against the **target** service (not gateway).
+    ///
+    /// Reads the `service_entitlements` JWT claim (set by uncleopa at mint time).
+    /// Grants access if `any=true` or if the specific method is listed.
     fn check_entitlements(
         &self,
         auth_header: &str,
@@ -143,62 +143,39 @@ impl GatewayAuth {
         let tw = Token::parse(token_str)
             .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
 
-        let azp = tw
-            .custom_field("azp")
-            .and_then(|v| v.as_str().map(String::from))
-            .unwrap_or_default();
+        // Extract service_entitlements claim (embedded by uncleopa/kernel at mint time).
+        let se_val = tw.custom_field("service_entitlements").ok_or_else(|| {
+            (StatusCode::FORBIDDEN, "token missing service_entitlements claim".into())
+        })?;
 
-        // Extract profile names from token.
-        let profile_names: Vec<String> = match tw.custom_field("profiles") {
-            Some(serde_json::Value::Array(arr)) => {
-                arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()
-            }
-            Some(serde_json::Value::String(s)) if !s.is_empty() => {
-                serde_json::from_str(s).unwrap_or_else(|_| {
-                    s.split(',').map(|p| p.trim().to_string()).collect()
-                })
-            }
-            _ => vec![],
+        // The claim may be a JSON string or a nested JSON object.
+        let se_obj: serde_json::Value = if se_val.is_string() {
+            serde_json::from_str(se_val.as_str().unwrap_or("{}")).unwrap_or(serde_json::Value::Null)
+        } else {
+            se_val.clone()
         };
 
-        if profile_names.is_empty() {
-            return Err((
-                StatusCode::FORBIDDEN,
-                "token missing profiles claim".into(),
-            ));
+        let svc_ent = se_obj.get(target_service).ok_or_else(|| {
+            (StatusCode::FORBIDDEN, format!("no entitlements for service \"{target_service}\""))
+        })?;
+
+        // any=true → wildcard access to all RPCs on this service.
+        if svc_ent.get("any").and_then(|v| v.as_bool()).unwrap_or(false) {
+            return Ok(());
         }
 
-        // Resolve against cached entitlement profiles.
-        if self.profile_cache.is_empty() {
-            return Err((
-                StatusCode::FORBIDDEN,
-                "no entitlement profiles cached yet".into(),
-            ));
-        }
-
-        for name in &profile_names {
-            if let Some(profile) = self.profile_cache.get(name) {
-                // azp restriction
-                if !profile.azp.is_empty() && !profile.azp.iter().any(|a| a == &azp) {
-                    continue;
-                }
-                // Check RPCs on the TARGET service (not gateway).
-                if let Some(rpcs) = profile.services.get(target_service) {
-                    for rpc in rpcs {
-                        if rpc == "*" || rpc == method {
-                            return Ok(());
-                        }
-                    }
+        // Check specific RPCs: stored as an array under the service's field name.
+        if let Some(rpcs) = svc_ent.get(target_service).and_then(|v| v.as_array()) {
+            for rpc in rpcs {
+                if rpc.as_str().map(|s| s == method).unwrap_or(false) {
+                    return Ok(());
                 }
             }
         }
 
         Err((
             StatusCode::FORBIDDEN,
-            format!(
-                "method \"{}\" not granted by any profile for service \"{}\"",
-                method, target_service
-            ),
+            format!("method \"{method}\" not entitled for service \"{target_service}\""),
         ))
     }
 

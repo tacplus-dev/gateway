@@ -111,12 +111,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let backend_tls = build_backend_tls_config(sm.config(), &dynamic_cas);
     let resolver = Arc::new(resolver::Resolver::new(health_watcher, backend_tls));
 
-    // 7. Create gateway auth using the SM's authorizer's JWK and profile caches.
-    // The SM already watches JWKs and entitlement profiles — no duplicate watchers.
+    // 7. Create gateway auth using the SM's authorizer's JWK cache.
+    // Entitlements are read from the service_entitlements JWT claim — no profile cache needed.
     let authorizer = sm.authorizer();
     let gateway_auth = Arc::new(auth::GatewayAuth::new(
         authorizer.jwk_cache().clone(),
-        authorizer.profile_cache().clone(),
     ));
 
     // 8. Build gateway Mint service (local OIDC/JWKS, delegates TokenMint/X509Mint to kernel).
