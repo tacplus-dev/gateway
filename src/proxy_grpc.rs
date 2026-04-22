@@ -191,6 +191,7 @@ pub async fn handle(
                                 trace_id: probe.trace_id.clone(),
                                 round: Some(round),
                                 message_type: path.clone(),
+                                ..Default::default()
                             });
                         }
                         Ok(_) => {}
@@ -253,6 +254,7 @@ pub async fn handle(
                     trace_id: active_trace_id,
                     round: Some(round),
                     message_type: format!("{} response", path),
+                    ..Default::default()
                 });
             }
             let (parts, body) = response.into_parts();
