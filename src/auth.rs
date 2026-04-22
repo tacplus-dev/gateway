@@ -159,18 +159,27 @@ impl GatewayAuth {
             (StatusCode::FORBIDDEN, format!("no entitlements for service \"{target_service}\""))
         })?;
 
-        // any=true → wildcard access to all RPCs on this service.
-        if svc_ent.get("any").and_then(|v| v.as_bool()).unwrap_or(false) {
-            return Ok(());
-        }
-
-        // Check specific RPCs: stored as an array under the service's field name.
-        if let Some(rpcs) = svc_ent.get(target_service).and_then(|v| v.as_array()) {
+        // Entitlements are a repeated enum array. 99 = _ANY wildcard (numeric proto value).
+        // Kernel serializes enum values as strings using tacplus json_return_value:
+        //   SENTINEL_RPCS_ANY → "sentinel_rpcs_any", GATEWAY_RPCS_ANY → "gateway_rpcs_any", etc.
+        // Check all representations of the ANY wildcard.
+        if let Some(rpcs) = svc_ent.as_array() {
             for rpc in rpcs {
-                if rpc.as_str().map(|s| s == method).unwrap_or(false) {
-                    return Ok(());
+                if rpc.as_u64() == Some(99) {
+                    return Ok(()); // numeric ANY
+                }
+                if let Some(s) = rpc.as_str() {
+                    let u = s.to_ascii_uppercase();
+                    if u == "ANY" || u.ends_with("_ANY") {
+                        return Ok(()); // string ANY ("SENTINEL_RPCS_ANY", "any", etc.)
+                    }
                 }
             }
+        }
+
+        // Legacy format: {"any": true} → wildcard access.
+        if svc_ent.get("any").and_then(|v| v.as_bool()).unwrap_or(false) {
+            return Ok(());
         }
 
         Err((
