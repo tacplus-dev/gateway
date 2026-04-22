@@ -138,6 +138,10 @@ pub async fn handle(
 
     let (parts, body) = req.into_parts();
 
+    // active_trace_id is set when a unary request carries a trace_id (field 200).
+    // It's used to publish a response trace event after the backend call completes.
+    let mut active_trace_id = String::new();
+
     let tonic_req = if is_streaming {
         // Streaming: validate auth on the initial request, then forward body directly.
         // Per-frame validation of subsequent messages is deferred (TODO).
@@ -181,17 +185,13 @@ pub async fn handle(
                     // Trace: extract trace_id from proto field 200.
                     match <TraceProbe as prost::Message>::decode(proto_bytes) {
                         Ok(probe) if !probe.trace_id.is_empty() => {
+                            active_trace_id = probe.trace_id.clone();
                             let round = (proxy.trace_round)();
                             (proxy.trace_publisher)(TraceEvent {
                                 trace_id: probe.trace_id.clone(),
                                 round: Some(round),
                                 message_type: path.clone(),
                             });
-                            tracing::debug!(
-                                trace_id = %probe.trace_id,
-                                grpc_path = %path,
-                                "published gateway trace event"
-                            );
                         }
                         Ok(_) => {}
                         Err(e) => {
@@ -246,6 +246,15 @@ pub async fn handle(
     }
     match channel.call(tonic_req).await {
         Ok(response) => {
+            // Publish response trace if the request was traced.
+            if !active_trace_id.is_empty() {
+                let round = (proxy.trace_round)();
+                (proxy.trace_publisher)(TraceEvent {
+                    trace_id: active_trace_id,
+                    round: Some(round),
+                    message_type: format!("{} response", path),
+                });
+            }
             let (parts, body) = response.into_parts();
             Response::from_parts(parts, Body::new(body))
         }
