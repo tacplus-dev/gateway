@@ -18,11 +18,15 @@ use gateway_token::token::Token;
 #[derive(Clone)]
 pub struct GatewayAuth {
     jwk_cache: Arc<JwkCache>,
+    /// When true, all C2S auth checks are bypassed. Requests are forwarded
+    /// to backend services without token validation or entitlement checks.
+    /// Set via GATEWAY_AUTH_PASSTHROUGH=1 env var (local testing only).
+    passthrough: bool,
 }
 
 impl GatewayAuth {
-    pub fn new(jwk_cache: Arc<JwkCache>) -> Self {
-        Self { jwk_cache }
+    pub fn new(jwk_cache: Arc<JwkCache>, passthrough: bool) -> Self {
+        Self { jwk_cache, passthrough }
     }
 
     /// Validate a C2S request against the per-route auth policy.
@@ -30,6 +34,8 @@ impl GatewayAuth {
     /// - `NoAuth`: pass through.
     /// - `AnyUser`: verify token, check aud==target_service, reject S2S tokens.
     /// - `Entitled`: AnyUser + check entitlements against `service_id`.
+    ///
+    /// When passthrough mode is enabled, all policies are treated as NoAuth.
     pub async fn validate_c2s(
         &self,
         auth_policy: gateway_tacplus::s2sm::rest_dispatch::AuthPolicy,
@@ -38,6 +44,10 @@ impl GatewayAuth {
         auth_header: Option<&str>,
     ) -> Result<(), (StatusCode, String)> {
         use gateway_tacplus::s2sm::rest_dispatch::AuthPolicy;
+
+        if self.passthrough {
+            return Ok(());
+        }
 
         match auth_policy {
             AuthPolicy::NoAuth => Ok(()),

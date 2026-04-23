@@ -114,8 +114,15 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // 7. Create gateway auth using the SM's authorizer's JWK cache.
     // Entitlements are read from the service_entitlements JWT claim — no profile cache needed.
     let authorizer = sm.authorizer();
+    let auth_passthrough = std::env::var("GATEWAY_AUTH_PASSTHROUGH")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    if auth_passthrough {
+        tracing::warn!("GATEWAY_AUTH_PASSTHROUGH is enabled — all C2S auth checks are bypassed");
+    }
     let gateway_auth = Arc::new(auth::GatewayAuth::new(
         authorizer.jwk_cache().clone(),
+        auth_passthrough,
     ));
 
     // 8. Build gateway Mint service (local OIDC/JWKS, delegates TokenMint/X509Mint to kernel).
