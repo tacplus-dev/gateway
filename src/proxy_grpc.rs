@@ -187,10 +187,11 @@ pub async fn handle(
                         Ok(probe) if !probe.trace_id.is_empty() => {
                             active_trace_id = probe.trace_id.clone();
                             let round = (proxy.trace_round)();
+                            // TODO: set typed rpc field using AccountingMethod lookup by path.
                             (proxy.trace_publisher)(TraceEvent {
                                 trace_id: probe.trace_id.clone(),
                                 round: Some(round),
-                                message_type: path.clone(),
+                                is_response: false,
                                 ..Default::default()
                             });
                         }
@@ -250,10 +251,11 @@ pub async fn handle(
             // Publish response trace if the request was traced.
             if !active_trace_id.is_empty() {
                 let round = (proxy.trace_round)();
+                // TODO: set typed rpc field using AccountingMethod lookup by path.
                 (proxy.trace_publisher)(TraceEvent {
                     trace_id: active_trace_id,
                     round: Some(round),
-                    message_type: format!("{} response", path),
+                    is_response: true,
                     ..Default::default()
                 });
             }
