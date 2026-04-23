@@ -156,7 +156,7 @@ impl GatewayAuth {
         };
 
         let svc_ent = se_obj.get(target_service).ok_or_else(|| {
-            (StatusCode::FORBIDDEN, format!("no entitlements for service \"{target_service}\""))
+            (StatusCode::FORBIDDEN, format!("no entitlements for service {target_service}"))
         })?;
 
         // Entitlements are a repeated enum array. 99 = _ANY wildcard (numeric proto value).
@@ -184,7 +184,7 @@ impl GatewayAuth {
 
         Err((
             StatusCode::FORBIDDEN,
-            format!("method \"{method}\" not entitled for service \"{target_service}\""),
+            format!("method {method} not entitled for service {target_service}"),
         ))
     }
 

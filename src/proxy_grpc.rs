@@ -11,7 +11,7 @@ use tower::{Service, ServiceExt};
 use crate::auth::GatewayAuth;
 use crate::resolver::Resolver;
 
-use gateway_tacplus::types::libs::trace::{TraceEvent, TraceRound};
+use gateway_tacplus::types::libs::trace::{TraceEvent, TraceEventKind, TraceRound};
 
 /// Body wrapper that overrides `is_end_stream()` to always return `false`.
 /// This prevents `tonic::body::Body::new()` from short-circuiting to an empty
@@ -191,7 +191,7 @@ pub async fn handle(
                             (proxy.trace_publisher)(TraceEvent {
                                 trace_id: probe.trace_id.clone(),
                                 round: Some(round),
-                                is_response: false,
+                                kind: TraceEventKind::ExternalRequest.into(),
                                 ..Default::default()
                             });
                         }
@@ -214,6 +214,16 @@ pub async fn handle(
             .await
         {
             tracing::warn!(path = %path, error = %msg, "gRPC auth rejected");
+            if !active_trace_id.is_empty() {
+                let round = (proxy.trace_round)();
+                (proxy.trace_publisher)(TraceEvent {
+                    trace_id: active_trace_id,
+                    round: Some(round),
+                    kind: TraceEventKind::ExternalResponse.into(),
+                    error: msg.clone(),
+                    ..Default::default()
+                });
+            }
             let grpc_code = match code {
                 StatusCode::FORBIDDEN => tonic::Code::PermissionDenied,
                 _ => tonic::Code::Unauthenticated,
@@ -241,6 +251,16 @@ pub async fn handle(
 
     if let Err(e) = channel.ready().await {
         tracing::error!(error = %e, service = service_id, path = %path, "gRPC proxy channel not ready");
+        if !active_trace_id.is_empty() {
+            let round = (proxy.trace_round)();
+            (proxy.trace_publisher)(TraceEvent {
+                trace_id: active_trace_id,
+                round: Some(round),
+                kind: TraceEventKind::ExternalResponse.into(),
+                error: format!("backend not ready: {}", e),
+                ..Default::default()
+            });
+        }
         return tonic_status_to_response(tonic::Status::unavailable(format!(
             "backend not ready: {}",
             e
@@ -248,14 +268,12 @@ pub async fn handle(
     }
     match channel.call(tonic_req).await {
         Ok(response) => {
-            // Publish response trace if the request was traced.
             if !active_trace_id.is_empty() {
                 let round = (proxy.trace_round)();
-                // TODO: set typed rpc field using AccountingMethod lookup by path.
                 (proxy.trace_publisher)(TraceEvent {
                     trace_id: active_trace_id,
                     round: Some(round),
-                    is_response: true,
+                    kind: TraceEventKind::ExternalResponse.into(),
                     ..Default::default()
                 });
             }
@@ -264,6 +282,16 @@ pub async fn handle(
         }
         Err(e) => {
             tracing::error!(error = %e, service = service_id, path = %path, "gRPC proxy error");
+            if !active_trace_id.is_empty() {
+                let round = (proxy.trace_round)();
+                (proxy.trace_publisher)(TraceEvent {
+                    trace_id: active_trace_id,
+                    round: Some(round),
+                    kind: TraceEventKind::ExternalResponse.into(),
+                    error: format!("backend unavailable: {}", e),
+                    ..Default::default()
+                });
+            }
             tonic_status_to_response(tonic::Status::unavailable(format!(
                 "backend unavailable: {}",
                 e
