@@ -35,11 +35,16 @@ impl GatewayAuth {
     /// - `AnyUser`: verify token, check aud==target_service, reject S2S tokens.
     /// - `Entitled`: AnyUser + check entitlements against `service_id`.
     ///
+    /// `entitlement_service` overrides which service name is used for the
+    /// entitlement lookup (for vservices where aud targets the physical host
+    /// but entitlements are keyed by the vservice name).
+    ///
     /// When passthrough mode is enabled, all policies are treated as NoAuth.
     pub async fn validate_c2s(
         &self,
         auth_policy: gateway_tacplus::s2sm::rest_dispatch::AuthPolicy,
         service_id: &str,
+        entitlement_service: &str,
         grpc_path: &str,
         auth_header: Option<&str>,
     ) -> Result<(), (StatusCode, String)> {
@@ -58,7 +63,7 @@ impl GatewayAuth {
             AuthPolicy::Entitled => {
                 self.authenticate(service_id, auth_header)?;
                 let method = grpc_path.rsplit('/').next().unwrap_or(grpc_path);
-                self.check_entitlements(auth_header.unwrap_or(""), service_id, method)?;
+                self.check_entitlements(auth_header.unwrap_or(""), entitlement_service, method)?;
                 Ok(())
             }
         }

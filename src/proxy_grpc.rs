@@ -123,6 +123,9 @@ pub async fn handle(
     let auth_policy = route_info
         .map(|r| r.auth_policy)
         .unwrap_or(gateway_tacplus::s2sm::rest_dispatch::AuthPolicy::Entitled);
+    let entitlement_service = route_info
+        .and_then(|r| r.entitlement_service)
+        .unwrap_or(service_id);
 
     // Extract auth header before consuming the request.
     let auth_header = req
@@ -147,7 +150,7 @@ pub async fn handle(
         // Per-frame validation of subsequent messages is deferred (TODO).
         if let Err((code, msg)) = proxy
             .auth
-            .validate_c2s(auth_policy, service_id, &path, auth_header.as_deref())
+            .validate_c2s(auth_policy, service_id, entitlement_service, &path, auth_header.as_deref())
             .await
         {
             tracing::warn!(path = %path, error = %msg, "gRPC auth rejected");
@@ -210,7 +213,7 @@ pub async fn handle(
         // Auth: validate after body extraction so we reject malformed messages first.
         if let Err((code, msg)) = proxy
             .auth
-            .validate_c2s(auth_policy, service_id, &path, auth_header.as_deref())
+            .validate_c2s(auth_policy, service_id, entitlement_service, &path, auth_header.as_deref())
             .await
         {
             tracing::warn!(path = %path, error = %msg, "gRPC auth rejected");
