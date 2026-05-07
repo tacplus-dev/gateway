@@ -1,5 +1,5 @@
 language: rust
-pkg: com.gitlab.secondstarcavalier.controlplane.services.gateway
+pkg: com.gitlab.secondstarcavalier.controlplane.cavalier.services.gateway
 output-dir: target/generated-sources/tacplus
 post-gen:
   - cmd: mkdir
