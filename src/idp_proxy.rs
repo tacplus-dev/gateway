@@ -11,7 +11,7 @@ use rustls::pki_types::ServerName;
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 
-use gateway_tacplus::types::services::keycloak::keycloak::{GATEWAY_PROXY_PATH_ADMIN, GATEWAY_PROXY_PATH_REALMS};
+use gateway_tacplus::types::services::keycloak::{GATEWAY_PROXY_PATH_ADMIN, GATEWAY_PROXY_PATH_REALMS};
 
 use crate::health::HealthWatcher;
 
