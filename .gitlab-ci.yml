@@ -14,15 +14,16 @@ build-webapp:
   variables:
     TRIGGERED_BY_GATEWAY: "true"
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+(-dev)?$/
 
 compute-image:
   stage: .pre
   image: alpine:latest
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+(-dev)?$/
   script:
     - V="${CI_COMMIT_TAG#v}"
+    - V="${V%-dev}"
     - MAJOR="$(echo "$V" | cut -d. -f1)"
     - MINOR="$(echo "$V" | cut -d. -f2)"
     - echo "TACPLUS_IMAGE=${CI_REGISTRY}/secondstarcavalier/schematic/tacplus/tacplus-${MAJOR}-${MINOR}:latest" > tacplus.env
@@ -38,6 +39,7 @@ variables:
 .parse-version: &parse-version
   - |
     V="${CI_COMMIT_TAG#v}"
+    V="${V%-dev}"
     MAJOR="$(echo "$V" | cut -d. -f1)"
     MINOR="$(echo "$V" | cut -d. -f2)"
     PATCH="$(echo "$V" | cut -d. -f3)"
@@ -50,7 +52,7 @@ variables:
   image: $TACPLUS_IMAGE
   needs: [compute-image, build-webapp]
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+(-dev)?$/
   cache:
     - key: tacplus
       paths:
@@ -96,7 +98,7 @@ build-arm64:
   services:
     - docker:dind
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+(-dev)?$/
   before_script:
     - *parse-version
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
@@ -137,7 +139,7 @@ manifest:
     - package-amd64
     - package-arm64
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+(-dev)?$/
   before_script:
     - *parse-version
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"

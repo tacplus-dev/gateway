@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::convert::Infallible;
 
 use axum::body::Body;
 use axum::response::Response;
@@ -118,9 +117,7 @@ impl IdpProxy {
         backend_req = backend_req.header(http::header::HOST, endpoint);
 
         let backend_req = backend_req.body(
-            http_body_util::Full::new(body_bytes)
-                .map_err(|e| match e {})
-                .boxed()
+            http_body_util::Full::new(body_bytes).boxed()
         )?;
 
         let backend_resp = sender.send_request(backend_req).await?;

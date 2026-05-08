@@ -102,6 +102,6 @@ impl Mint for GatewayMintService
         _request: tonic::Request<TraceRequest>,
     ) -> Result<tonic::Response<PublicCaResponse>, tonic::Status> {
         let certs = self.ca_certs.read().await.clone();
-        Ok(tonic::Response::new(PublicCaResponse { certs }))
+        Ok(tonic::Response::new(PublicCaResponse { certs, ..Default::default() }))
     }
 }
