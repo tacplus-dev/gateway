@@ -1,11 +1,13 @@
 use std::sync::Arc;
 
+use tokio::sync::RwLock;
 use tonic::transport::Channel;
 
 use gateway_tacplus::types::common::tokenrequest::{TokenMintRequest, TokenMintResponse, X509MintRequest};
 use gateway_tacplus::types::libs::jwk::jwk::{Jwks, OpenIdConfiguration};
 use gateway_tacplus::types::libs::trace::trace::TraceRequest;
-use gateway_tacplus::types::libs::x509::x509::X509CertChain;
+use gateway_tacplus::types::libs::x509::x509::{X509CertChain, X509Cert};
+use gateway_tacplus::types::services::gateway::gateway::{PublicCaResponse, mint_server::Mint};
 use gateway_tacplus::types::services::kernel::kernel::mint_client::MintClient as KernelMintClient;
 
 use crate::auth::GatewayAuth;
@@ -14,18 +16,26 @@ use crate::auth::GatewayAuth;
 ///
 /// OpenIdConfig and Jwks are served locally from watched JWK keys.
 /// TokenMint and X509Mint are delegated to kernel via the direct channel.
+/// PublicCa serves the cluster root CA certs (watched from kernel CaState).
 pub struct GatewayMintService {
     kernel_channel: Channel,
     auth: Arc<GatewayAuth>,
     issuer_url: String,
+    ca_certs: Arc<RwLock<Vec<X509Cert>>>,
 }
 
 impl GatewayMintService {
-    pub fn new(kernel_channel: Channel, auth: Arc<GatewayAuth>, issuer_url: String) -> Self {
+    pub fn new(
+        kernel_channel: Channel,
+        auth: Arc<GatewayAuth>,
+        issuer_url: String,
+        ca_certs: Arc<RwLock<Vec<X509Cert>>>,
+    ) -> Self {
         Self {
             kernel_channel,
             auth,
             issuer_url,
+            ca_certs,
         }
     }
 
@@ -55,8 +65,7 @@ impl GatewayMintService {
 //   gateway_tacplus::types::services::gateway::gateway::mint_server::Mint
 
 #[tonic::async_trait]
-impl gateway_tacplus::types::services::gateway::gateway::mint_server::Mint
-    for GatewayMintService
+impl Mint for GatewayMintService
 {
     async fn open_id_config(
         &self,
@@ -86,5 +95,13 @@ impl gateway_tacplus::types::services::gateway::gateway::mint_server::Mint
     ) -> Result<tonic::Response<X509CertChain>, tonic::Status> {
         let mut client = KernelMintClient::new(self.kernel_channel.clone());
         client.x509_mint(request).await
+    }
+
+    async fn public_ca(
+        &self,
+        _request: tonic::Request<TraceRequest>,
+    ) -> Result<tonic::Response<PublicCaResponse>, tonic::Status> {
+        let certs = self.ca_certs.read().await.clone();
+        Ok(tonic::Response::new(PublicCaResponse { certs }))
     }
 }

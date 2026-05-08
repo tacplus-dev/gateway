@@ -7,11 +7,13 @@ use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::Router;
 use futures::StreamExt;
+use tokio::sync::RwLock;
 use tonic::transport::Channel;
 use uuid::Uuid;
 
 use gateway_tacplus::s2sm::rest_dispatch::{self, RouteInfo, ROUTES, REST_ROOT_PATH};
 use gateway_tacplus::types::libs::jwk::jwk::{Jwks, OpenIdConfiguration};
+use gateway_tacplus::types::libs::x509::x509::X509Cert;
 use gateway_tacplus::types::services::kernel::kernel::mint_client::MintClient as KernelMintClient;
 
 use crate::auth::GatewayAuth;
@@ -22,6 +24,7 @@ pub struct RestState {
     pub proxy: Arc<ProxyState>,
     pub kernel_channel: Channel,
     pub auth: Arc<GatewayAuth>,
+    pub ca_certs: Arc<RwLock<Vec<X509Cert>>>,
 }
 
 /// Build the REST router.
@@ -379,7 +382,7 @@ impl futures::Stream for GrpcFrameStream {
     }
 }
 
-/// Handle Mint RPCs: OpenIdConfig/Jwks locally, TokenMint/X509Mint via kernel.
+/// Handle Mint RPCs: OpenIdConfig/Jwks/PublicCa locally, TokenMint/X509Mint via kernel.
 async fn handle_mint(
     route: &RouteInfo,
     state: &RestState,
@@ -461,6 +464,19 @@ async fn handle_mint(
                     (code, msg).into_response()
                 }
             }
+        }
+        "/gateway.Mint/PublicCa" => {
+            let certs = state.ca_certs.read().await;
+            let items: Vec<serde_json::Value> = certs.iter().map(|c| {
+                serde_json::json!({"id": c.id, "base64": c.base64})
+            }).collect();
+            let resp = serde_json::json!({"certs": items});
+            (
+                StatusCode::OK,
+                [(axum::http::header::CONTENT_TYPE, "application/json".to_string())],
+                resp.to_string(),
+            )
+                .into_response()
         }
         _ => (
             StatusCode::NOT_FOUND,

@@ -1,4 +1,5 @@
 mod auth;
+mod idp_proxy;
 mod proxy_grpc;
 mod health;
 mod mint;
@@ -107,9 +108,15 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // 6. Fetch dynamic CAs from kernel's CaState and build backend TLS config.
     // CaState.ca_certs contains the runtime CA(s) that sign per-service intermediate CAs
     // via X509Mint. Without these, the resolver can't verify backend service TLS certs.
-    let dynamic_cas = wait_for_ca_certs(kernel_channel.clone(), &token_provider).await?;
-    let backend_tls = build_backend_tls_config(sm.config(), &dynamic_cas);
-    let resolver = Arc::new(resolver::Resolver::new(health_watcher, backend_tls));
+    let initial_cas = wait_for_ca_certs(kernel_channel.clone(), &token_provider).await?;
+    let ca_pem_bundle = build_ca_pem_bundle(sm.config(), &initial_cas);
+    let backend_tls = build_backend_tls_config_from_pem(&ca_pem_bundle);
+    let resolver = Arc::new(resolver::Resolver::new(health_watcher.clone(), backend_tls));
+
+    // Store CA certs in a shared RwLock so the Mint service can serve them via PublicCa.
+    let ca_certs_store = Arc::new(tokio::sync::RwLock::new(initial_cas));
+    spawn_ca_cert_watcher(kernel_channel.clone(), token_provider.clone(), Arc::clone(&ca_certs_store));
+
 
     // 7. Create gateway auth using the SM's authorizer's JWK cache.
     // Entitlements are read from the service_entitlements JWT claim — no profile cache needed.
@@ -130,6 +137,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         kernel_channel.clone(),
         Arc::clone(&gateway_auth),
         String::new(), // issuer URL — empty = same origin
+        Arc::clone(&ca_certs_store),
     );
 
     // 9. Create trace publisher (shared between gRPC proxy and REST handler).
@@ -160,9 +168,19 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         proxy: Arc::clone(&proxy_state),
         kernel_channel: kernel_channel.clone(),
         auth: Arc::clone(&gateway_auth),
+        ca_certs: Arc::clone(&ca_certs_store),
     });
 
-    // 12. Layer the routers: Mint (tonic) → gRPC proxy → REST/SPA.
+    // 12. Build IDP proxy for /realms/* and /admin/* → Keycloak.
+    // This is the only HTTP (non-gRPC) backend proxy in gateway.
+    // Keycloak uses a kernel-issued cert; we verify against the kernel CA
+    // using "kernel" as the SNI hostname (all service certs have SAN DNS:kernel).
+    let idp_proxy = Arc::new(
+        idp_proxy::IdpProxy::new(health_watcher.clone(), &ca_pem_bundle)
+            .map_err(|e| format!("failed to build IDP proxy: {e}"))?,
+    );
+
+    // 13. Layer the routers: Mint (tonic) → gRPC proxy → IDP proxy → REST/SPA.
     // Mint is a native tonic service; all other gRPC requests are proxied
     // as raw HTTP/2 through the resolver to backend services.
     let registry_route = format!("{}/registry/{{file}}", gateway_tacplus::s2sm::rest_dispatch::REST_ROOT_PATH);
@@ -175,14 +193,18 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Intercept gRPC requests before they reach REST/SPA routing.
     // Native gRPC clients (cavalierctl, service-to-service) send content-type: application/grpc.
     // These are proxied as raw HTTP/2 to backend services. Non-gRPC requests pass through
-    // to REST routes and SPA handler.
+    // to the IDP proxy check, then REST routes and SPA handler.
     let proxy_state_clone = Arc::clone(&proxy_state);
-    let grpc_intercept = axum::middleware::from_fn(
+    let idp_proxy_clone = Arc::clone(&idp_proxy);
+    let grpc_and_idp_intercept = axum::middleware::from_fn(
         move |req: axum::extract::Request, next: axum::middleware::Next| {
             let proxy = Arc::clone(&proxy_state_clone);
+            let idp = Arc::clone(&idp_proxy_clone);
             async move {
                 if proxy_grpc::is_grpc(&req) {
                     proxy_grpc::handle(&proxy, req).await
+                } else if idp_proxy::IdpProxy::is_idp_request(req.uri().path()) {
+                    idp.handle(req).await
                 } else {
                     next.run(req).await
                 }
@@ -191,10 +213,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Mint (tonic) handles /gateway.Mint/* methods.
-    // Everything else hits the gRPC intercept layer: gRPC requests are proxied,
-    // non-gRPC requests fall through to REST routes and SPA.
+    // Everything else hits the intercept layer: gRPC → IDP proxy → REST/SPA.
     let app = grpc_router
-        .fallback_service(spa_and_rest.layer(grpc_intercept));
+        .fallback_service(spa_and_rest.layer(grpc_and_idp_intercept));
 
     // 13. Start TLS listener — serves both HTTP and gRPC on the same port.
     tracing::info!(addr = %tcp_addr, "listening (TLS, HTTP+gRPC)");
@@ -344,6 +365,66 @@ fn load_gateway_config() -> GatewayConfig {
     cfg
 }
 
+/// Spawn a background task that watches kernel's CaState and updates the shared CA cert store.
+fn spawn_ca_cert_watcher(
+    channel: tonic::transport::Channel,
+    token_provider: TokenProvider,
+    ca_certs_store: Arc<tokio::sync::RwLock<Vec<gateway_tacplus::types::libs::x509::x509::X509Cert>>>,
+) {
+    tokio::spawn(async move {
+        loop {
+            match watch_ca_cert_updates(channel.clone(), &token_provider, &ca_certs_store).await {
+                Ok(()) => tracing::warn!("WatchCaCerts stream ended, reconnecting"),
+                Err(e) => {
+                    tracing::error!(error = %e, "CA cert watcher failed, retrying in 5s");
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                }
+            }
+        }
+    });
+}
+
+async fn watch_ca_cert_updates(
+    channel: tonic::transport::Channel,
+    token_provider: &TokenProvider,
+    ca_certs_store: &tokio::sync::RwLock<Vec<gateway_tacplus::types::libs::x509::x509::X509Cert>>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use gateway_tacplus::types::services::kernel::kernel::ca_state_service_client::CaStateServiceClient;
+
+    let mut client = CaStateServiceClient::new(channel);
+
+    let mut request = tonic::Request::new(Default::default());
+    if let Ok(token) = (token_provider)().await {
+        let val: tonic::metadata::MetadataValue<tonic::metadata::Ascii> =
+            format!("Bearer {}", token).parse()
+                .map_err(|e| format!("invalid token metadata: {e}"))?;
+        request.metadata_mut().insert("authorization", val);
+    }
+
+    let response = client.watch_ca_certs(request).await?;
+    let mut stream = response.into_inner();
+
+    tracing::info!("CA cert watcher stream started");
+
+    while let Some(msg) = stream.next().await {
+        match msg {
+            Ok(entries) => {
+                if !entries.entries.is_empty() {
+                    let certs: Vec<_> = entries.entries.into_values().collect();
+                    tracing::info!(count = certs.len(), "CA certificates updated from kernel CaState");
+                    *ca_certs_store.write().await = certs;
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "WatchCaCerts stream error");
+                return Err(e.into());
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Wait for dynamic CA certificates from kernel's CaState.
 /// These are the runtime CAs that sign per-service intermediate CAs via X509Mint.
 async fn wait_for_ca_certs(
@@ -400,34 +481,34 @@ async fn wait_for_ca_certs(
     }
 }
 
-/// Build a ClientTlsConfig for backend connections using bootstrap CAs and dynamic CAs.
-/// Bootstrap CAs come from the config file; dynamic CAs come from the kernel's CaState
-/// (runtime CAs that sign per-service intermediate certs via X509Mint).
-fn build_backend_tls_config(
+/// Build the raw PEM bundle of all CA certificates (bootstrap + dynamic).
+fn build_ca_pem_bundle(
     config: &gateway_tacplus::types::libs::grpcconfig::grpcconfig::Config,
     dynamic_cas: &[gateway_tacplus::types::libs::x509::x509::X509Cert],
-) -> tonic::transport::ClientTlsConfig {
-    let mut tls_config = tonic::transport::ClientTlsConfig::new();
+) -> String {
     let mut pem_bundle = String::new();
-
-    // Add bootstrap CAs from config.
     tracing::info!(count = config.trusted_cas.len(), "loading bootstrap CAs");
     for ca in &config.trusted_cas {
         decode_ca_pem(&ca.base64, &mut pem_bundle);
     }
-
-    // Add dynamic CAs from kernel's CaState.
     tracing::info!(count = dynamic_cas.len(), "loading dynamic CAs from CaState");
     for ca in dynamic_cas {
         decode_ca_pem(&ca.base64, &mut pem_bundle);
     }
-
-    if !pem_bundle.is_empty() {
-        tracing::info!(total_len = pem_bundle.len(), "backend TLS trust store built");
-        let ca_cert = tonic::transport::Certificate::from_pem(pem_bundle);
-        tls_config = tls_config.ca_certificate(ca_cert);
-    } else {
+    if pem_bundle.is_empty() {
         tracing::warn!("no CA certificates available for backend TLS — connections will fail");
+    } else {
+        tracing::info!(total_len = pem_bundle.len(), "backend TLS trust store built");
+    }
+    pem_bundle
+}
+
+/// Build a ClientTlsConfig for gRPC backend connections from a PEM CA bundle.
+fn build_backend_tls_config_from_pem(ca_pem_bundle: &str) -> tonic::transport::ClientTlsConfig {
+    let mut tls_config = tonic::transport::ClientTlsConfig::new();
+    if !ca_pem_bundle.is_empty() {
+        let ca_cert = tonic::transport::Certificate::from_pem(ca_pem_bundle);
+        tls_config = tls_config.ca_certificate(ca_cert);
     }
     tls_config
 }
