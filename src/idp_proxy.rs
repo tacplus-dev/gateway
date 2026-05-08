@@ -12,6 +12,8 @@ use rustls::pki_types::ServerName;
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 
+use gateway_tacplus::types::services::keycloak::keycloak::{GATEWAY_PROXY_PATH_ADMIN, GATEWAY_PROXY_PATH_REALMS};
+
 use crate::health::HealthWatcher;
 
 /// IdpProxy HTTP-proxies requests to the Keycloak IDP service.
@@ -42,9 +44,10 @@ impl IdpProxy {
     }
 
     /// Returns true if the request path starts with an IDP proxy prefix.
+    /// Path prefixes are defined as constants in the keycloak proto.
     pub fn is_idp_request(path: &str) -> bool {
-        path.starts_with("/realms/") || path == "/realms"
-            || path.starts_with("/admin/") || path == "/admin"
+        path == GATEWAY_PROXY_PATH_REALMS || path.starts_with(&format!("{}/", GATEWAY_PROXY_PATH_REALMS))
+            || path == GATEWAY_PROXY_PATH_ADMIN || path.starts_with(&format!("{}/", GATEWAY_PROXY_PATH_ADMIN))
     }
 
     /// Forwards an incoming HTTP request to the Keycloak backend.
