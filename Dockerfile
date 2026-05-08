@@ -15,13 +15,8 @@ LABEL org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.title="Gateway" \
       org.opencontainers.image.description="API gateway for Cavalier control plane services"
 
-ARG GRPC_HEALTH_PROBE_VERSION=0.4.48
-ARG TARGETARCH
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && \
-    curl -fsSL -o /usr/local/bin/grpc_health_probe \
-      "https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-${TARGETARCH}" && \
-    chmod +x /usr/local/bin/grpc_health_probe && \
-    apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+COPY --from=ghcr.io/grpc-ecosystem/grpc-health-probe:v0.4.48 /ko-app/grpc-health-probe /usr/local/bin/grpc_health_probe
+RUN chmod +x /usr/local/bin/grpc_health_probe
 COPY target/release/gateway /usr/local/bin/gateway
 RUN chmod +x /usr/local/bin/gateway
 
