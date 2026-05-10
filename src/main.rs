@@ -173,12 +173,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // 12. Build IDP proxy for /realms/* and /admin/* → Keycloak.
     // This is the only HTTP (non-gRPC) backend proxy in gateway.
-    // Keycloak uses a kernel-issued cert; we verify against the kernel CA
-    // using "kernel" as the SNI hostname (all service certs have SAN DNS:kernel).
-    let idp_proxy = Arc::new(
-        idp_proxy::IdpProxy::new(health_watcher.clone(), &ca_pem_bundle)
-            .map_err(|e| format!("failed to build IDP proxy: {e}"))?,
-    );
+    // Keycloak is proxied over plain HTTP on port 8080 (intra-cluster connection).
+    let idp_proxy = Arc::new(idp_proxy::IdpProxy::new(health_watcher.clone()));
 
     // 13. Layer the routers: Mint (tonic) → gRPC proxy → IDP proxy → REST/SPA.
     // Mint is a native tonic service; all other gRPC requests are proxied

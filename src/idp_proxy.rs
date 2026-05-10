@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use axum::body::Body;
@@ -6,10 +5,7 @@ use axum::response::Response;
 use http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use hyper_util::rt::TokioIo;
-use rustls::RootCertStore;
-use rustls::pki_types::ServerName;
 use tokio::net::TcpStream;
-use tokio_rustls::TlsConnector;
 
 use gateway_tacplus::types::services::keycloak::{GATEWAY_PROXY_PATH_ADMIN, GATEWAY_PROXY_PATH_REALMS};
 
@@ -17,29 +13,25 @@ use crate::health::HealthWatcher;
 
 /// IdpProxy HTTP-proxies requests to the Keycloak IDP service.
 ///
-/// Keycloak is accessed over HTTPS using a kernel-issued certificate. All
-/// service certs have SAN DNS:kernel, so TLS verification uses "kernel" as
-/// the server name — the same approach as the gRPC resolver's domain_name("kernel").
+/// Keycloak is accessed over plain HTTP on port 8080 (its internal HTTP listener).
+/// The connection is intra-cluster so TLS is not required on this leg — the
+/// external-facing HTTPS is terminated by the gateway itself.
 ///
 /// Gateway routes /realms/* and /admin/* through this proxy instead of the
 /// gRPC path. This is the only HTTP (non-gRPC) backend in the gateway.
 pub struct IdpProxy {
     health: HealthWatcher,
-    tls_connector: TlsConnector,
     counter: AtomicUsize,
 }
 
 impl IdpProxy {
-    /// Creates an IdpProxy from the kernel CA PEM bundle.
+    /// Creates an IdpProxy backed by the given HealthWatcher.
     /// HealthWatcher is cheaply cloneable — all internal state is Arc-wrapped.
-    pub fn new(health: HealthWatcher, ca_pem_bundle: &str) -> Result<Self, String> {
-        let connector = build_tls_connector(ca_pem_bundle)
-            .map_err(|e| format!("IdpProxy: failed to build TLS connector: {e}"))?;
-        Ok(Self {
+    pub fn new(health: HealthWatcher) -> Self {
+        Self {
             health,
-            tls_connector: connector,
             counter: AtomicUsize::new(0),
-        })
+        }
     }
 
     /// Returns true if the request path starts with an IDP proxy prefix.
@@ -51,13 +43,18 @@ impl IdpProxy {
 
     /// Forwards an incoming HTTP request to the Keycloak backend.
     pub async fn handle(&self, req: Request<Body>) -> Response<Body> {
-        let endpoints = self.health.get_endpoints("keycloak");
+        // health.get_endpoints("keycloak") returns the gRPC port (8443).
+        // Keycloak's internal HTTP listener is on port 8080 — same host, different port.
+        let endpoints: Vec<String> = self.health.get_endpoints("keycloak")
+            .into_iter()
+            .filter_map(|ep| ep.split(':').next().map(|host| format!("{}:8080", host)))
+            .collect();
         if endpoints.is_empty() {
             tracing::warn!("idp_proxy: no healthy keycloak endpoints");
             return error_response(StatusCode::SERVICE_UNAVAILABLE, "IDP service unavailable");
         }
 
-        // Round-robin across healthy endpoints.
+        // Round-robin across healthy endpoints (using Keycloak HTTP port 8080).
         let idx = self.counter.fetch_add(1, Ordering::Relaxed) % endpoints.len();
         let endpoint = &endpoints[idx];
 
@@ -80,15 +77,11 @@ impl IdpProxy {
         // Collect the incoming body.
         let body_bytes = body.collect().await?.to_bytes();
 
-        // Connect to the Keycloak endpoint over TLS, using "kernel" as SNI.
-        // All kernel-issued service certs have SAN DNS:kernel.
-        let server_name = ServerName::try_from("kernel")
-            .map_err(|e| format!("invalid server name: {e}"))?;
+        // Connect to the Keycloak endpoint over plain TCP (HTTP, not HTTPS).
         let tcp = TcpStream::connect(endpoint).await?;
-        let tls_stream = self.tls_connector.connect(server_name, tcp).await?;
-        let io = TokioIo::new(tls_stream);
+        let io = TokioIo::new(tcp);
 
-        // Build an HTTP/1.1 connection (Keycloak supports HTTP/1.1 and HTTP/2).
+        // Build an HTTP/1.1 connection.
         let (mut sender, conn) = hyper::client::conn::http1::handshake(io).await?;
         tokio::spawn(async move {
             if let Err(e) = conn.await {
@@ -97,7 +90,7 @@ impl IdpProxy {
         });
 
         // Reconstruct the request for the backend.
-        let uri_str = format!("https://{}{}", endpoint, parts.uri.path_and_query()
+        let uri_str = format!("http://{}{}", endpoint, parts.uri.path_and_query()
             .map(|pq| pq.as_str())
             .unwrap_or(""));
         let backend_uri: http::Uri = uri_str.parse()?;
@@ -107,6 +100,12 @@ impl IdpProxy {
             .uri(backend_uri)
             .version(http::Version::HTTP_11);
 
+        // Extract the original Host header (external FQDN) for X-Forwarded-Host.
+        let original_host = parts.headers.get(http::header::HOST)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+
         // Copy request headers, replacing Host with the backend endpoint.
         for (name, value) in &parts.headers {
             if name == http::header::HOST {
@@ -115,6 +114,13 @@ impl IdpProxy {
             backend_req = backend_req.header(name, value);
         }
         backend_req = backend_req.header(http::header::HOST, endpoint);
+
+        // Inject X-Forwarded-* headers so Keycloak constructs correct external URLs.
+        if !original_host.is_empty() {
+            backend_req = backend_req.header("X-Forwarded-Host", original_host.as_str());
+        }
+        backend_req = backend_req.header("X-Forwarded-Proto", "https");
+        backend_req = backend_req.header("X-Forwarded-Port", "443");
 
         let backend_req = backend_req.body(
             http_body_util::Full::new(body_bytes).boxed()
@@ -135,22 +141,6 @@ impl IdpProxy {
 
         Ok(resp.body(Body::new(response_body))?)
     }
-}
-
-/// Build a TlsConnector from a PEM CA bundle.
-fn build_tls_connector(ca_pem_bundle: &str) -> Result<TlsConnector, Box<dyn std::error::Error>> {
-    let mut root_store = RootCertStore::empty();
-
-    // Parse the PEM bundle and add each certificate to the root store.
-    for cert in rustls_pemfile::certs(&mut ca_pem_bundle.as_bytes()) {
-        root_store.add(cert?)?;
-    }
-
-    let config = rustls::ClientConfig::builder()
-        .with_root_certificates(root_store)
-        .with_no_client_auth();
-
-    Ok(TlsConnector::from(Arc::new(config)))
 }
 
 fn error_response(status: StatusCode, msg: &'static str) -> Response<Body> {
