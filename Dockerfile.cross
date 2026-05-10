@@ -1,0 +1,49 @@
+# Multi-stage build: compile Rust for linux/arm64, then create runtime image.
+# Used for local development builds when cross-compilation tools aren't available.
+FROM --platform=linux/arm64 rust:bookworm AS builder
+
+# Install build dependencies.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    libssl-dev \
+    protobuf-compiler \
+    libprotobuf-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy all source files including tacplus-generated crates.
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+COPY target/generated-sources/tacplus ./target/generated-sources/tacplus
+
+# Remove any pre-compiled artifacts that are wrong architecture.
+RUN find target/generated-sources/tacplus/target -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+
+# Copy the pre-built SPA into dist/ for RustEmbed to embed at compile time.
+COPY dist ./dist
+
+# Build the release binary.
+RUN cargo build --release
+
+# ---- Runtime image ----
+FROM --platform=linux/arm64 debian:trixie-slim
+
+ARG BUILD_DATE
+ARG VCS_REF
+ARG VERSION
+
+LABEL org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.authors="Second Star Cavalier LLC <cloudctlplane@secondstarcavalier.com>" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="Second Star Cavalier LLC" \
+      org.opencontainers.image.title="Gateway" \
+      org.opencontainers.image.description="API gateway for Cavalier control plane services"
+
+COPY --from=ghcr.io/grpc-ecosystem/grpc-health-probe:v0.4.48 /ko-app/grpc-health-probe /usr/local/bin/grpc_health_probe
+RUN chmod +x /usr/local/bin/grpc_health_probe
+COPY --from=builder /build/target/release/gateway /usr/local/bin/gateway
+RUN chmod +x /usr/local/bin/gateway
+
+ENTRYPOINT ["gateway"]
