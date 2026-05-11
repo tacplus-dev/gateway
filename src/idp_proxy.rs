@@ -7,7 +7,9 @@ use http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use hyper_util::rt::TokioIo;
 use rustls::RootCertStore;
-use rustls::pki_types::ServerName;
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use rustls::{CertificateError, DigitallySignedStruct, Error as TlsError, SignatureScheme};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 
@@ -18,8 +20,10 @@ use crate::health::HealthWatcher;
 /// IdpProxy HTTPS-proxies requests to the Keycloak IDP service.
 ///
 /// Keycloak's subprocess listens on port 9443 (HTTPS) using a kernel-issued
-/// TLS certificate (SAN DNS:kernel). The gateway trusts this certificate via
-/// the kernel root chain already present in its config.
+/// TLS certificate. The cert is signed by the kernel root CA and uses a SPIFFE
+/// URI SAN (spiffe://local/dev/keycloak/keycloak0) — not a DNS SAN. The
+/// KernelCaVerifier below validates the chain against the kernel root CA while
+/// skipping DNS hostname matching.
 ///
 /// Gateway routes /realms/* and /admin/* through this proxy instead of the
 /// gRPC path. This is the only non-gRPC backend proxy in the gateway.
@@ -85,8 +89,9 @@ impl IdpProxy {
         let body_bytes = body.collect().await?.to_bytes();
 
         // Connect to the Keycloak HTTPS endpoint over TLS.
-        // All kernel-issued service certs have SAN DNS:kernel.
-        let server_name = ServerName::try_from("kernel")
+        // Kernel-issued certs use SPIFFE URI SANs; KernelCaVerifier validates
+        // the chain while skipping DNS name matching.
+        let server_name = ServerName::try_from("keycloak0")
             .map_err(|e| format!("invalid server name: {e}"))?;
         let tcp = TcpStream::connect(endpoint).await?;
         let tls_stream = self.tls_connector.connect(server_name, tcp).await?;
@@ -154,14 +159,75 @@ impl IdpProxy {
     }
 }
 
+/// A TLS verifier that validates the kernel CA chain but skips DNS hostname
+/// matching. Kernel-issued service certs carry SPIFFE URI SANs, so standard
+/// WebPki hostname verification always fails. K8s DNS routing guarantees we
+/// are connected to the correct pod; the CA chain is still fully verified.
+///
+/// Security note: rustls's WebPkiServerVerifier validates the certificate chain
+/// via verify_for_usage() before checking the server name, so swallowing
+/// NotValidForName does NOT bypass chain validation.
+#[derive(Debug)]
+struct KernelCaVerifier {
+    inner: Arc<dyn ServerCertVerifier>,
+}
+
+impl ServerCertVerifier for KernelCaVerifier {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer<'_>,
+        intermediates: &[CertificateDer<'_>],
+        server_name: &ServerName<'_>,
+        ocsp_response: &[u8],
+        now: UnixTime,
+    ) -> Result<ServerCertVerified, TlsError> {
+        match self.inner.verify_server_cert(end_entity, intermediates, server_name, ocsp_response, now) {
+            Ok(v) => Ok(v),
+            // Kernel-issued certs use SPIFFE URI SANs — no DNS SAN is present.
+            // The chain was already validated above; only the name match fails.
+            Err(TlsError::InvalidCertificate(CertificateError::NotValidForName)) => {
+                Ok(ServerCertVerified::assertion())
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        self.inner.verify_tls12_signature(message, cert, dss)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        self.inner.verify_tls13_signature(message, cert, dss)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.inner.supported_verify_schemes()
+    }
+}
+
 /// Build a TlsConnector from a PEM CA bundle (kernel root chain).
 fn build_tls_connector(ca_pem_bundle: &str) -> Result<TlsConnector, Box<dyn std::error::Error>> {
     let mut root_store = RootCertStore::empty();
     for cert in rustls_pemfile::certs(&mut ca_pem_bundle.as_bytes()) {
         root_store.add(cert?)?;
     }
+    let inner = rustls::client::WebPkiServerVerifier::builder(Arc::new(root_store))
+        .build()
+        .map_err(|e| format!("WebPkiServerVerifier: {e}"))?;
+    let verifier = KernelCaVerifier { inner };
     let config = rustls::ClientConfig::builder()
-        .with_root_certificates(root_store)
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(verifier))
         .with_no_client_auth();
     Ok(TlsConnector::from(Arc::new(config)))
 }
