@@ -185,7 +185,10 @@ impl ServerCertVerifier for KernelCaVerifier {
             Ok(v) => Ok(v),
             // Kernel-issued certs use SPIFFE URI SANs — no DNS SAN is present.
             // The chain was already validated above; only the name match fails.
-            Err(TlsError::InvalidCertificate(CertificateError::NotValidForName)) => {
+            // rustls 0.23.37+ uses NotValidForNameContext (with context data) over
+            // the older NotValidForName; catch both.
+            Err(TlsError::InvalidCertificate(CertificateError::NotValidForName))
+            | Err(TlsError::InvalidCertificate(CertificateError::NotValidForNameContext { .. })) => {
                 Ok(ServerCertVerified::assertion())
             }
             Err(e) => Err(e),
