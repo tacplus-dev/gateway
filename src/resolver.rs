@@ -33,6 +33,54 @@ impl Resolver {
         self.dial_endpoints(service_id, &endpoints)
     }
 
+    /// Try each unique endpoint with a raw TCP probe and return a channel to the
+    /// first reachable one. Falls back to round-robin if no endpoint responds.
+    ///
+    /// `Channel::poll_ready()` is a no-op for lazy-connect channels — it always
+    /// returns immediately without testing connectivity. A raw TCP connect is the
+    /// only way to determine if a backend pod is actually reachable before
+    /// committing the request.
+    pub async fn dial_ready_any(&self, service_id: &str) -> Channel {
+        let all_endpoints = self.health.get_endpoints(service_id);
+        if all_endpoints.is_empty() {
+            return self.dial_spiffe(service_id);
+        }
+
+        // Deduplicate: try each unique endpoint address exactly once.
+        let mut seen = std::collections::HashSet::new();
+        let unique: Vec<String> = all_endpoints
+            .iter()
+            .filter(|ep| seen.insert(ep.as_str()))
+            .cloned()
+            .collect();
+
+        for ep in &unique {
+            // TCP probe — drops the TcpStream immediately after connect.
+            // Fails fast (ECONNREFUSED) for dead pods; succeeds within ~1ms for live ones.
+            let reachable = tokio::time::timeout(
+                std::time::Duration::from_millis(500),
+                tokio::net::TcpStream::connect(ep.as_str()),
+            )
+            .await
+            .map(|r| r.is_ok())
+            .unwrap_or(false);
+
+            if reachable {
+                let tls = self.tls_config.clone().domain_name("kernel");
+                let uri = format!("https://{}", ep);
+                tracing::debug!(service = %service_id, endpoint = %ep, "dial_ready_any: found live endpoint");
+                return Endpoint::from_shared(uri)
+                    .expect("valid endpoint URI")
+                    .tls_config(tls)
+                    .expect("valid TLS config")
+                    .connect_lazy();
+            }
+            tracing::debug!(service = %service_id, endpoint = %ep, "dial_ready_any: TCP probe failed, trying next");
+        }
+        tracing::warn!(service = %service_id, endpoints = unique.len(), "dial_ready_any: no live endpoint found");
+        self.dial(service_id)
+    }
+
     /// Create a tonic Channel to a service identified by its SPIFFE path.
     /// Uses hierarchical fallback: if "mud-controller/agent-42" has no
     /// registered endpoints, falls back to "mud-controller" (the parent).

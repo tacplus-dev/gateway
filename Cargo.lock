@@ -662,7 +662,7 @@ dependencies = [
 
 [[package]]
 name = "gateway"
-version = "0.1.0"
+version = "1.2.0"
 dependencies = [
  "axum",
  "axum-server",
@@ -688,6 +688,7 @@ dependencies = [
  "servicemanager",
  "token",
  "tokio",
+ "tokio-rustls",
  "tokio-stream",
  "tonic",
  "tonic-health",
@@ -721,6 +722,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rustls",
+ "saml",
  "serde",
  "serde_json",
  "servicemanager",
@@ -1882,6 +1884,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "quick-xml"
+version = "0.36.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7649a7b4df05aed9ea7ec6f628c67c9953a43869b8bc50929569b2999d443fe"
+dependencies = [
+ "memchr",
+ "serde",
+]
+
+[[package]]
 name = "quinn"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2275,6 +2287,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "saml"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "ecdsa",
+ "gateway-tacplus-types",
+ "key",
+ "p256",
+ "quick-xml",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "signature",
+ "tokio",
+ "uuid",
+ "x509",
+ "x509-cert",
 ]
 
 [[package]]

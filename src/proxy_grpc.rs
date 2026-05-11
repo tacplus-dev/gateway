@@ -242,13 +242,16 @@ pub async fn handle(
     };
 
     // Forward to backend service.
+    // Probe endpoints to find a live one — stale health entries (pods that were
+    // removed from the cluster but not yet expired from Hazelcast) cause transport
+    // errors without probing. dial_ready_any() skips unreachable endpoints.
     // Try service_id first, fall back to SPIFFE path routing.
     let mut channel = {
         let endpoints = proxy.resolver.health().get_endpoints(service_id);
         if endpoints.is_empty() {
             proxy.resolver.dial_spiffe(service_id)
         } else {
-            proxy.resolver.dial(service_id)
+            proxy.resolver.dial_ready_any(service_id).await
         }
     };
 
