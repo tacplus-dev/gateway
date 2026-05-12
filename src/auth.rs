@@ -11,7 +11,7 @@ use gateway_token::token::Token;
 /// Gateway C2S authenticator/authorizer.
 ///
 /// Uses JwkCache for signature verification. Entitlements are read directly
-/// from the `service_entitlements` JWT claim (set by uncleopa at mint time),
+/// from the `service_entitlements` JWT claim (set by opa at mint time),
 /// so no separate profile cache is needed.
 ///   - `aud` must match the **target** service (not "gateway")
 ///   - entitlements are checked against the **target** service
@@ -145,7 +145,7 @@ impl GatewayAuth {
 
     /// Check entitlements against the **target** service (not gateway).
     ///
-    /// Reads the `service_entitlements` JWT claim (set by uncleopa at mint time).
+    /// Reads the `service_entitlements` JWT claim (set by opa at mint time).
     /// Grants access if `any=true` or if the specific method is listed.
     fn check_entitlements(
         &self,
@@ -158,7 +158,7 @@ impl GatewayAuth {
         let tw = Token::parse(token_str)
             .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
 
-        // Extract service_entitlements claim (embedded by uncleopa/kernel at mint time).
+        // Extract service_entitlements claim (embedded by opa/kernel at mint time).
         let se_val = tw.custom_field("service_entitlements").ok_or_else(|| {
             (StatusCode::FORBIDDEN, "token missing service_entitlements claim".into())
         })?;
