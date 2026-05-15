@@ -88,7 +88,7 @@ variables:
 build-arm64:
   extends: .build-arch
   tags:
-    - br.aarch64
+    - cavalier-arm64
   variables:
     ARCH: arm64
 
@@ -116,7 +116,7 @@ build-arm64:
 package-arm64:
   extends: .package-arch
   tags:
-    - br.aarch64
+    - cavalier-arm64
   needs:
     - build-arm64
   variables:
@@ -127,6 +127,8 @@ manifest:
   image: docker:latest
   services:
     - docker:dind
+  tags:
+    - br.aarch64
   needs:
     - package-arm64
   rules:
