@@ -170,6 +170,11 @@ impl GatewayAuth {
             se_val.clone()
         };
 
+        // Global all-entitlements bypass (admin users): {"all": true}
+        if se_obj.get("all").and_then(|v| v.as_bool()).unwrap_or(false) {
+            return Ok(());
+        }
+
         let svc_ent = se_obj.get(target_service).ok_or_else(|| {
             (StatusCode::FORBIDDEN, format!("no entitlements for service {target_service}"))
         })?;
