@@ -33,6 +33,7 @@ compute-image:
       dotenv: tacplus.env
 
 variables:
+  DOCKER_TLS_CERTDIR: ""
   WEBAPP_PROJECT_ID: "81967224"
   CARGO_HOME: "$CI_PROJECT_DIR/.cargo-home"
 
