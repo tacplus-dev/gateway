@@ -13,7 +13,9 @@ use rustls::{CertificateError, DigitallySignedStruct, Error as TlsError, Signatu
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 
-use gateway_tacplus::types::services::keycloak::{GATEWAY_PROXY_PATH_ADMIN, GATEWAY_PROXY_PATH_REALMS};
+// Keycloak service was removed; keep path constants here to avoid changing routing logic.
+const GATEWAY_PROXY_PATH_REALMS: &str = "/realms";
+const GATEWAY_PROXY_PATH_ADMIN: &str = "/admin";
 
 use crate::health::HealthWatcher;
 
