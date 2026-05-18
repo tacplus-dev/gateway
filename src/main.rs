@@ -21,9 +21,10 @@ use tracing_subscriber::EnvFilter;
 use gateway_tacplus::s2sm::ServiceManager;
 use gateway_tacplus::types::libs::host::host::Host;
 use gateway_tacplus::types::services::gateway::gateway::Config as GatewayConfig;
+use gateway_tacplus::types::services::gateway::gateway::ExternalTlsMode;
 use gateway_tacplus::types::services::gateway::helpers::{config_defaults, config_from_bytes};
-use gateway_tacplus::types::services::kernel::kernel::gateway_tls_state_service_client::GatewayTlsStateServiceClient;
-use gateway_tacplus::types::services::kernel::GatewayTlsCert;
+use gateway_tacplus::types::services::letsencrypt::letsencrypt::lets_encrypt_state_service_client::LetsEncryptStateServiceClient;
+use gateway_tacplus::types::services::letsencrypt::letsencrypt::LetsEncryptCertData;
 use crate::health::TokenProvider;
 
 #[tokio::main]
@@ -83,15 +84,30 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Use the generated token provider from ServiceManager.
     let token_provider = sm.token_provider();
 
-    // 3. Wait for TLS certificate from kernel state (GatewayTlsState.all_certs view).
-    // Gateway requires a publicly-signed cert — either manually configured or from LetsEncrypt.
-    // Crash after 60 seconds if no cert is available.
-    let initial_cert = wait_for_tls_cert(kernel_channel.clone(), &token_provider).await?;
-    let tls_config = tls::build_server_config(&initial_cert)?;
+    // 3. Build external TLS config based on external_tls_mode.
+    let tls_config = match cfg.external_tls_mode() {
+        ExternalTlsMode::CertChain => {
+            tracing::info!("external TLS mode: cert_chain");
+            tls::build_server_config_from_pem(&cfg.external_cert_pem, &cfg.external_key_pem)?
+        }
+        ExternalTlsMode::Letsencrypt => {
+            tracing::info!("external TLS mode: letsencrypt");
+            let cert_data = wait_for_tls_cert(kernel_channel.clone(), &token_provider).await?;
+            let chain = cert_data.tls_cert
+                .as_ref()
+                .ok_or("LetsEncryptState cert_data has no tls_cert")?;
+            tls::build_server_config(chain)?
+        }
+        ExternalTlsMode::Unspecified => {
+            return Err("external_tls_mode must be set in gateway config (cert_chain or letsencrypt)".into());
+        }
+    };
     let tls_acceptor = axum_server::tls_rustls::RustlsConfig::from_config(tls_config);
 
-    // Spawn background watcher for cert hot-reload.
-    spawn_cert_watcher(kernel_channel.clone(), token_provider.clone(), tls_acceptor.clone());
+    // Spawn cert hot-reload watcher for letsencrypt mode (cert_chain is static config).
+    if cfg.external_tls_mode() == ExternalTlsMode::Letsencrypt {
+        spawn_cert_watcher(kernel_channel.clone(), token_provider.clone(), tls_acceptor.clone());
+    }
 
     // 4. Log the compile-time route table.
     registry::Registry::load();
@@ -229,13 +245,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Wait for a TLS certificate from GatewayTlsState.all_certs view.
+/// Wait for a TLS certificate from LetsEncryptState.cert_data.
 /// Logs every 5 seconds while waiting. Returns error after 60 seconds.
 async fn wait_for_tls_cert(
     channel: tonic::transport::Channel,
     token_provider: &TokenProvider,
-) -> Result<GatewayTlsCert, Box<dyn std::error::Error>> {
-    let mut client = GatewayTlsStateServiceClient::new(channel);
+) -> Result<LetsEncryptCertData, Box<dyn std::error::Error>> {
+    let mut client = LetsEncryptStateServiceClient::new(channel);
 
     let mut request = tonic::Request::new(Default::default());
     if let Ok(token) = (token_provider)().await {
@@ -245,7 +261,7 @@ async fn wait_for_tls_cert(
         request.metadata_mut().insert("authorization", val);
     }
 
-    let response = client.watch_all_certs(request).await?;
+    let response = client.watch_cert_data(request).await?;
     let mut stream = response.into_inner();
 
     let mut log_interval = tokio::time::interval(Duration::from_secs(5));
@@ -256,19 +272,22 @@ async fn wait_for_tls_cert(
             tokio::select! {
                 msg = stream.next() => {
                     match msg {
-                        Some(Ok(entries)) => {
-                            if let Some((domain, cert)) = entries.entries.into_iter().next() {
-                                tracing::info!(domain = %domain, "TLS certificate received from kernel state");
-                                return Ok(cert);
-                            }
-                            // Empty entries — keep waiting.
+                        Some(Ok(cert_data)) if cert_data.tls_cert.is_some() => {
+                            tracing::info!(
+                                hostnames = ?cert_data.hostnames,
+                                "TLS certificate received from LetsEncryptState"
+                            );
+                            return Ok(cert_data);
+                        }
+                        Some(Ok(_)) => {
+                            // Empty cert_data — keep waiting.
                         }
                         Some(Err(e)) => return Err(Box::new(e) as Box<dyn std::error::Error>),
-                        None => return Err("WatchAllCerts stream ended without data".into()),
+                        None => return Err("WatchCertData stream ended without data".into()),
                     }
                 }
                 _ = log_interval.tick() => {
-                    tracing::info!("waiting for TLS certificate from kernel state...");
+                    tracing::info!("waiting for TLS certificate from LetsEncryptState...");
                 }
             }
         }
@@ -280,8 +299,8 @@ async fn wait_for_tls_cert(
     }
 }
 
-/// Spawn a background task that watches GatewayTlsState.all_certs and
-/// hot-reloads the TLS config when certificates change.
+/// Spawn a background task that watches LetsEncryptState.cert_data and
+/// hot-reloads the TLS config when the certificate is renewed.
 fn spawn_cert_watcher(
     channel: tonic::transport::Channel,
     token_provider: TokenProvider,
@@ -290,9 +309,9 @@ fn spawn_cert_watcher(
     tokio::spawn(async move {
         loop {
             match watch_cert_updates(channel.clone(), &token_provider, &tls_config).await {
-                Ok(()) => tracing::warn!("WatchAllCerts stream ended, reconnecting"),
+                Ok(()) => tracing::warn!("WatchCertData stream ended, reconnecting"),
                 Err(e) => {
-                    tracing::error!(error = %e, "WatchAllCerts cert watcher failed, retrying in 5s");
+                    tracing::error!(error = %e, "WatchCertData cert watcher failed, retrying in 5s");
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             }
@@ -305,7 +324,7 @@ async fn watch_cert_updates(
     token_provider: &TokenProvider,
     tls_config: &axum_server::tls_rustls::RustlsConfig,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let mut client = GatewayTlsStateServiceClient::new(channel);
+    let mut client = LetsEncryptStateServiceClient::new(channel);
 
     let mut request = tonic::Request::new(Default::default());
     if let Ok(token) = (token_provider)().await {
@@ -315,28 +334,28 @@ async fn watch_cert_updates(
         request.metadata_mut().insert("authorization", val);
     }
 
-    let response = client.watch_all_certs(request).await?;
+    let response = client.watch_cert_data(request).await?;
     let mut stream = response.into_inner();
 
     tracing::info!("TLS cert watcher stream started");
 
     while let Some(msg) = stream.next().await {
         match msg {
-            Ok(entries) => {
-                if let Some((domain, cert)) = entries.entries.into_iter().next() {
-                    match tls::build_server_config(&cert) {
+            Ok(cert_data) => {
+                if let Some(chain) = cert_data.tls_cert.as_ref() {
+                    match tls::build_server_config(chain) {
                         Ok(new_config) => {
                             tls_config.reload_from_config(new_config);
-                            tracing::info!(domain = %domain, "TLS certificate hot-reloaded");
+                            tracing::info!(hostnames = ?cert_data.hostnames, "TLS certificate hot-reloaded");
                         }
                         Err(e) => {
-                            tracing::error!(error = %e, "failed to build TLS config from updated cert");
+                            tracing::error!(error = %e, "failed to build TLS config from renewed cert");
                         }
                     }
                 }
             }
             Err(e) => {
-                tracing::warn!(error = %e, "WatchAllCerts stream error");
+                tracing::warn!(error = %e, "WatchCertData stream error");
                 return Err(e.into());
             }
         }
