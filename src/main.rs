@@ -22,7 +22,6 @@ use gateway_tacplus::s2sm::ServiceManager;
 use gateway_tacplus::types::libs::host::host::Host;
 use gateway_tacplus::types::services::gateway::gateway::Config as GatewayConfig;
 use gateway_tacplus::types::services::gateway::gateway::ExternalTlsMode;
-use gateway_tacplus::types::services::gateway::helpers::{config_defaults, config_from_bytes};
 use gateway_tacplus::types::services::letsencrypt::letsencrypt::lets_encrypt_state_service_client::LetsEncryptStateServiceClient;
 use gateway_tacplus::types::services::letsencrypt::letsencrypt::LetsEncryptCertData;
 use crate::health::TokenProvider;
@@ -46,17 +45,34 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    // 1. Load gateway-specific config (listen address, enable flags).
-    let cfg = load_gateway_config();
+    // 1. Connect to kernel via ServiceManager.
+    // SM loads bootstrap config, creates connection pool, StateClients, GrpcClients.
+    let sm = Arc::new(ServiceManager::new().await?);
+    let kernel_channel = sm.conn().await
+        .ok_or("no active kernel connection")?;
+
+    tracing::info!("ServiceManager connected to kernel");
+
+    // 2. Fetch gateway config from kernel state (delivered by operator via bootstrap).
+    let cfg = sm
+        .state_clients()
+        .services()
+        .gateway_config_state()
+        .config()
+        .fetch()
+        .await
+        .map_err(|e| format!("failed to fetch gateway config from kernel: {e}"))?;
+
     let tcp_addr = host_to_socket_addr(
-        cfg.tcp_listener.as_ref().expect("tcp_listener must be set after config_defaults"),
+        cfg.tcp_listener.as_ref().ok_or("tcp_listener must be set in gateway config")?,
     );
     tracing::info!(
         tcp_addr = %tcp_addr,
         http = cfg.enable_http,
         grpc = cfg.enable_grpc,
         http3 = cfg.enable_http3,
-        "starting gateway"
+        tls_mode = ?cfg.external_tls_mode(),
+        "gateway config received from kernel"
     );
 
     // Log SPA serving mode.
@@ -73,18 +89,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Err("at least one of enable_http, enable_http3, or enable_grpc must be true".into());
     }
 
-    // 2. Connect to kernel via ServiceManager.
-    // SM loads bootstrap config, creates connection pool, StateClients, GrpcClients.
-    let sm = Arc::new(ServiceManager::new().await?);
-    let kernel_channel = sm.conn().await
-        .ok_or("no active kernel connection")?;
-
-    tracing::info!("ServiceManager connected to kernel");
-
     // Use the generated token provider from ServiceManager.
     let token_provider = sm.token_provider();
 
     // 3. Build external TLS config based on external_tls_mode.
+    // Use the generated token provider from ServiceManager.
     let tls_config = match cfg.external_tls_mode() {
         ExternalTlsMode::CertChain => {
             tracing::info!("external TLS mode: cert_chain");
@@ -368,21 +377,6 @@ async fn watch_cert_updates(
 
 async fn healthz() -> StatusCode {
     StatusCode::OK
-}
-
-/// Load gateway-specific config from GATEWAY_CONFIG env var, or use defaults.
-/// The bootstrap/kernel config (-c/--config, BOOTSTRAP_CONFIG) is handled
-/// separately by the ServiceManager.
-fn load_gateway_config() -> GatewayConfig {
-    let mut cfg = match std::env::var("GATEWAY_CONFIG") {
-        Ok(data) => config_from_bytes(data.as_bytes()).unwrap_or_else(|e| {
-            tracing::warn!(error = %e, "failed to parse GATEWAY_CONFIG, using defaults");
-            GatewayConfig::default()
-        }),
-        Err(_) => GatewayConfig::default(),
-    };
-    config_defaults(&mut cfg);
-    cfg
 }
 
 /// Spawn a background task that watches kernel's CaState and updates the shared CA cert store.
