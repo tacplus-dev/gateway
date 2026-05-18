@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
 use tonic::transport::Channel;
 
 use gateway_tacplus::types::common::tokenrequest::{TokenMintRequest, TokenMintResponse, X509MintRequest};
@@ -16,12 +15,13 @@ use crate::auth::GatewayAuth;
 ///
 /// OpenIdConfig and Jwks are served locally from watched JWK keys.
 /// TokenMint and X509Mint are delegated to kernel via the direct channel.
-/// PublicCa serves the cluster root CA certs (watched from kernel CaState).
+/// PublicCa serves the root CA cert(s) from gateway config — the CA that
+/// signed the external TLS cert, which clients need to configure TLS trust.
 pub struct GatewayMintService {
     kernel_channel: Channel,
     auth: Arc<GatewayAuth>,
     issuer_url: String,
-    ca_certs: Arc<RwLock<Vec<X509Cert>>>,
+    root_ca: Vec<X509Cert>,
 }
 
 impl GatewayMintService {
@@ -29,13 +29,13 @@ impl GatewayMintService {
         kernel_channel: Channel,
         auth: Arc<GatewayAuth>,
         issuer_url: String,
-        ca_certs: Arc<RwLock<Vec<X509Cert>>>,
+        root_ca: Vec<X509Cert>,
     ) -> Self {
         Self {
             kernel_channel,
             auth,
             issuer_url,
-            ca_certs,
+            root_ca,
         }
     }
 
@@ -101,7 +101,6 @@ impl Mint for GatewayMintService
         &self,
         _request: tonic::Request<TraceRequest>,
     ) -> Result<tonic::Response<PublicCaResponse>, tonic::Status> {
-        let certs = self.ca_certs.read().await.clone();
-        Ok(tonic::Response::new(PublicCaResponse { certs, ..Default::default() }))
+        Ok(tonic::Response::new(PublicCaResponse { certs: self.root_ca.clone(), ..Default::default() }))
     }
 }

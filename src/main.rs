@@ -149,11 +149,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     // 8. Build gateway Mint service (local OIDC/JWKS, delegates TokenMint/X509Mint to kernel).
+    // root_ca comes from config — the CA that signed the external TLS cert.
+    // Clients call PublicCa to retrieve it for TLS trust configuration.
     let mint_service = mint::GatewayMintService::new(
         kernel_channel.clone(),
         Arc::clone(&gateway_auth),
         String::new(), // issuer URL — empty = same origin
-        Arc::clone(&ca_certs_store),
+        cfg.root_ca.clone(),
     );
 
     // 9. Create trace publisher (shared between gRPC proxy and REST handler).
