@@ -1,4 +1,5 @@
 mod auth;
+mod client_download;
 mod idp_proxy;
 mod proxy_grpc;
 mod health;
@@ -210,10 +211,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Mint is a native tonic service; all other gRPC requests are proxied
     // as raw HTTP/2 through the resolver to backend services.
     let registry_route = format!("{}/registry/{{file}}", gateway_tacplus::s2sm::rest_dispatch::REST_ROOT_PATH);
+    let client_route = format!("{}/client/{{os}}/{{arch}}", gateway_tacplus::s2sm::rest_dispatch::REST_ROOT_PATH);
+    let client_auth = Arc::clone(&gateway_auth);
     let spa_and_rest = rest_translation::router(rest_state)
         .route("/healthz", get(healthz))
         .route("/readyz", get(healthz))
         .route(&registry_route, get(spa::registry_handler))
+        .route(&client_route, get(move |path, req| client_download::handler(path, req, client_auth.clone())))
         .fallback(spa::spa_handler);
 
     // Intercept gRPC requests before they reach REST/SPA routing.

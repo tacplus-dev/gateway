@@ -3,8 +3,8 @@ stages:
   - package
   - manifest
 
-# Trigger webapp build and wait for it to publish before gateway builds.
-# Gateway embeds the webapp dist; this ensures it always gets the latest.
+# Trigger webapp build in parallel with gateway cargo build.
+# Package stage waits for both before baking the container.
 build-webapp:
   stage: .pre
   trigger:
@@ -41,6 +41,7 @@ compute-image:
 variables:
   DOCKER_TLS_CERTDIR: ""
   WEBAPP_PROJECT_ID: "81967224"
+  CAVALIER_PROJECT_ID: "81967223"
   CARGO_HOME: "$CI_PROJECT_DIR/.cargo-home"
 
 .parse-version: &parse-version
@@ -53,11 +54,15 @@ variables:
 .setup-netrc: &setup-netrc
   - printf "machine gitlab.com\nlogin gitlab-ci-token\npassword %s\n" "$CI_JOB_TOKEN" > ~/.netrc
 
+# ---------------------------------------------------------------------------
+# Build: compile the gateway binary only (no webapp, no cavalier clients).
+# Webapp and clients are installed in the container at package time.
+# ---------------------------------------------------------------------------
 .build-arch:
   stage: build
   retry: 2
   image: $TACPLUS_IMAGE
-  needs: [compute-image, build-webapp]
+  needs: [compute-image]
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-[a-zA-Z0-9_][a-zA-Z0-9_.-]*\.\d+$/
   cache:
@@ -71,20 +76,6 @@ variables:
   before_script:
     - *setup-netrc
     - tacplus build --skip-post
-    - |
-      set -euo pipefail
-      V="${CI_COMMIT_TAG#v}"
-      DOTPART="${V%%-*}"
-      MAJOR="$(echo "$DOTPART" | cut -d. -f1)"
-      MINOR="$(echo "$DOTPART" | cut -d. -f2)"
-      WEBAPP_PKG="webapp-${MAJOR}-${MINOR}"
-      echo "Downloading webapp dist..."
-      mkdir -p dist
-      curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-        -o webapp.tgz \
-        "${CI_API_V4_URL}/projects/${WEBAPP_PROJECT_ID}/packages/generic/${WEBAPP_PKG}/latest/${WEBAPP_PKG}-latest.tgz"
-      tar -xzf webapp.tgz -C dist
-      rm webapp.tgz
   script:
     - cargo build --release
   artifacts:
@@ -99,6 +90,10 @@ build-arm64:
   variables:
     ARCH: arm64
 
+# ---------------------------------------------------------------------------
+# Package: download webapp + cavalier clients, bake into container.
+# When only webapp or cavalier changes, retag gateway to rebuild just this.
+# ---------------------------------------------------------------------------
 .package-arch:
   stage: package
   retry: 2
@@ -111,12 +106,33 @@ build-arm64:
     - *parse-version
     - unset DOCKER_AUTH_CONFIG
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    # Download webapp dist
+    - |
+      WEBAPP_PKG="webapp-${MAJOR}-${MINOR}"
+      echo "Downloading webapp dist..."
+      mkdir -p webapp-dist
+      wget -q --header="JOB-TOKEN: $CI_JOB_TOKEN" \
+        -O webapp.tgz \
+        "${CI_API_V4_URL}/projects/${WEBAPP_PROJECT_ID}/packages/generic/${WEBAPP_PKG}/latest/${WEBAPP_PKG}-latest.tgz" \
+        || echo "WARN: webapp not available"
+      [ -f webapp.tgz ] && tar -xzf webapp.tgz -C webapp-dist && rm webapp.tgz || true
+    # Download cavalier client binaries
+    - |
+      CAVALIER_PKG="cavalier-${MAJOR}-${MINOR}"
+      echo "Downloading cavalier client binaries..."
+      mkdir -p clients
+      for target in linux-arm64 darwin-arm64 windows-amd64.exe windows-arm64.exe; do
+        echo "  ${target}..."
+        wget -q --header="JOB-TOKEN: $CI_JOB_TOKEN" \
+          -O "clients/cavalier-${target}" \
+          "${CI_API_V4_URL}/projects/${CAVALIER_PROJECT_ID}/packages/generic/${CAVALIER_PKG}/latest/${CAVALIER_PKG}-latest-${target}" \
+          || echo "  WARN: ${target} not available, skipping"
+      done
+      ls -lh clients/
   script:
     - |
       IMAGE="$CI_REGISTRY_IMAGE/gateway-${MAJOR}-${MINOR}"
-      docker pull "${IMAGE}:${CI_COMMIT_TAG}-${ARCH}" || true
       docker build --platform "linux/${ARCH}" \
-        --cache-from "${IMAGE}:${CI_COMMIT_TAG}-${ARCH}" \
         -t "${IMAGE}:${CI_COMMIT_TAG}-${ARCH}" \
         .
       docker push "${IMAGE}:${CI_COMMIT_TAG}-${ARCH}"
@@ -127,6 +143,7 @@ package-arm64:
     - schematic-aarch64
   needs:
     - build-arm64
+    - build-webapp
   variables:
     ARCH: arm64
 
@@ -170,7 +187,7 @@ compute-validate-image:
       MINOR="$(echo "$TACPLUS_VER" | cut -d. -f2)"
       REPO="secondstarcavalier/schematic/tacplus/tacplus-${MAJOR}-${MINOR}"
       echo "TACPLUS_IMAGE=${CI_REGISTRY}/${REPO}:latest" > tacplus.env
-      echo "Using tacplus image: ${CI_REGISTRY}/${REPO}:latest" 
+      echo "Using tacplus image: ${CI_REGISTRY}/${REPO}:latest"
   artifacts:
     reports:
       dotenv: tacplus.env
