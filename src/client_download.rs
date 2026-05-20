@@ -12,9 +12,9 @@ const CLIENT_DIR: &str = "/opt/cavalier/clients";
 /// Valid os/arch combinations.
 const VALID_TARGETS: &[(&str, &str)] = &[
     ("linux", "arm64"),
+    ("linux", "amd64"),
     ("darwin", "arm64"),
     ("windows", "amd64"),
-    ("windows", "arm64"),
 ];
 
 /// Serve cavalier client binary downloads.
