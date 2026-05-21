@@ -1,24 +1,31 @@
 # Local development builds only — not used in CI/CD.
 
-mount_flag := if path_exists("../../utils") == "true" { "--mount ../../utils:/utils" } else { "" }
+TACPLUS_IMAGE := "registry.gitlab.com/secondstarcavalier/schematic/tacplus/tacplus-1-2:latest"
 
-proto-sync:
+default: generate
+
+generate:
   #!/usr/bin/env bash
   set -euo pipefail
-  if [ -L proto ]; then
-    : # symlink — user-managed, skip sync
-  elif [ -d proto ]; then
+  if [ -d proto ]; then
     git -C proto fetch --quiet
     git -C proto reset --hard --quiet origin/HEAD
   else
     git clone --quiet https://gitlab.com/secondstarcavalier/schematic/platform/proto.git proto
   fi
-
-default: proto-sync
-  tacplus build --src proto {{mount_flag}}
+  docker pull "{{TACPLUS_IMAGE}}" --quiet
+  docker run --rm \
+    -v "$PWD:/work" \
+    -w /work \
+    "{{TACPLUS_IMAGE}}" \
+    tacplus build --src proto
 
 verify:
-  tacplus verify
+  docker run --rm \
+    -v "$PWD:/work" \
+    -w /work \
+    "{{TACPLUS_IMAGE}}" \
+    tacplus verify
 
 clean:
   rm -rf target

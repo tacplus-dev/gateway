@@ -2,10 +2,3 @@ tacplus-version: "1.2.x"
 language: rust
 pkg: com.gitlab.secondstarcavalier.controlplane.cavalier.services.gateway
 output-dir: target/generated-sources/tacplus
-post-gen:
-  - cmd: mkdir
-    args: [-p, dist]
-  - cmd: cargo
-    args: [build, --release]
-container:
-  image: registry.gitlab.com/secondstarcavalier/schematic/platform/services/gateway/gateway
