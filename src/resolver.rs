@@ -73,6 +73,9 @@ impl Resolver {
                     .expect("valid endpoint URI")
                     .tls_config(tls)
                     .expect("valid TLS config")
+                    .http2_keep_alive_interval(std::time::Duration::from_secs(10))
+                    .keep_alive_while_idle(true)
+                    .timeout(std::time::Duration::from_secs(300))
                     .connect_lazy();
             }
             tracing::debug!(service = %service_id, endpoint = %ep, "dial_ready_any: TCP probe failed, trying next");
@@ -111,6 +114,9 @@ impl Resolver {
             .expect("valid endpoint URI")
             .tls_config(tls)
             .expect("valid TLS config")
+            .http2_keep_alive_interval(std::time::Duration::from_secs(10))
+            .keep_alive_while_idle(true)
+            .timeout(std::time::Duration::from_secs(300))
             .connect_lazy()
     }
 }
