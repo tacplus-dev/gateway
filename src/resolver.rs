@@ -75,6 +75,7 @@ impl Resolver {
                     .expect("valid TLS config")
                     .http2_keep_alive_interval(std::time::Duration::from_secs(10))
                     .keep_alive_while_idle(true)
+                    .keep_alive_timeout(std::time::Duration::from_secs(60))
                     .timeout(std::time::Duration::from_secs(300))
                     .connect_lazy();
             }
@@ -116,6 +117,7 @@ impl Resolver {
             .expect("valid TLS config")
             .http2_keep_alive_interval(std::time::Duration::from_secs(10))
             .keep_alive_while_idle(true)
+            .keep_alive_timeout(std::time::Duration::from_secs(60))
             .timeout(std::time::Duration::from_secs(300))
             .connect_lazy()
     }
