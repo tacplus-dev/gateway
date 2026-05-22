@@ -249,7 +249,7 @@ pub async fn handle(
     let mut channel = {
         let endpoints = proxy.resolver.health().get_endpoints(service_id);
         if endpoints.is_empty() {
-            proxy.resolver.dial_spiffe(service_id)
+            proxy.resolver.dial_spiffe(service_id).await
         } else {
             proxy.resolver.dial_ready_any(service_id).await
         }
