@@ -65,7 +65,7 @@ impl Resolver {
             .unwrap_or(false);
 
             if reachable {
-                let tls = self.tls_config.clone().domain_name("kernel");
+                let tls = self.tls_config.clone().domain_name(service_id);
                 let uri = format!("https://{}", ep);
                 tracing::debug!(service = %service_id, endpoint = %ep, "dial_ready_any: found live endpoint");
                 match Self::connect_eager(&uri, tls).await {
@@ -101,7 +101,7 @@ impl Resolver {
         };
 
         let uri = format!("https://{}", endpoints[idx]);
-        let tls = self.tls_config.clone().domain_name("kernel");
+        let tls = self.tls_config.clone().domain_name(label);
 
         match Self::connect_eager(&uri, tls.clone()).await {
             Ok(ch) => {
