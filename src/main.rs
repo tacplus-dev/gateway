@@ -158,13 +158,24 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         auth_passthrough,
     ));
 
+    // Derive the public issuer URL from configured external_hostnames.
+    // This is the base for the OIDC `iss` claim and jwks_uri/token_endpoint
+    // in the discovery doc — external OIDC verifiers (e.g. Anthropic) will
+    // fetch JWKS by appending well-known paths to this URL.
+    let issuer_url = cfg
+        .external_hostnames
+        .first()
+        .map(|h| format!("https://{}", h))
+        .ok_or("gateway config has no external_hostnames; cannot build issuer URL")?;
+    tracing::info!(issuer_url = %issuer_url, "OIDC issuer URL derived from external_hostnames");
+
     // 8. Build gateway Mint service (local OIDC/JWKS, delegates TokenMint/X509Mint to kernel).
     // root_ca comes from config — the CA that signed the external TLS cert.
     // Clients call PublicCa to retrieve it for TLS trust configuration.
     let mint_service = mint::GatewayMintService::new(
         kernel_channel.clone(),
         Arc::clone(&gateway_auth),
-        String::new(), // issuer URL — empty = same origin
+        issuer_url.clone(),
         cfg.root_ca.clone(),
     );
 
@@ -197,6 +208,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         kernel_channel: kernel_channel.clone(),
         auth: Arc::clone(&gateway_auth),
         ca_certs: Arc::clone(&ca_certs_store),
+        issuer_url: issuer_url.clone(),
     });
 
     // 12. Build IDP proxy for /realms/* and /admin/* → Keycloak.

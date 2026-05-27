@@ -12,7 +12,8 @@ use tonic::transport::Channel;
 use uuid::Uuid;
 
 use gateway_tacplus::s2sm::rest_dispatch::{self, RouteInfo, ROUTES, REST_ROOT_PATH};
-use gateway_tacplus::types::libs::jwk::jwk::{Jwks, OpenIdConfiguration};
+use gateway_tacplus::types::libs::jwk::jwk::Jwks;
+use gateway_tacplus::types::libs::jwk::helpers as jwk_helpers;
 use gateway_tacplus::types::libs::x509::x509::X509Cert;
 use gateway_tacplus::types::services::kernel::kernel::mint_client::MintClient as KernelMintClient;
 
@@ -25,6 +26,26 @@ pub struct RestState {
     pub kernel_channel: Channel,
     pub auth: Arc<GatewayAuth>,
     pub ca_certs: Arc<RwLock<Vec<X509Cert>>>,
+    /// Public base URL (scheme + host) used as the OIDC `iss` claim and the
+    /// base for jwks_uri / token_endpoint. Sourced from gateway config's
+    /// external_hostnames at startup.
+    pub issuer_url: String,
+}
+
+/// OIDC Discovery 1.0 document, hand-written with snake_case field names.
+/// The generated `OpenIdConfiguration` proto-JSON serializer emits camelCase
+/// (proto3 canonical JSON convention) which is not what the OIDC spec
+/// requires. Until tacplus emits an RFC-compliant override for this type,
+/// we hand-roll the discovery doc locally.
+#[derive(serde::Serialize)]
+struct OidcDiscoveryDoc<'a> {
+    issuer: &'a str,
+    jwks_uri: String,
+    token_endpoint: String,
+    response_types_supported: &'static [&'static str],
+    grant_types_supported: &'static [&'static str],
+    subject_types_supported: &'static [&'static str],
+    id_token_signing_alg_values_supported: &'static [&'static str],
 }
 
 /// Build the REST router.
@@ -114,7 +135,7 @@ async fn rest_handler(
     // Gateway Mint special cases — served locally or proxied to kernel directly.
     if route.grpc_path.starts_with("/gateway.Mint/") {
         return handle_mint(
-            route, &state, &body_bytes, auth_header_value.as_deref(), &request_id, &headers,
+            route, &state, &body_bytes, auth_header_value.as_deref(), &request_id,
         ).await;
     }
 
@@ -389,34 +410,38 @@ async fn handle_mint(
     body: &[u8],
     auth_header: Option<&str>,
     request_id: &str,
-    headers: &axum::http::HeaderMap,
 ) -> axum::response::Response {
     match route.grpc_path {
         "/gateway.Mint/OpenIdConfig" => {
-            let host = headers
-                .get("host")
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("localhost");
-            let base = format!("https://{}", host);
-            let config = OpenIdConfiguration {
-                issuer: base.clone(),
+            // issuer is the gateway's configured public URL (not the Host header,
+            // which can be lost across HTTP/2 / TLS termination boundaries).
+            let base = &state.issuer_url;
+            let config = OidcDiscoveryDoc {
+                issuer: base,
                 jwks_uri: format!("{}{}/.well-known/jwks.json", base, REST_ROOT_PATH),
                 token_endpoint: format!("{}{}/gateway/TokenMint", base, REST_ROOT_PATH),
-                subject_types_supported: vec!["public".to_string()],
-                id_token_signing_alg_values_supported: vec!["EdDSA".to_string()],
-                response_types_supported: vec!["token".to_string()],
-                grant_types_supported: vec![
-                    "urn:ietf:params:oauth:grant-type:token-exchange".to_string(),
-                ],
-                ..Default::default()
+                response_types_supported: &["token"],
+                grant_types_supported: &["urn:ietf:params:oauth:grant-type:token-exchange"],
+                subject_types_supported: &["public"],
+                id_token_signing_alg_values_supported: &["EdDSA"],
             };
             json_response(&config)
         }
         "/gateway.Mint/Jwks" => {
-            let jwks = Jwks {
-                keys: state.auth.get_raw_jwks(),
-            };
-            json_response(&jwks)
+            // Use the tacplus-emitted `jwks_to_api_json` helper, which runs
+            // `stringify_jwks_enums` to convert kty/use enum ints into their
+            // RFC 7517 / 8037 canonical string forms ("OKP", "sig", …).
+            let jwks = Jwks { keys: state.auth.get_raw_jwks() };
+            match jwk_helpers::jwks_to_api_json(&jwks) {
+                Ok(bytes) => (
+                    [(axum::http::header::CONTENT_TYPE, "application/json")],
+                    bytes,
+                ).into_response(),
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("{{\"error\":\"failed to serialize JWKS: {}\"}}", e),
+                ).into_response(),
+            }
         }
         "/gateway.Mint/TokenMint" => {
             tracing::info!(request_id = %request_id, "routing TokenMint to kernel");
