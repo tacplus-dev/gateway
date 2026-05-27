@@ -12,8 +12,9 @@ use tonic::transport::Channel;
 use uuid::Uuid;
 
 use gateway_tacplus::s2sm::rest_dispatch::{self, RouteInfo, ROUTES, REST_ROOT_PATH};
-use gateway_tacplus::types::libs::jwk::jwk::Jwks;
-use gateway_tacplus::types::libs::jwk::helpers as jwk_helpers;
+use gateway_tacplus::types::libs::jwk::jwk::Jwk as ProtoJwk;
+use gateway_tacplus::types::libs::jwk::jwk::JwkUseType;
+use gateway_tacplus::types::libs::key::key::KeyType;
 use gateway_tacplus::types::libs::x509::x509::X509Cert;
 use gateway_tacplus::types::services::kernel::kernel::mint_client::MintClient as KernelMintClient;
 
@@ -46,6 +47,63 @@ struct OidcDiscoveryDoc<'a> {
     grant_types_supported: &'static [&'static str],
     subject_types_supported: &'static [&'static str],
     id_token_signing_alg_values_supported: &'static [&'static str],
+}
+
+/// RFC 7517 / RFC 8037 compliant JWK. Hand-written because tacplus's
+/// `jwks_to_api_json` helper has a bug: its `stringify_jwks_enums` only
+/// converts INT enum values to strings, but tacplus's serde impl emits
+/// enums as proto-name strings ("KEY_TYPE_OKP"), so the rewrite never
+/// fires. Until that helper is fixed, we map manually here.
+#[derive(serde::Serialize)]
+struct PublicJwk {
+    kty: &'static str,
+    #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
+    use_: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    alg: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    crv: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    x: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    y: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    n: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    e: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct PublicJwks {
+    keys: Vec<PublicJwk>,
+}
+
+fn proto_jwk_to_public(j: &ProtoJwk) -> Option<PublicJwk> {
+    let kty = match KeyType::try_from(j.kty).ok()? {
+        KeyType::Rsa => "RSA",
+        KeyType::Ec => "EC",
+        KeyType::Okp => "OKP",
+        KeyType::Undefined => return None,
+    };
+    let use_ = match JwkUseType::try_from(j.r#use).ok()? {
+        JwkUseType::Sig => Some("sig"),
+        JwkUseType::Enc => Some("enc"),
+        JwkUseType::Undefined => None,
+    };
+    let opt = |s: &str| if s.is_empty() { None } else { Some(s.to_string()) };
+    Some(PublicJwk {
+        kty,
+        use_,
+        alg: opt(&j.alg),
+        kid: opt(&j.kid),
+        crv: opt(&j.crv),
+        x: opt(&j.x),
+        y: opt(&j.y),
+        n: opt(&j.n),
+        e: opt(&j.e),
+    })
 }
 
 /// Build the REST router.
@@ -428,20 +486,13 @@ async fn handle_mint(
             json_response(&config)
         }
         "/gateway.Mint/Jwks" => {
-            // Use the tacplus-emitted `jwks_to_api_json` helper, which runs
-            // `stringify_jwks_enums` to convert kty/use enum ints into their
-            // RFC 7517 / 8037 canonical string forms ("OKP", "sig", …).
-            let jwks = Jwks { keys: state.auth.get_raw_jwks() };
-            match jwk_helpers::jwks_to_api_json(&jwks) {
-                Ok(bytes) => (
-                    [(axum::http::header::CONTENT_TYPE, "application/json")],
-                    bytes,
-                ).into_response(),
-                Err(e) => (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("{{\"error\":\"failed to serialize JWKS: {}\"}}", e),
-                ).into_response(),
-            }
+            let keys: Vec<PublicJwk> = state
+                .auth
+                .get_raw_jwks()
+                .iter()
+                .filter_map(proto_jwk_to_public)
+                .collect();
+            json_response(&PublicJwks { keys })
         }
         "/gateway.Mint/TokenMint" => {
             tracing::info!(request_id = %request_id, "routing TokenMint to kernel");
