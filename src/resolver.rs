@@ -121,13 +121,20 @@ impl Resolver {
     }
 
     /// Eagerly connect to an endpoint with keep-alive settings.
+    ///
+    /// No `.timeout()` is set on the endpoint: tonic's `Endpoint::timeout()`
+    /// applies the timeout to the entire RPC, which for streaming RPCs (bidi,
+    /// server-stream) is a hard wall-clock kill — not an idle timeout. Long-
+    /// lived streams like `oauth.Session.Session` (held open while the user
+    /// authenticates in the browser) and `eventbus.Trace.WatchTrace` must not
+    /// be capped here. HTTP/2 keep-alive pings detect dead peers; per-call
+    /// deadlines belong on individual unary calls, not on the channel.
     async fn connect_eager(uri: &str, tls: ClientTlsConfig) -> Result<Channel, Box<dyn std::error::Error>> {
         let endpoint = Endpoint::from_shared(uri.to_string())?
             .tls_config(tls)?
             .http2_keep_alive_interval(std::time::Duration::from_secs(10))
             .keep_alive_while_idle(true)
-            .keep_alive_timeout(std::time::Duration::from_secs(60))
-            .timeout(std::time::Duration::from_secs(300));
+            .keep_alive_timeout(std::time::Duration::from_secs(60));
         let channel = endpoint.connect().await?;
         Ok(channel)
     }
