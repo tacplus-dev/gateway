@@ -532,8 +532,8 @@ async fn handle_mint(
                     }
                 };
             let grpc_req = rest_dispatch::with_metadata(req, auth_header, request_id);
-            // X509Mint stays in kernel — proxied to kernel.Mint.
-            match state.sm.s2s().kernel().mint_client().x509_mint(grpc_req).await {
+            // X509Mint moved to mint (sole signing authority) — proxied to mint.Mint.
+            match state.sm.s2s().mint().mint_client().x509_mint(grpc_req).await {
                 Ok(resp) => json_response(&resp.into_inner()),
                 Err(status) => {
                     tracing::warn!(request_id = %request_id, status = %status, "kernel x509 mint error");

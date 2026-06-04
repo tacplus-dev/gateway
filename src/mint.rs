@@ -14,7 +14,7 @@ use crate::auth::GatewayAuth;
 /// OpenIdConfig and Jwks are served locally from watched JWK keys.
 /// After the kernel-minting teardown the backend split is:
 ///   TokenMint -> mint.Mint  (sm.s2s().mint().mint_client())
-///   X509Mint  -> kernel.Mint (sm.s2s().kernel().mint_client()) — stays in kernel
+///   X509Mint  -> mint.Mint  (sm.s2s().mint().mint_client()) — mint is sole signer
 /// PublicCa serves the root CA cert(s) from gateway config — the CA that
 /// signed the external TLS cert, which clients need to configure TLS trust.
 pub struct GatewayMintService {
@@ -95,8 +95,8 @@ impl Mint for GatewayMintService
         &self,
         request: tonic::Request<X509MintRequest>,
     ) -> Result<tonic::Response<X509CertChain>, tonic::Status> {
-        // X509Mint stays in kernel — proxied to kernel.Mint.
-        self.sm.s2s().kernel().mint_client().x509_mint(request).await
+        // X509Mint moved to mint (sole signing authority) — proxied to mint.Mint.
+        self.sm.s2s().mint().mint_client().x509_mint(request).await
     }
 
     async fn public_ca(
