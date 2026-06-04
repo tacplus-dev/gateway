@@ -678,7 +678,7 @@ async fn handle_websocket_stream(
     let (reader_error_tx, mut reader_error_rx) = mpsc::channel::<String>(1);
     let reader_state = Arc::clone(&state);
 
-    tokio::spawn(async move {
+    let reader_task = tokio::spawn(async move {
         if let Some(frame) = initial_frame {
             if forward_ws_json_frame(&body_tx, &reader_error_tx, &reader_state, route, frame)
                 .await
@@ -735,6 +735,7 @@ async fn handle_websocket_stream(
                 let _ = ws_sender
                     .send(ws_error(format!("failed to build gRPC request: {}", e)))
                     .await;
+                reader_task.abort();
                 return;
             }
         };
@@ -746,6 +747,7 @@ async fn handle_websocket_stream(
             Some(error) = reader_error_rx.recv() => {
                 let _ = ws_sender.send(ws_error(error)).await;
                 let _ = ws_sender.close().await;
+                reader_task.abort();
                 return;
             }
             response = &mut proxy_response => response,
@@ -755,6 +757,7 @@ async fn handle_websocket_stream(
     if let Some(error) = grpc_error_from_headers(response.headers()) {
         let _ = ws_sender.send(ws_error(error.message)).await;
         let _ = ws_sender.close().await;
+        reader_task.abort();
         return;
     }
 
@@ -765,6 +768,7 @@ async fn handle_websocket_stream(
             Some(error) = reader_error_rx.recv() => {
                 let _ = ws_sender.send(ws_error(error)).await;
                 let _ = ws_sender.close().await;
+                reader_task.abort();
                 return;
             }
             frame = frames.next() => {
@@ -783,16 +787,19 @@ async fn handle_websocket_stream(
                                     .send(ws_error(format!("failed to serialize response: {e}")))
                                     .await;
                                 let _ = ws_sender.close().await;
+                                reader_task.abort();
                                 return;
                             }
                         };
                         if ws_sender.send(Message::Text(json.into())).await.is_err() {
+                            reader_task.abort();
                             return;
                         }
                     }
                     Err(e) => {
                         let _ = ws_sender.send(ws_error(e)).await;
                         let _ = ws_sender.close().await;
+                        reader_task.abort();
                         return;
                     }
                 }
@@ -803,10 +810,12 @@ async fn handle_websocket_stream(
     if let Ok(error) = reader_error_rx.try_recv() {
         let _ = ws_sender.send(ws_error(error)).await;
         let _ = ws_sender.close().await;
+        reader_task.abort();
         return;
     }
 
     let _ = ws_sender.close().await;
+    reader_task.abort();
 }
 
 #[derive(Debug)]
