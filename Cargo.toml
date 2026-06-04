@@ -4,7 +4,7 @@ version = "1.2.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.8"
+axum = { version = "0.8", features = ["ws"] }
 axum-server = { version = "0.7", features = ["tls-rustls-no-provider"] }
 bytes = "1"
 futures = "0.3"
@@ -37,4 +37,3 @@ gateway-jwk = { package = "jwk", path = "target/generated-sources/tacplus/libs/j
 gateway-servicemanager = { package = "servicemanager", path = "target/generated-sources/tacplus/libs/servicemanager" }
 gateway-token = { package = "token", path = "target/generated-sources/tacplus/libs/token" }
 gateway-grpcserver = { package = "grpcserver", path = "target/generated-sources/tacplus/libs/grpcserver" }
-

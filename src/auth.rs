@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use http::StatusCode;
 
-use gateway_tacplus::types::libs::jwk::jwk::Jwk as ProtoJwk;
 use gateway_grpcserver::authorizer::JwkCache;
+use gateway_tacplus::types::libs::jwk::jwk::Jwk as ProtoJwk;
 
 // Generated libs for JWT parsing (no crypto needed — authorizer handles verification)
 use gateway_token::token::Token;
@@ -26,7 +26,10 @@ pub struct GatewayAuth {
 
 impl GatewayAuth {
     pub fn new(jwk_cache: Arc<JwkCache>, passthrough: bool) -> Self {
-        Self { jwk_cache, passthrough }
+        Self {
+            jwk_cache,
+            passthrough,
+        }
     }
 
     /// Validate a C2S request against the per-route auth policy.
@@ -69,27 +72,69 @@ impl GatewayAuth {
         }
     }
 
+    /// Validate token/audience/entitlements and, when the generated proto
+    /// metadata exposes a target namespace, enforce the level-or-below rule.
+    pub async fn validate_c2s_with_target_namespace(
+        &self,
+        auth_policy: gateway_tacplus::s2sm::rest_dispatch::AuthPolicy,
+        service_id: &str,
+        entitlement_service: &str,
+        grpc_path: &str,
+        auth_header: Option<&str>,
+        target_namespace: Option<&str>,
+    ) -> Result<(), (StatusCode, String)> {
+        use gateway_tacplus::s2sm::rest_dispatch::AuthPolicy;
+
+        self.validate_c2s(
+            auth_policy,
+            service_id,
+            entitlement_service,
+            grpc_path,
+            auth_header,
+        )
+        .await?;
+
+        if self.passthrough || matches!(auth_policy, AuthPolicy::NoAuth) {
+            return Ok(());
+        }
+
+        if let Some(target_namespace) = target_namespace {
+            self.check_target_namespace(auth_header, target_namespace)?;
+        }
+
+        Ok(())
+    }
+
     /// Verify token signature + aud == target_service, then reject S2S tokens.
     fn authenticate(
         &self,
         target_service: &str,
         auth_header: Option<&str>,
     ) -> Result<(), (StatusCode, String)> {
-        let token_str = extract_bearer(
-            auth_header.ok_or_else(|| {
-                (StatusCode::UNAUTHORIZED, "missing authorization header".into())
-            })?,
-        )
-        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "invalid authorization header".into()))?;
+        let token_str = extract_bearer(auth_header.ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                "missing authorization header".into(),
+            )
+        })?)
+        .ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                "invalid authorization header".into(),
+            )
+        })?;
 
         // Parse token
         let tw = Token::parse(token_str)
             .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
 
         // Verify signature using JWK cache
-        let kid = tw
-            .kid()
-            .ok_or_else(|| (StatusCode::UNAUTHORIZED, "token missing key ID (kid)".into()))?;
+        let kid = tw.kid().ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                "token missing key ID (kid)".into(),
+            )
+        })?;
 
         let jwk = self.jwk_cache.get(kid).ok_or_else(|| {
             if self.jwk_cache.has_keys() {
@@ -99,15 +144,18 @@ impl GatewayAuth {
                 )
             } else {
                 // No keys loaded yet — fail open for gradual rollout
-                (
-                    StatusCode::UNAUTHORIZED,
-                    "no JWK keys loaded yet".into(),
-                )
+                (StatusCode::UNAUTHORIZED, "no JWK keys loaded yet".into())
             }
         })?;
 
-        tw.verify(&jwk)
-            .map_err(|e| (StatusCode::UNAUTHORIZED, format!("token verification failed: {e}")))?;
+        tw.verify(&jwk).map_err(|e| {
+            (
+                StatusCode::UNAUTHORIZED,
+                format!("token verification failed: {e}"),
+            )
+        })?;
+
+        ensure_not_expired(&tw)?;
 
         // Reject refresh tokens — they should only be exchanged at the Mint endpoint.
         // Check token_use first, fall back to legacy typ for backwards compat.
@@ -153,14 +201,21 @@ impl GatewayAuth {
         target_service: &str,
         method: &str,
     ) -> Result<(), (StatusCode, String)> {
-        let token_str = extract_bearer(auth_header)
-            .ok_or_else(|| (StatusCode::UNAUTHORIZED, "invalid authorization header".into()))?;
+        let token_str = extract_bearer(auth_header).ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                "invalid authorization header".into(),
+            )
+        })?;
         let tw = Token::parse(token_str)
             .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
 
         // Extract service_entitlements claim (embedded by opa/kernel at mint time).
         let se_val = tw.custom_field("service_entitlements").ok_or_else(|| {
-            (StatusCode::FORBIDDEN, "token missing service_entitlements claim".into())
+            (
+                StatusCode::FORBIDDEN,
+                "token missing service_entitlements claim".into(),
+            )
         })?;
 
         // The claim may be a JSON string or a nested JSON object.
@@ -176,7 +231,10 @@ impl GatewayAuth {
         }
 
         let svc_ent = se_obj.get(target_service).ok_or_else(|| {
-            (StatusCode::FORBIDDEN, format!("no entitlements for service {target_service}"))
+            (
+                StatusCode::FORBIDDEN,
+                format!("no entitlements for service {target_service}"),
+            )
         })?;
 
         // Entitlements are a repeated enum array. 99 = _ANY wildcard (numeric proto value).
@@ -198,7 +256,11 @@ impl GatewayAuth {
         }
 
         // Legacy format: {"any": true} → wildcard access.
-        if svc_ent.get("any").and_then(|v| v.as_bool()).unwrap_or(false) {
+        if svc_ent
+            .get("any")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
             return Ok(());
         }
 
@@ -208,40 +270,74 @@ impl GatewayAuth {
         ))
     }
 
-    /// Check whether a bearer token has expired. Used for per-frame expiry
-    #[allow(dead_code)] // TODO: used when per-frame expiry checking is wired for streaming RPCs
-    /// checking on streaming RPCs (validate_c2s checks auth on the first frame;
-    /// this checks expiry on subsequent frames without re-verifying the signature).
+    fn check_target_namespace(
+        &self,
+        auth_header: Option<&str>,
+        target_namespace: &str,
+    ) -> Result<(), (StatusCode, String)> {
+        if target_namespace.is_empty() {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "target namespace field is empty".into(),
+            ));
+        }
+
+        let token_str = extract_bearer(auth_header.ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                "missing authorization header".into(),
+            )
+        })?)
+        .ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                "invalid authorization header".into(),
+            )
+        })?;
+        let tw = Token::parse(token_str)
+            .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
+        let caller_namespace = tw.namespace().unwrap_or("");
+        if caller_namespace.is_empty() {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "token has empty namespace claim".into(),
+            ));
+        }
+        if !is_at_or_below(caller_namespace, target_namespace) {
+            return Err((
+                StatusCode::FORBIDDEN,
+                format!(
+                    "caller namespace \"{}\" is not at-or-above target \"{}\"",
+                    caller_namespace, target_namespace
+                ),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Check whether a bearer token has expired.
+    #[allow(dead_code)]
     pub fn check_token_expiry(
         &self,
         auth_header: Option<&str>,
     ) -> Result<(), (StatusCode, String)> {
-        let token_str = extract_bearer(
-            auth_header.ok_or_else(|| {
-                (StatusCode::UNAUTHORIZED, "missing authorization header".into())
-            })?,
-        )
-        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "invalid authorization header".into()))?;
+        let token_str = extract_bearer(auth_header.ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                "missing authorization header".into(),
+            )
+        })?)
+        .ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                "invalid authorization header".into(),
+            )
+        })?;
 
         let tw = Token::parse(token_str)
             .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
 
-        match tw.expiration() {
-            Some(exp) => {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs() as i64;
-                if now >= exp {
-                    return Err((StatusCode::UNAUTHORIZED, "token expired".into()));
-                }
-            }
-            None => {
-                return Err((StatusCode::UNAUTHORIZED, "token missing expiration".into()));
-            }
-        }
-
-        Ok(())
+        ensure_not_expired(&tw)
     }
 
     /// Returns raw JWK protos for the JWKS endpoint.
@@ -255,4 +351,49 @@ fn extract_bearer(header_value: &str) -> Option<&str> {
     header_value
         .strip_prefix("Bearer ")
         .or_else(|| header_value.strip_prefix("bearer "))
+}
+
+fn ensure_not_expired(token: &Token) -> Result<(), (StatusCode, String)> {
+    match token.expiration() {
+        Some(exp) => {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as i64;
+            if now >= exp {
+                return Err((StatusCode::UNAUTHORIZED, "token expired".into()));
+            }
+        }
+        None => {
+            return Err((StatusCode::UNAUTHORIZED, "token missing expiration".into()));
+        }
+    }
+
+    Ok(())
+}
+
+fn is_at_or_below(caller_namespace: &str, target_namespace: &str) -> bool {
+    if caller_namespace.is_empty() || target_namespace.is_empty() {
+        return false;
+    }
+
+    let caller = normalize_namespace(caller_namespace);
+    let target = normalize_namespace(target_namespace);
+
+    if caller == target {
+        return true;
+    }
+    if caller == "/" {
+        return target.starts_with('/');
+    }
+    target.starts_with(&format!("{caller}/"))
+}
+
+fn normalize_namespace(namespace: &str) -> String {
+    let trimmed = namespace.trim_end_matches('/');
+    if trimmed.is_empty() {
+        "/".to_string()
+    } else {
+        trimmed.to_string()
+    }
 }

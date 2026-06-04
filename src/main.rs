@@ -21,7 +21,6 @@ use tracing_subscriber::EnvFilter;
 
 use gateway_tacplus::s2sm::ServiceManager;
 use gateway_tacplus::types::libs::host::host::Host;
-use gateway_tacplus::types::services::gateway::gateway::Config as GatewayConfig;
 use gateway_tacplus::types::services::gateway::gateway::ExternalTlsMode;
 use gateway_tacplus::types::services::letsencrypt::letsencrypt::lets_encrypt_state_service_client::LetsEncryptStateServiceClient;
 use gateway_tacplus::types::services::letsencrypt::letsencrypt::LetsEncryptCertData;

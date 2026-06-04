@@ -6,12 +6,16 @@ use axum::body::Body;
 use axum::response::Response;
 use http::{Request, StatusCode};
 use http_body::Frame;
+use http_body_util::BodyExt;
+use tokio_stream::wrappers::ReceiverStream;
 use tower::{Service, ServiceExt};
 
 use crate::auth::GatewayAuth;
 use crate::resolver::Resolver;
 
 use gateway_tacplus::types::libs::trace::{TraceEvent, TraceEventKind, TraceRound};
+
+const MAX_GRPC_MESSAGE_BYTES: usize = 10 * 1024 * 1024;
 
 /// Body wrapper that overrides `is_end_stream()` to always return `false`.
 /// This prevents `tonic::body::Body::new()` from short-circuiting to an empty
@@ -80,13 +84,210 @@ pub fn frame_grpc(proto_bytes: &[u8]) -> Vec<u8> {
 /// the 5-byte header, or an error if the frame is malformed.
 fn unframe_grpc(grpc_bytes: &[u8]) -> Result<&[u8], tonic::Status> {
     if grpc_bytes.len() < 5 {
-        return Err(tonic::Status::internal("gRPC frame too short"));
+        return Err(tonic::Status::invalid_argument("gRPC frame too short"));
     }
-    let msg_len = u32::from_be_bytes([
-        grpc_bytes[1], grpc_bytes[2], grpc_bytes[3], grpc_bytes[4],
-    ]) as usize;
-    let proto_end = (5 + msg_len).min(grpc_bytes.len());
+    if grpc_bytes[0] != 0 {
+        return Err(tonic::Status::unimplemented(
+            "compressed gRPC frames are not supported by gateway validation",
+        ));
+    }
+    let msg_len =
+        u32::from_be_bytes([grpc_bytes[1], grpc_bytes[2], grpc_bytes[3], grpc_bytes[4]]) as usize;
+    if msg_len > MAX_GRPC_MESSAGE_BYTES {
+        return Err(tonic::Status::resource_exhausted(
+            "gRPC message exceeds gateway validation limit",
+        ));
+    }
+    let proto_end = 5 + msg_len;
+    if grpc_bytes.len() != proto_end {
+        return Err(tonic::Status::invalid_argument(
+            "gRPC frame length mismatch",
+        ));
+    }
     Ok(&grpc_bytes[5..proto_end])
+}
+
+fn status_code_to_tonic(code: StatusCode) -> tonic::Code {
+    match code {
+        StatusCode::FORBIDDEN => tonic::Code::PermissionDenied,
+        StatusCode::BAD_REQUEST => tonic::Code::InvalidArgument,
+        StatusCode::TOO_MANY_REQUESTS => tonic::Code::ResourceExhausted,
+        StatusCode::SERVICE_UNAVAILABLE => tonic::Code::Unavailable,
+        StatusCode::GATEWAY_TIMEOUT => tonic::Code::DeadlineExceeded,
+        _ => tonic::Code::Unauthenticated,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StreamingValidation {
+    RequestHeader,
+    AlreadyValidated,
+}
+
+/// Wrap a streaming gRPC request body with per-frame validation and auth.
+///
+/// Each inbound gRPC data frame is decoded enough to extract one or more gRPC
+/// message frames. Every message is validated through generated tacplus
+/// constraints and authorized against the bearer token before the original frame
+/// bytes are forwarded to the backend service.
+fn validated_streaming_body(
+    mut body: Body,
+    proxy: &ProxyState,
+    path: String,
+    service_id: String,
+    entitlement_service: String,
+    auth_policy: gateway_tacplus::s2sm::rest_dispatch::AuthPolicy,
+    auth_header: Option<String>,
+) -> Body {
+    let auth = Arc::clone(&proxy.auth);
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(16);
+
+    tokio::spawn(async move {
+        let mut buffer = bytes::BytesMut::new();
+
+        while let Some(frame_result) = body.frame().await {
+            let frame = match frame_result {
+                Ok(frame) => frame,
+                Err(e) => {
+                    let _ = tx
+                        .send(Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("request body read error: {e}"),
+                        )))
+                        .await;
+                    return;
+                }
+            };
+
+            let Some(data) = frame.data_ref() else {
+                continue;
+            };
+            buffer.extend_from_slice(data);
+
+            loop {
+                if buffer.len() < 5 {
+                    break;
+                }
+                let msg_len =
+                    u32::from_be_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]) as usize;
+                if buffer[0] != 0 {
+                    let _ = tx
+                        .send(Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "compressed gRPC frames are not supported by gateway validation",
+                        )))
+                        .await;
+                    return;
+                }
+                if msg_len > MAX_GRPC_MESSAGE_BYTES {
+                    let _ = tx
+                        .send(Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "gRPC message exceeds gateway validation limit",
+                        )))
+                        .await;
+                    return;
+                }
+                let frame_len = 5 + msg_len;
+                if buffer.len() < frame_len {
+                    if buffer.len() > 5 + MAX_GRPC_MESSAGE_BYTES {
+                        let _ = tx
+                            .send(Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                "incomplete gRPC frame exceeds gateway validation limit",
+                            )))
+                            .await;
+                        return;
+                    }
+                    break;
+                }
+
+                let grpc_frame = buffer.split_to(frame_len).freeze();
+                let proto_bytes = &grpc_frame[5..];
+
+                if let Err(status) =
+                    gateway_tacplus::s2sm::proxy_dispatch::validate_request(&path, proto_bytes)
+                {
+                    tracing::warn!(
+                        path = %path,
+                        error = %status.message(),
+                        "streaming request frame validation failed"
+                    );
+                    let _ = tx
+                        .send(Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            status.to_string(),
+                        )))
+                        .await;
+                    return;
+                }
+
+                let target_namespace =
+                    match gateway_tacplus::s2sm::proxy_dispatch::request_target_namespace(
+                        &path,
+                        proto_bytes,
+                    ) {
+                        Ok(ns) => ns,
+                        Err(status) => {
+                            tracing::warn!(
+                                path = %path,
+                                error = %status.message(),
+                                "streaming request frame namespace extraction failed"
+                            );
+                            let _ = tx
+                                .send(Err(std::io::Error::new(
+                                    std::io::ErrorKind::InvalidData,
+                                    status.to_string(),
+                                )))
+                                .await;
+                            return;
+                        }
+                    };
+
+                if let Err((code, msg)) = auth
+                    .validate_c2s_with_target_namespace(
+                        auth_policy,
+                        &service_id,
+                        &entitlement_service,
+                        &path,
+                        auth_header.as_deref(),
+                        target_namespace.as_deref(),
+                    )
+                    .await
+                {
+                    let grpc_code = status_code_to_tonic(code);
+                    tracing::warn!(
+                        path = %path,
+                        code = ?grpc_code,
+                        error = %msg,
+                        "streaming request frame auth rejected"
+                    );
+                    let _ = tx
+                        .send(Err(std::io::Error::new(
+                            std::io::ErrorKind::PermissionDenied,
+                            tonic::Status::new(grpc_code, msg).to_string(),
+                        )))
+                        .await;
+                    return;
+                }
+
+                if tx.send(Ok(grpc_frame)).await.is_err() {
+                    return;
+                }
+            }
+        }
+
+        if !buffer.is_empty() {
+            let _ = tx
+                .send(Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "incomplete trailing gRPC frame",
+                )))
+                .await;
+        }
+    });
+
+    Body::from_stream(ReceiverStream::new(rx))
 }
 
 /// Handle a gRPC request: extract frame, validate, authenticate, and forward.
@@ -97,9 +298,20 @@ fn unframe_grpc(grpc_bytes: &[u8]) -> Result<&[u8], tonic::Status> {
 /// 3. Authenticate via GatewayAuth::validate_c2s()
 /// 4. Extract trace_id (field 200) and publish TraceEvent if present
 /// 5. Forward original bytes to backend service
-pub async fn handle(
+pub async fn handle(proxy: &ProxyState, req: Request<Body>) -> Response {
+    handle_inner(proxy, req, StreamingValidation::RequestHeader).await
+}
+
+/// Handle an internally constructed streaming request whose inbound frames have
+/// already been validated and authorized before entering the gRPC body stream.
+pub async fn handle_prevalidated_stream(proxy: &ProxyState, req: Request<Body>) -> Response {
+    handle_inner(proxy, req, StreamingValidation::AlreadyValidated).await
+}
+
+async fn handle_inner(
     proxy: &ProxyState,
     req: Request<Body>,
+    streaming_validation: StreamingValidation,
 ) -> Response {
     let path = req.uri().path().to_string();
 
@@ -134,9 +346,11 @@ pub async fn handle(
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
 
-    // Check if this is a streaming RPC.
+    // Check if this is a streaming RPC. Either direction of streaming must be
+    // treated as streaming so each incoming frame is validated and authorized
+    // before forwarding.
     let is_streaming = route_info
-        .map(|r| r.server_streaming)
+        .map(|r| r.server_streaming || r.client_streaming)
         .unwrap_or(false);
 
     let (parts, body) = req.into_parts();
@@ -146,74 +360,111 @@ pub async fn handle(
     let mut active_trace_id = String::new();
 
     let tonic_req = if is_streaming {
-        // Streaming: validate auth on the initial request, then forward body directly.
-        // Per-frame validation of subsequent messages is deferred (TODO).
-        if let Err((code, msg)) = proxy
-            .auth
-            .validate_c2s(auth_policy, service_id, entitlement_service, &path, auth_header.as_deref())
-            .await
-        {
-            tracing::warn!(path = %path, error = %msg, "gRPC auth rejected");
-            let grpc_code = match code {
-                StatusCode::FORBIDDEN => tonic::Code::PermissionDenied,
-                _ => tonic::Code::Unauthenticated,
-            };
-            return tonic_status_to_response(tonic::Status::new(grpc_code, msg));
+        if streaming_validation == StreamingValidation::RequestHeader {
+            if let Err((code, msg)) = proxy
+                .auth
+                .validate_c2s(
+                    auth_policy,
+                    service_id,
+                    entitlement_service,
+                    &path,
+                    auth_header.as_deref(),
+                )
+                .await
+            {
+                tracing::warn!(path = %path, error = %msg, "gRPC stream auth rejected");
+                let grpc_code = status_code_to_tonic(code);
+                return tonic_status_to_response(tonic::Status::new(grpc_code, msg));
+            }
         }
 
+        let body = match streaming_validation {
+            StreamingValidation::RequestHeader => validated_streaming_body(
+                body,
+                proxy,
+                path.clone(),
+                service_id.to_string(),
+                entitlement_service.to_string(),
+                auth_policy,
+                auth_header.clone(),
+            ),
+            StreamingValidation::AlreadyValidated => body,
+        };
         let streaming_body = StreamingBody(body);
         let tonic_body = tonic::body::Body::new(streaming_body);
         Request::from_parts(parts, tonic_body)
     } else {
         // Unary: buffer body, extract frame, validate, auth, trace, then forward.
-        let body_bytes = match axum::body::to_bytes(body, 10 * 1024 * 1024).await {
+        let body_bytes = match axum::body::to_bytes(body, 5 + MAX_GRPC_MESSAGE_BYTES).await {
             Ok(b) => b,
             Err(e) => {
-                return tonic_status_to_response(tonic::Status::internal(
-                    format!("failed to read request body: {}", e),
-                ));
+                return tonic_status_to_response(tonic::Status::internal(format!(
+                    "failed to read request body: {}",
+                    e
+                )));
             }
         };
 
         // Extract and validate the protobuf payload from the gRPC frame.
-        if body_bytes.len() > 5 {
-            match unframe_grpc(&body_bytes) {
-                Ok(proto_bytes) => {
-                    // Validate: deserialize into typed message and run validation.
-                    if let Err(status) = gateway_tacplus::s2sm::proxy_dispatch::validate_request(&path, proto_bytes) {
-                        tracing::warn!(path = %path, error = %status.message(), "request validation failed");
-                        return tonic_status_to_response(status);
-                    }
-
-                    // Trace: extract trace_id from proto field 200.
-                    match <TraceProbe as prost::Message>::decode(proto_bytes) {
-                        Ok(probe) if !probe.trace_id.is_empty() => {
-                            active_trace_id = probe.trace_id.clone();
-                            let round = (proxy.trace_round)();
-                            // TODO: set typed rpc field using AccountingMethod lookup by path.
-                            (proxy.trace_publisher)(TraceEvent {
-                                trace_id: probe.trace_id.clone(),
-                                round: Some(round),
-                                kind: TraceEventKind::ExternalRequest.into(),
-                                ..Default::default()
-                            });
-                        }
-                        Ok(_) => {}
-                        Err(e) => {
-                            tracing::debug!(error = %e, grpc_path = %path, "TraceProbe decode skipped");
-                        }
-                    }
-                }
-                Err(status) => {
+        let target_namespace = match unframe_grpc(&body_bytes) {
+            Ok(proto_bytes) => {
+                // Validate: deserialize into typed message and run validation.
+                if let Err(status) =
+                    gateway_tacplus::s2sm::proxy_dispatch::validate_request(&path, proto_bytes)
+                {
+                    tracing::warn!(path = %path, error = %status.message(), "request validation failed");
                     return tonic_status_to_response(status);
                 }
+
+                let target_namespace =
+                    match gateway_tacplus::s2sm::proxy_dispatch::request_target_namespace(
+                        &path,
+                        proto_bytes,
+                    ) {
+                        Ok(ns) => ns,
+                        Err(status) => {
+                            tracing::warn!(path = %path, error = %status.message(), "request namespace extraction failed");
+                            return tonic_status_to_response(status);
+                        }
+                    };
+
+                // Trace: extract trace_id from proto field 200.
+                match <TraceProbe as prost::Message>::decode(proto_bytes) {
+                    Ok(probe) if !probe.trace_id.is_empty() => {
+                        active_trace_id = probe.trace_id.clone();
+                        let round = (proxy.trace_round)();
+                        // TODO: set typed rpc field using AccountingMethod lookup by path.
+                        (proxy.trace_publisher)(TraceEvent {
+                            trace_id: probe.trace_id.clone(),
+                            round: Some(round),
+                            kind: TraceEventKind::ExternalRequest.into(),
+                            ..Default::default()
+                        });
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::debug!(error = %e, grpc_path = %path, "TraceProbe decode skipped");
+                    }
+                }
+
+                target_namespace
             }
-        }
+            Err(status) => {
+                return tonic_status_to_response(status);
+            }
+        };
 
         // Auth: validate after body extraction so we reject malformed messages first.
         if let Err((code, msg)) = proxy
             .auth
-            .validate_c2s(auth_policy, service_id, entitlement_service, &path, auth_header.as_deref())
+            .validate_c2s_with_target_namespace(
+                auth_policy,
+                service_id,
+                entitlement_service,
+                &path,
+                auth_header.as_deref(),
+                target_namespace.as_deref(),
+            )
             .await
         {
             tracing::warn!(path = %path, error = %msg, "gRPC auth rejected");
@@ -227,10 +478,7 @@ pub async fn handle(
                     ..Default::default()
                 });
             }
-            let grpc_code = match code {
-                StatusCode::FORBIDDEN => tonic::Code::PermissionDenied,
-                _ => tonic::Code::Unauthenticated,
-            };
+            let grpc_code = status_code_to_tonic(code);
             return tonic_status_to_response(tonic::Status::new(grpc_code, msg));
         }
 
