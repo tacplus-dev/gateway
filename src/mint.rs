@@ -1,24 +1,24 @@
 use std::sync::Arc;
 
-use tonic::transport::Channel;
-
+use gateway_tacplus::s2sm::ServiceManager;
 use gateway_tacplus::types::common::tokenrequest::{TokenMintRequest, TokenMintResponse, X509MintRequest};
 use gateway_tacplus::types::libs::jwk::jwk::{Jwks, OpenIdConfiguration};
 use gateway_tacplus::types::libs::trace::trace::TraceRequest;
 use gateway_tacplus::types::libs::x509::x509::{X509CertChain, X509Cert};
 use gateway_tacplus::types::services::gateway::gateway::{PublicCaResponse, mint_server::Mint};
-use gateway_tacplus::types::services::kernel::kernel::mint_client::MintClient as KernelMintClient;
 
 use crate::auth::GatewayAuth;
 
 /// Gateway Mint service implementation.
 ///
 /// OpenIdConfig and Jwks are served locally from watched JWK keys.
-/// TokenMint and X509Mint are delegated to kernel via the direct channel.
+/// After the kernel-minting teardown the backend split is:
+///   TokenMint -> mint.Mint  (sm.s2s().mint().mint_client())
+///   X509Mint  -> kernel.Mint (sm.s2s().kernel().mint_client()) — stays in kernel
 /// PublicCa serves the root CA cert(s) from gateway config — the CA that
 /// signed the external TLS cert, which clients need to configure TLS trust.
 pub struct GatewayMintService {
-    kernel_channel: Channel,
+    sm: Arc<ServiceManager>,
     auth: Arc<GatewayAuth>,
     issuer_url: String,
     root_ca: Vec<X509Cert>,
@@ -26,13 +26,13 @@ pub struct GatewayMintService {
 
 impl GatewayMintService {
     pub fn new(
-        kernel_channel: Channel,
+        sm: Arc<ServiceManager>,
         auth: Arc<GatewayAuth>,
         issuer_url: String,
         root_ca: Vec<X509Cert>,
     ) -> Self {
         Self {
-            kernel_channel,
+            sm,
             auth,
             issuer_url,
             root_ca,
@@ -85,16 +85,18 @@ impl Mint for GatewayMintService
         &self,
         request: tonic::Request<TokenMintRequest>,
     ) -> Result<tonic::Response<TokenMintResponse>, tonic::Status> {
-        let mut client = KernelMintClient::new(self.kernel_channel.clone());
-        client.token_mint(request).await
+        // After the kernel-minting teardown, TokenMint is proxied to mint.Mint.
+        // TODO(generated): sm.s2s().mint() accessor is produced by tacplus from
+        // the committed gateway.proto (mint.Mint S2S client); CI regenerates it.
+        self.sm.s2s().mint().mint_client().token_mint(request).await
     }
 
     async fn x509_mint(
         &self,
         request: tonic::Request<X509MintRequest>,
     ) -> Result<tonic::Response<X509CertChain>, tonic::Status> {
-        let mut client = KernelMintClient::new(self.kernel_channel.clone());
-        client.x509_mint(request).await
+        // X509Mint stays in kernel — proxied to kernel.Mint.
+        self.sm.s2s().kernel().mint_client().x509_mint(request).await
     }
 
     async fn public_ca(

@@ -8,15 +8,14 @@ use axum::routing::any;
 use axum::Router;
 use futures::StreamExt;
 use tokio::sync::RwLock;
-use tonic::transport::Channel;
 use uuid::Uuid;
 
 use gateway_tacplus::s2sm::rest_dispatch::{self, RouteInfo, ROUTES, REST_ROOT_PATH};
+use gateway_tacplus::s2sm::ServiceManager;
 use gateway_tacplus::types::libs::jwk::jwk::Jwk as ProtoJwk;
 use gateway_tacplus::types::libs::jwk::jwk::JwkUseType;
 use gateway_tacplus::types::libs::key::key::KeyType;
 use gateway_tacplus::types::libs::x509::x509::X509Cert;
-use gateway_tacplus::types::services::kernel::kernel::mint_client::MintClient as KernelMintClient;
 
 use crate::auth::GatewayAuth;
 use crate::proxy_grpc::{self, ProxyState};
@@ -24,7 +23,7 @@ use crate::proxy_grpc::{self, ProxyState};
 /// Application state for REST translation.
 pub struct RestState {
     pub proxy: Arc<ProxyState>,
-    pub kernel_channel: Channel,
+    pub sm: Arc<ServiceManager>,
     pub auth: Arc<GatewayAuth>,
     pub ca_certs: Arc<RwLock<Vec<X509Cert>>>,
     /// Public base URL (scheme + host) used as the OIDC `iss` claim and the
@@ -495,7 +494,7 @@ async fn handle_mint(
             json_response(&PublicJwks { keys })
         }
         "/gateway.Mint/TokenMint" => {
-            tracing::info!(request_id = %request_id, "routing TokenMint to kernel");
+            tracing::info!(request_id = %request_id, "routing TokenMint to mint");
             let req =
                 match gateway_tacplus::types::common::tokenrequest::token_mint_request_from_json(body) {
                     Ok(r) => r,
@@ -508,11 +507,13 @@ async fn handle_mint(
                     }
                 };
             let grpc_req = rest_dispatch::with_metadata(req, auth_header, request_id);
-            let mut client = KernelMintClient::new(state.kernel_channel.clone());
-            match client.token_mint(grpc_req).await {
+            // After the kernel-minting teardown, TokenMint is proxied to mint.Mint.
+            // TODO(generated): sm.s2s().mint() accessor is produced by tacplus from
+            // the committed gateway.proto (mint.Mint S2S client); CI regenerates it.
+            match state.sm.s2s().mint().mint_client().token_mint(grpc_req).await {
                 Ok(resp) => json_response(&resp.into_inner()),
                 Err(status) => {
-                    tracing::warn!(request_id = %request_id, status = %status, "kernel mint error");
+                    tracing::warn!(request_id = %request_id, status = %status, "mint token error");
                     let (code, msg) = rest_dispatch::grpc_err(status);
                     (code, msg).into_response()
                 }
@@ -531,8 +532,8 @@ async fn handle_mint(
                     }
                 };
             let grpc_req = rest_dispatch::with_metadata(req, auth_header, request_id);
-            let mut client = KernelMintClient::new(state.kernel_channel.clone());
-            match client.x509_mint(grpc_req).await {
+            // X509Mint stays in kernel — proxied to kernel.Mint.
+            match state.sm.s2s().kernel().mint_client().x509_mint(grpc_req).await {
                 Ok(resp) => json_response(&resp.into_inner()),
                 Err(status) => {
                     tracing::warn!(request_id = %request_id, status = %status, "kernel x509 mint error");

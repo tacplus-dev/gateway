@@ -173,7 +173,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // root_ca comes from config — the CA that signed the external TLS cert.
     // Clients call PublicCa to retrieve it for TLS trust configuration.
     let mint_service = mint::GatewayMintService::new(
-        kernel_channel.clone(),
+        Arc::clone(&sm),
         Arc::clone(&gateway_auth),
         issuer_url.clone(),
         cfg.root_ca.clone(),
@@ -205,7 +205,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // 11. Build REST state (shares ProxyState — all auth is in proxy_grpc).
     let rest_state = Arc::new(rest_translation::RestState {
         proxy: Arc::clone(&proxy_state),
-        kernel_channel: kernel_channel.clone(),
+        sm: Arc::clone(&sm),
         auth: Arc::clone(&gateway_auth),
         ca_certs: Arc::clone(&ca_certs_store),
         issuer_url: issuer_url.clone(),
