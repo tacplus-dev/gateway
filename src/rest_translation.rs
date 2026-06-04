@@ -507,10 +507,8 @@ async fn handle_mint(
                     }
                 };
             let grpc_req = rest_dispatch::with_metadata(req, auth_header, request_id);
-            // After the kernel-minting teardown, TokenMint is proxied to mint.Mint.
-            // TODO(generated): sm.s2s().mint() accessor is produced by tacplus from
-            // the committed gateway.proto (mint.Mint S2S client); CI regenerates it.
-            match state.sm.s2s().mint().mint_client().token_mint(grpc_req).await {
+            // TokenMint is proxied to kernel.Mint (the sole token authority).
+            match state.sm.s2s().kernel().mint_client().token_mint(grpc_req).await {
                 Ok(resp) => json_response(&resp.into_inner()),
                 Err(status) => {
                     tracing::warn!(request_id = %request_id, status = %status, "mint token error");
@@ -532,8 +530,8 @@ async fn handle_mint(
                     }
                 };
             let grpc_req = rest_dispatch::with_metadata(req, auth_header, request_id);
-            // X509Mint moved to mint (sole signing authority) — proxied to mint.Mint.
-            match state.sm.s2s().mint().mint_client().x509_mint(grpc_req).await {
+            // X509Mint is proxied to kernel.Mint (the sole cert signing authority).
+            match state.sm.s2s().kernel().mint_client().x509_mint(grpc_req).await {
                 Ok(resp) => json_response(&resp.into_inner()),
                 Err(status) => {
                     tracing::warn!(request_id = %request_id, status = %status, "kernel x509 mint error");

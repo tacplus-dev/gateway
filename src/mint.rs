@@ -12,9 +12,9 @@ use crate::auth::GatewayAuth;
 /// Gateway Mint service implementation.
 ///
 /// OpenIdConfig and Jwks are served locally from watched JWK keys.
-/// After the kernel-minting teardown the backend split is:
-///   TokenMint -> mint.Mint  (sm.s2s().mint().mint_client())
-///   X509Mint  -> mint.Mint  (sm.s2s().mint().mint_client()) — mint is sole signer
+/// TokenMint and X509Mint are delegated to kernel.Mint — kernel is the cluster
+/// trust root and the sole token + cert signing authority
+/// (sm.s2s().kernel().mint_client()).
 /// PublicCa serves the root CA cert(s) from gateway config — the CA that
 /// signed the external TLS cert, which clients need to configure TLS trust.
 pub struct GatewayMintService {
@@ -85,18 +85,16 @@ impl Mint for GatewayMintService
         &self,
         request: tonic::Request<TokenMintRequest>,
     ) -> Result<tonic::Response<TokenMintResponse>, tonic::Status> {
-        // After the kernel-minting teardown, TokenMint is proxied to mint.Mint.
-        // TODO(generated): sm.s2s().mint() accessor is produced by tacplus from
-        // the committed gateway.proto (mint.Mint S2S client); CI regenerates it.
-        self.sm.s2s().mint().mint_client().token_mint(request).await
+        // TokenMint is proxied to kernel.Mint (the sole token authority).
+        self.sm.s2s().kernel().mint_client().token_mint(request).await
     }
 
     async fn x509_mint(
         &self,
         request: tonic::Request<X509MintRequest>,
     ) -> Result<tonic::Response<X509CertChain>, tonic::Status> {
-        // X509Mint moved to mint (sole signing authority) — proxied to mint.Mint.
-        self.sm.s2s().mint().mint_client().x509_mint(request).await
+        // X509Mint is proxied to kernel.Mint (the sole cert signing authority).
+        self.sm.s2s().kernel().mint_client().x509_mint(request).await
     }
 
     async fn public_ca(
