@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use http::StatusCode;
 
-use gateway_grpcserver::authorizer::JwkCache;
+use gateway_grpcserver::{authorizer::JwkCache, spiffe::is_at_or_below};
 use gateway_tacplus::types::libs::jwk::jwk::Jwk as ProtoJwk;
 
 // Generated libs for JWT parsing (no crypto needed — authorizer handles verification)
@@ -370,30 +370,4 @@ fn ensure_not_expired(token: &Token) -> Result<(), (StatusCode, String)> {
     }
 
     Ok(())
-}
-
-fn is_at_or_below(caller_namespace: &str, target_namespace: &str) -> bool {
-    if caller_namespace.is_empty() || target_namespace.is_empty() {
-        return false;
-    }
-
-    let caller = normalize_namespace(caller_namespace);
-    let target = normalize_namespace(target_namespace);
-
-    if caller == target {
-        return true;
-    }
-    if caller == "/" {
-        return target.starts_with('/');
-    }
-    target.starts_with(&format!("{caller}/"))
-}
-
-fn normalize_namespace(namespace: &str) -> String {
-    let trimmed = namespace.trim_end_matches('/');
-    if trimmed.is_empty() {
-        "/".to_string()
-    } else {
-        trimmed.to_string()
-    }
 }
