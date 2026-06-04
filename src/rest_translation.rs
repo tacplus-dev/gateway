@@ -625,7 +625,11 @@ async fn handle_websocket_stream(
 
     match serde_json::from_str::<serde_json::Value>(first.as_str()) {
         Ok(value) if value.get("type").and_then(|v| v.as_str()) == Some("start") => {
-            if let Some(auth) = value.get("authorization").and_then(|v| v.as_str()) {
+            if let Some(auth) = value
+                .get("authorization")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+            {
                 backend_auth_header = Some(auth.to_string());
             }
             if let Some(id) = value.get("requestId").and_then(|v| v.as_str()) {
@@ -650,7 +654,7 @@ async fn handle_websocket_stream(
     if !matches!(route.auth_policy, AuthPolicy::NoAuth) && backend_auth_header.is_none() {
         let _ = ws_sender
             .send(ws_error(
-                "authenticated WebSocket streams require start.authorization or first message authorization",
+                "authenticated WebSocket streams require an authorization token before backend stream open; every data message must include authorization",
             ))
             .await;
         let _ = ws_sender.close().await;
@@ -805,6 +809,7 @@ async fn handle_websocket_stream(
     let _ = ws_sender.close().await;
 }
 
+#[derive(Debug)]
 struct WsDataFrame {
     json_bytes: Vec<u8>,
     auth_header: Option<String>,
@@ -829,7 +834,13 @@ fn parse_ws_data_frame(route: &RouteInfo, text: &str) -> Result<WsDataFrame, Str
                 let auth_header = value
                     .get("authorization")
                     .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
                     .map(str::to_string);
+                if !matches!(route.auth_policy, AuthPolicy::NoAuth) && auth_header.is_none() {
+                    return Err(
+                        "authenticated WebSocket message frames require authorization".to_string(),
+                    );
+                }
                 Ok(WsDataFrame {
                     json_bytes,
                     auth_header,
@@ -1195,5 +1206,75 @@ fn grpc_status_to_http(grpc_status: i32) -> StatusCode {
         14 => StatusCode::SERVICE_UNAVAILABLE, // UNAVAILABLE
         16 => StatusCode::UNAUTHORIZED,        // UNAUTHENTICATED
         _ => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn route(auth_policy: AuthPolicy) -> RouteInfo {
+        RouteInfo {
+            http_path: "/api/test",
+            grpc_path: "/test.Service/Method",
+            service_id: "test",
+            entitlement_service: None,
+            http_methods: &["POST"],
+            auth_policy,
+            server_streaming: true,
+            client_streaming: true,
+            target_namespace_field: None,
+        }
+    }
+
+    #[test]
+    fn authenticated_message_frame_requires_authorization() {
+        let err = parse_ws_data_frame(
+            &route(AuthPolicy::Entitled),
+            r#"{"type":"message","message":{"id":"1"}}"#,
+        )
+        .expect_err("authenticated frames without authorization must fail");
+
+        assert!(err.contains("authorization"));
+    }
+
+    #[test]
+    fn authenticated_message_frame_rejects_empty_authorization() {
+        let err = parse_ws_data_frame(
+            &route(AuthPolicy::AnyUser),
+            r#"{"type":"message","authorization":"","message":{"id":"1"}}"#,
+        )
+        .expect_err("empty authorization is not a token");
+
+        assert!(err.contains("authorization"));
+    }
+
+    #[test]
+    fn authenticated_message_frame_accepts_authorization() {
+        let frame = parse_ws_data_frame(
+            &route(AuthPolicy::Entitled),
+            r#"{"type":"message","authorization":"Bearer token","message":{"id":"1"}}"#,
+        )
+        .expect("authorized message frame should parse");
+
+        assert_eq!(frame.auth_header.as_deref(), Some("Bearer token"));
+        assert_eq!(frame.json_bytes, br#"{"id":"1"}"#);
+    }
+
+    #[test]
+    fn auth_disabled_route_allows_raw_json_payload() {
+        let frame = parse_ws_data_frame(&route(AuthPolicy::NoAuth), r#"{"id":"1"}"#)
+            .expect("auth-disabled routes can use raw JSON payloads");
+
+        assert!(frame.auth_header.is_none());
+        assert_eq!(frame.json_bytes, br#"{"id":"1"}"#);
+    }
+
+    #[test]
+    fn complete_frame_never_becomes_a_payload() {
+        let err = parse_ws_data_frame(&route(AuthPolicy::NoAuth), r#"{"type":"complete"}"#)
+            .expect_err("complete is a control frame");
+
+        assert!(err.contains("complete"));
     }
 }
