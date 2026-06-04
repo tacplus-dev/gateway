@@ -8,7 +8,7 @@ use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::Router;
 use futures::{SinkExt, StreamExt};
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, RwLock};
 use tokio::time::{timeout, Duration};
 use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
@@ -279,6 +279,107 @@ async fn read_body_for_method(
         })
 }
 
+#[derive(Debug)]
+struct GrpcBodyError {
+    grpc_status: Option<i32>,
+    message: String,
+}
+
+impl GrpcBodyError {
+    fn transport(message: impl Into<String>) -> Self {
+        Self {
+            grpc_status: None,
+            message: message.into(),
+        }
+    }
+
+    fn grpc(grpc_status: i32, message: impl Into<String>) -> Self {
+        Self {
+            grpc_status: Some(grpc_status),
+            message: message.into(),
+        }
+    }
+}
+
+fn json_error_body(message: impl AsRef<str>) -> String {
+    serde_json::json!({ "error": message.as_ref() }).to_string()
+}
+
+fn json_error_response(status: StatusCode, message: impl AsRef<str>) -> axum::response::Response {
+    (
+        status,
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "application/json".to_string(),
+        )],
+        json_error_body(message),
+    )
+        .into_response()
+}
+
+fn grpc_message_from_headers(headers: &http::HeaderMap) -> String {
+    headers
+        .get("grpc-message")
+        .and_then(|v| v.to_str().ok())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("unknown gRPC error")
+        .to_string()
+}
+
+fn grpc_error_from_headers(headers: &http::HeaderMap) -> Option<GrpcBodyError> {
+    let status_value = headers.get("grpc-status")?;
+    let grpc_status = status_value
+        .to_str()
+        .ok()
+        .and_then(|v| v.parse::<i32>().ok());
+    let Some(grpc_status) = grpc_status else {
+        return Some(GrpcBodyError::transport("malformed grpc-status header"));
+    };
+    if grpc_status <= 0 {
+        return None;
+    }
+    Some(GrpcBodyError::grpc(
+        grpc_status,
+        grpc_message_from_headers(headers),
+    ))
+}
+
+fn grpc_error_response_from_headers(headers: &http::HeaderMap) -> Option<axum::response::Response> {
+    grpc_error_from_headers(headers).map(grpc_body_error_response)
+}
+
+fn grpc_body_error_response(error: GrpcBodyError) -> axum::response::Response {
+    let status = error
+        .grpc_status
+        .map(grpc_status_to_http)
+        .unwrap_or(StatusCode::BAD_GATEWAY);
+    json_error_response(status, error.message)
+}
+
+async fn read_grpc_response_body(mut body: axum::body::Body) -> Result<Vec<u8>, GrpcBodyError> {
+    use http_body_util::BodyExt as _;
+
+    let mut bytes = Vec::new();
+    while let Some(frame_result) = body.frame().await {
+        let frame =
+            frame_result.map_err(|e| GrpcBodyError::transport(format!("body read error: {e}")))?;
+        if let Some(data) = frame.data_ref() {
+            if bytes.len().saturating_add(data.len()) > 5 + MAX_JSON_BODY_BYTES {
+                return Err(GrpcBodyError::transport(
+                    "gRPC response exceeds REST translation limit",
+                ));
+            }
+            bytes.extend_from_slice(data);
+        }
+        if let Some(trailers) = frame.trailers_ref() {
+            if let Some(error) = grpc_error_from_headers(trailers) {
+                return Err(error);
+            }
+        }
+    }
+    Ok(bytes)
+}
+
 /// Convert JSON to proto, frame as gRPC, delegate to proxy_grpc, convert response to JSON.
 async fn dispatch_via_proxy(
     state: &RestState,
@@ -328,36 +429,15 @@ async fn dispatch_via_proxy(
     // 4. Delegate to proxy_grpc.
     let response = proxy_grpc::handle(&state.proxy, grpc_request).await;
 
-    // 5. Check for gRPC error.
-    let grpc_status = response
-        .headers()
-        .get("grpc-status")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i32>().ok())
-        .unwrap_or(-1);
-
-    if grpc_status > 0 {
-        let grpc_message = response
-            .headers()
-            .get("grpc-message")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("unknown error")
-            .to_string();
-        let http_status = grpc_status_to_http(grpc_status);
-        return (http_status, format!("{{\"error\":\"{}\"}}", grpc_message)).into_response();
+    // 5. Check for headers-only gRPC errors before reading the body.
+    if let Some(error_response) = grpc_error_response_from_headers(response.headers()) {
+        return error_response;
     }
 
-    // 6. Read response body, unframe gRPC, convert to JSON.
-    let response_bytes = match axum::body::to_bytes(response.into_body(), MAX_JSON_BODY_BYTES).await
-    {
+    // 6. Read response body and trailers, unframe gRPC, convert to JSON.
+    let response_bytes = match read_grpc_response_body(response.into_body()).await {
         Ok(b) => b,
-        Err(e) => {
-            return (
-                StatusCode::BAD_GATEWAY,
-                format!("{{\"error\":\"failed to read backend response: {}\"}}", e),
-            )
-                .into_response();
-        }
+        Err(e) => return grpc_body_error_response(e),
     };
 
     if response_bytes.len() < 5 {
@@ -462,42 +542,49 @@ async fn dispatch_stream_via_proxy(
     // Delegate to proxy_grpc.
     let response = proxy_grpc::handle(&state.proxy, grpc_request).await;
 
-    // Check for gRPC error before streaming.
-    let grpc_status = response
-        .headers()
-        .get("grpc-status")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i32>().ok())
-        .unwrap_or(-1);
-
-    if grpc_status > 0 {
-        let grpc_message = response
-            .headers()
-            .get("grpc-message")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("unknown error")
-            .to_string();
-        let http_status = grpc_status_to_http(grpc_status);
-        return (http_status, format!("{{\"error\":\"{}\"}}", grpc_message)).into_response();
+    // Check for headers-only gRPC errors before streaming.
+    if let Some(error_response) = grpc_error_response_from_headers(response.headers()) {
+        return error_response;
     }
 
     // Stream response frames as SSE events.
     let grpc_path_owned = grpc_path.to_string();
     let body = response.into_body();
 
-    let sse_stream = GrpcFrameStream::new(body).map(move |frame_result| match frame_result {
-        Ok(proto_bytes) => {
-            let json = gateway_tacplus::s2sm::proxy_dispatch::response_to_json(
-                &grpc_path_owned,
-                &proto_bytes,
-            )
-            .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
-            Ok::<_, std::convert::Infallible>(Event::default().data(json))
-        }
-        Err(e) => Ok(Event::default()
-            .event("error")
-            .data(format!("{{\"error\":\"{}\"}}", e))),
-    });
+    let sse_stream = futures::stream::unfold(
+        (GrpcFrameStream::new(body), grpc_path_owned, false),
+        |(mut frames, grpc_path, done)| async move {
+            if done {
+                return None;
+            }
+            match frames.next().await {
+                Some(Ok(proto_bytes)) => {
+                    match gateway_tacplus::s2sm::proxy_dispatch::response_to_json(
+                        &grpc_path,
+                        &proto_bytes,
+                    ) {
+                        Ok(json) => Some((
+                            Ok::<_, std::convert::Infallible>(Event::default().data(json)),
+                            (frames, grpc_path, false),
+                        )),
+                        Err(e) => Some((
+                            Ok(Event::default()
+                                .event("error")
+                                .data(json_error_body(format!(
+                                    "failed to serialize response: {e}"
+                                )))),
+                            (frames, grpc_path, true),
+                        )),
+                    }
+                }
+                Some(Err(e)) => Some((
+                    Ok(Event::default().event("error").data(json_error_body(e))),
+                    (frames, grpc_path, true),
+                )),
+                None => None,
+            }
+        },
+    );
 
     Sse::new(sse_stream).into_response()
 }
@@ -583,12 +670,13 @@ async fn handle_websocket_stream(
         builder = builder.header("x-request-id", id);
     }
 
-    let (body_tx, body_rx) = tokio::sync::mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(16);
+    let (body_tx, body_rx) = mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(16);
+    let (reader_error_tx, mut reader_error_rx) = mpsc::channel::<String>(1);
     let reader_state = Arc::clone(&state);
 
     tokio::spawn(async move {
         if let Some(frame) = initial_frame {
-            if send_ws_json_frame(&body_tx, &reader_state, route, frame)
+            if forward_ws_json_frame(&body_tx, &reader_error_tx, &reader_state, route, frame)
                 .await
                 .is_err()
             {
@@ -605,13 +693,19 @@ async fn handle_websocket_stream(
                     let frame = match parse_ws_data_frame(route, text.as_str()) {
                         Ok(frame) => frame,
                         Err(e) => {
-                            let _ = send_ws_body_error(&body_tx, e).await;
+                            let _ = send_ws_reader_error(&reader_error_tx, e).await;
                             return;
                         }
                     };
-                    if send_ws_json_frame(&body_tx, &reader_state, route, frame)
-                        .await
-                        .is_err()
+                    if forward_ws_json_frame(
+                        &body_tx,
+                        &reader_error_tx,
+                        &reader_state,
+                        route,
+                        frame,
+                    )
+                    .await
+                    .is_err()
                     {
                         return;
                     };
@@ -619,9 +713,11 @@ async fn handle_websocket_stream(
                 Ok(Message::Close(_)) | Err(_) => break,
                 Ok(Message::Ping(_)) | Ok(Message::Pong(_)) => {}
                 Ok(Message::Binary(_)) => {
-                    let _ =
-                        send_ws_body_error(&body_tx, "binary WebSocket messages are not supported")
-                            .await;
+                    let _ = send_ws_reader_error(
+                        &reader_error_tx,
+                        "binary WebSocket messages are not supported",
+                    )
+                    .await;
                     return;
                 }
             }
@@ -639,45 +735,71 @@ async fn handle_websocket_stream(
             }
         };
 
-    let response = proxy_grpc::handle_prevalidated_stream(&state.proxy, grpc_request).await;
-    let grpc_status = response
-        .headers()
-        .get("grpc-status")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<i32>().ok())
-        .unwrap_or(-1);
+    let response = {
+        let proxy_response = proxy_grpc::handle_prevalidated_stream(&state.proxy, grpc_request);
+        tokio::pin!(proxy_response);
+        tokio::select! {
+            Some(error) = reader_error_rx.recv() => {
+                let _ = ws_sender.send(ws_error(error)).await;
+                let _ = ws_sender.close().await;
+                return;
+            }
+            response = &mut proxy_response => response,
+        }
+    };
 
-    if grpc_status > 0 {
-        let grpc_message = response
-            .headers()
-            .get("grpc-message")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("unknown error");
-        let _ = ws_sender.send(ws_error(grpc_message)).await;
+    if let Some(error) = grpc_error_from_headers(response.headers()) {
+        let _ = ws_sender.send(ws_error(error.message)).await;
         let _ = ws_sender.close().await;
         return;
     }
 
     let grpc_path = route.grpc_path.to_string();
     let mut frames = GrpcFrameStream::new(response.into_body());
-    while let Some(frame) = frames.next().await {
-        match frame {
-            Ok(proto_bytes) => {
-                let json = gateway_tacplus::s2sm::proxy_dispatch::response_to_json(
-                    &grpc_path,
-                    &proto_bytes,
-                )
-                .unwrap_or_else(|e| format!("{{\"error\":\"{}\"}}", e));
-                if ws_sender.send(Message::Text(json.into())).await.is_err() {
-                    return;
-                }
-            }
-            Err(e) => {
-                let _ = ws_sender.send(ws_error(e)).await;
+    loop {
+        tokio::select! {
+            Some(error) = reader_error_rx.recv() => {
+                let _ = ws_sender.send(ws_error(error)).await;
                 let _ = ws_sender.close().await;
                 return;
             }
+            frame = frames.next() => {
+                let Some(frame) = frame else {
+                    break;
+                };
+                match frame {
+                    Ok(proto_bytes) => {
+                        let json = match gateway_tacplus::s2sm::proxy_dispatch::response_to_json(
+                            &grpc_path,
+                            &proto_bytes,
+                        ) {
+                            Ok(json) => json,
+                            Err(e) => {
+                                let _ = ws_sender
+                                    .send(ws_error(format!("failed to serialize response: {e}")))
+                                    .await;
+                                let _ = ws_sender.close().await;
+                                return;
+                            }
+                        };
+                        if ws_sender.send(Message::Text(json.into())).await.is_err() {
+                            return;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = ws_sender.send(ws_error(e)).await;
+                        let _ = ws_sender.close().await;
+                        return;
+                    }
+                }
+            }
         }
+    }
+
+    if let Ok(error) = reader_error_rx.try_recv() {
+        let _ = ws_sender.send(ws_error(error)).await;
+        let _ = ws_sender.close().await;
+        return;
     }
 
     let _ = ws_sender.close().await;
@@ -740,43 +862,48 @@ fn is_ws_complete(text: &str) -> bool {
         == Some("complete")
 }
 
-async fn send_ws_json_frame(
-    tx: &tokio::sync::mpsc::Sender<Result<bytes::Bytes, std::io::Error>>,
+async fn forward_ws_json_frame(
+    tx: &mpsc::Sender<Result<bytes::Bytes, std::io::Error>>,
+    error_tx: &mpsc::Sender<String>,
     state: &RestState,
     route: &RouteInfo,
     frame: WsDataFrame,
 ) -> Result<(), ()> {
-    let proto_bytes = match gateway_tacplus::s2sm::proxy_dispatch::request_json_to_proto(
-        route.grpc_path,
-        &frame.json_bytes,
-    ) {
+    let proto_bytes = match ws_frame_to_proto(state, route, frame).await {
         Ok(bytes) => bytes,
         Err(e) => {
-            let _ = send_ws_body_error(tx, format!("invalid WebSocket request body: {e}")).await;
+            let _ = send_ws_reader_error(error_tx, e).await;
             return Err(());
         }
     };
 
-    if let Err(status) =
-        gateway_tacplus::s2sm::proxy_dispatch::validate_request(route.grpc_path, &proto_bytes)
-    {
-        let _ = send_ws_body_error(tx, status.to_string()).await;
-        return Err(());
-    }
+    tx.send(Ok(bytes::Bytes::from(proxy_grpc::frame_grpc(&proto_bytes))))
+        .await
+        .map_err(|_| ())
+}
 
-    let target_namespace = match gateway_tacplus::s2sm::proxy_dispatch::request_target_namespace(
+async fn ws_frame_to_proto(
+    state: &RestState,
+    route: &RouteInfo,
+    frame: WsDataFrame,
+) -> Result<Vec<u8>, String> {
+    let proto_bytes = gateway_tacplus::s2sm::proxy_dispatch::request_json_to_proto(
+        route.grpc_path,
+        &frame.json_bytes,
+    )
+    .map_err(|e| format!("invalid WebSocket request body: {e}"))?;
+
+    gateway_tacplus::s2sm::proxy_dispatch::validate_request(route.grpc_path, &proto_bytes)
+        .map_err(|status| status.to_string())?;
+
+    let target_namespace = gateway_tacplus::s2sm::proxy_dispatch::request_target_namespace(
         route.grpc_path,
         &proto_bytes,
-    ) {
-        Ok(ns) => ns,
-        Err(status) => {
-            let _ = send_ws_body_error(tx, status.to_string()).await;
-            return Err(());
-        }
-    };
+    )
+    .map_err(|status| status.to_string())?;
 
     let entitlement_service = route.entitlement_service.unwrap_or(route.service_id);
-    if let Err((_, msg)) = state
+    state
         .auth
         .validate_c2s_with_target_namespace(
             route.auth_policy,
@@ -787,26 +914,16 @@ async fn send_ws_json_frame(
             target_namespace.as_deref(),
         )
         .await
-    {
-        let _ = send_ws_body_error(tx, msg).await;
-        return Err(());
-    }
+        .map_err(|(_, msg)| msg)?;
 
-    tx.send(Ok(bytes::Bytes::from(proxy_grpc::frame_grpc(&proto_bytes))))
-        .await
-        .map_err(|_| ())
+    Ok(proto_bytes)
 }
 
-async fn send_ws_body_error(
-    tx: &tokio::sync::mpsc::Sender<Result<bytes::Bytes, std::io::Error>>,
+async fn send_ws_reader_error(
+    tx: &mpsc::Sender<String>,
     message: impl Into<String>,
 ) -> Result<(), ()> {
-    tx.send(Err(std::io::Error::new(
-        std::io::ErrorKind::InvalidData,
-        message.into(),
-    )))
-    .await
-    .map_err(|_| ())
+    tx.send(message.into()).await.map_err(|_| ())
 }
 
 fn ws_error(message: impl AsRef<str>) -> Message {
@@ -821,6 +938,7 @@ fn ws_error(message: impl AsRef<str>) -> Message {
 struct GrpcFrameStream {
     body: axum::body::Body,
     buffer: bytes::BytesMut,
+    done: bool,
 }
 
 impl GrpcFrameStream {
@@ -828,7 +946,17 @@ impl GrpcFrameStream {
         Self {
             body,
             buffer: bytes::BytesMut::new(),
+            done: false,
         }
+    }
+
+    fn fail(
+        &mut self,
+        message: impl Into<String>,
+    ) -> std::task::Poll<Option<Result<Vec<u8>, String>>> {
+        self.done = true;
+        self.buffer.clear();
+        std::task::Poll::Ready(Some(Err(message.into())))
     }
 }
 
@@ -842,14 +970,17 @@ impl futures::Stream for GrpcFrameStream {
         use http_body::Body as HttpBody;
         let this = self.get_mut();
 
+        if this.done {
+            return std::task::Poll::Ready(None);
+        }
+
         loop {
             // Try to extract a complete frame from the buffer.
             if this.buffer.len() >= 5 {
                 if this.buffer[0] != 0 {
-                    return std::task::Poll::Ready(Some(Err(
-                        "compressed gRPC response frames are not supported by REST translation"
-                            .to_string(),
-                    )));
+                    return this.fail(
+                        "compressed gRPC response frames are not supported by REST translation",
+                    );
                 }
                 let msg_len = u32::from_be_bytes([
                     this.buffer[1],
@@ -858,9 +989,7 @@ impl futures::Stream for GrpcFrameStream {
                     this.buffer[4],
                 ]) as usize;
                 if msg_len > MAX_JSON_BODY_BYTES {
-                    return std::task::Poll::Ready(Some(Err(
-                        "gRPC response message exceeds REST translation limit".to_string(),
-                    )));
+                    return this.fail("gRPC response message exceeds REST translation limit");
                 }
                 let frame_len = 5 + msg_len;
                 if this.buffer.len() >= frame_len {
@@ -877,25 +1006,30 @@ impl futures::Stream for GrpcFrameStream {
                     if let Some(data) = frame.data_ref() {
                         this.buffer.extend_from_slice(data);
                         if this.buffer.len() > 5 + MAX_JSON_BODY_BYTES {
-                            return std::task::Poll::Ready(Some(Err(
-                                "incomplete gRPC response frame exceeds REST translation limit"
-                                    .to_string(),
-                            )));
+                            return this.fail(
+                                "incomplete gRPC response frame exceeds REST translation limit",
+                            );
+                        }
+                    }
+                    if let Some(trailers) = frame.trailers_ref() {
+                        if let Some(error) = grpc_error_from_headers(trailers) {
+                            return this.fail(error.message);
                         }
                     }
                 }
                 std::task::Poll::Ready(Some(Err(e))) => {
-                    return std::task::Poll::Ready(Some(Err(format!("body read error: {}", e))));
+                    return this.fail(format!("body read error: {}", e));
                 }
                 std::task::Poll::Ready(None) => {
                     if !this.buffer.is_empty() {
                         let remaining = this.buffer.len();
                         this.buffer.clear();
-                        return std::task::Poll::Ready(Some(Err(format!(
+                        return this.fail(format!(
                             "incomplete trailing gRPC response frame: {} bytes",
                             remaining
-                        ))));
+                        ));
                     }
+                    this.done = true;
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Pending => {
@@ -1053,8 +1187,10 @@ fn json_response<T: serde::Serialize>(value: &T) -> axum::response::Response {
 fn grpc_status_to_http(grpc_status: i32) -> StatusCode {
     match grpc_status {
         3 => StatusCode::BAD_REQUEST,          // INVALID_ARGUMENT
+        4 => StatusCode::GATEWAY_TIMEOUT,      // DEADLINE_EXCEEDED
         5 => StatusCode::NOT_FOUND,            // NOT_FOUND
         7 => StatusCode::FORBIDDEN,            // PERMISSION_DENIED
+        8 => StatusCode::TOO_MANY_REQUESTS,    // RESOURCE_EXHAUSTED
         12 => StatusCode::NOT_IMPLEMENTED,     // UNIMPLEMENTED
         14 => StatusCode::SERVICE_UNAVAILABLE, // UNAVAILABLE
         16 => StatusCode::UNAUTHORIZED,        // UNAUTHENTICATED

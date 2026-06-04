@@ -5,7 +5,7 @@ This document defines the target architecture for the Cavalier gateway. It super
 ## Design Principles
 
 1. **Every message is validated and authenticated.** The gateway deserializes every protobuf message (unary and streaming) into its typed form, runs validation, and checks auth. Corrupted types are rejected at the edge. Expired tokens are rejected immediately.
-2. **No redundant auth layers.** Auth and validation happen in exactly one place: `proxy_grpc`. The REST translation layer does zero auth — it converts the format and hands off to `proxy_grpc`.
+2. **No redundant auth layers.** Native gRPC, unary REST, and SSE REST auth/validation flow through `proxy_grpc`. W2S WebSocket messages are the exception: each JSON data frame carries its own token, so `rest_translation` validates and authorizes each frame before it enters the gRPC request body.
 3. **No redundant serialization.** After validation, the gateway forwards the original bytes held in the receive buffer. It does not re-serialize the validated message.
 4. **Two logical services, one process.** `proxy_grpc` and `rest_translation` are conceptually separate services co-located in one binary to avoid an extra network hop.
 
@@ -35,8 +35,8 @@ This document defines the target architecture for the Cavalier gateway. It super
   │   JSON → proto (*_from_json) │   │   deserialize (*_from_bytes)     │
   │   frame as gRPC              ├──►│   validate type                  │
   │                              │   │   authenticate (every message)   │
-  │   (no auth)                  │   │   extract trace_id               │
-  │   (no validation)            │   │   forward original bytes ────────┼──► backend
+  │   unary/SSE delegate auth    │   │   extract trace_id               │
+  │   W2S prevalidates frames    │   │   forward original bytes ────────┼──► backend
   │                              │   │                                  │   services
   │   response:                  │   │   response:                      │
   │   proto → JSON (*_to_json)   │◄──┤   return response proto bytes    │◄── backend
@@ -61,13 +61,15 @@ Handles all gRPC traffic, both from native gRPC clients and from `rest_translati
 1. **Extract gRPC frame** — Read the 5-byte gRPC header (1 byte compressed flag + 4 bytes big-endian message length), then read the protobuf payload bytes.
 2. **Deserialize into typed message** — Using the tacplus-generated `*_from_bytes()` function for the RPC's request type (looked up from the ROUTES table via the gRPC method path).
 3. **Validate** — Run proto validation on the typed message. Reject with `INVALID_ARGUMENT` if validation fails.
-4. **Authenticate** — Extract the bearer token from the initial HEADERS `authorization` metadata. On every message, check:
+4. **Authenticate** — Extract the bearer token from the initial HEADERS `authorization` metadata. On every native gRPC message, check:
    - Token signature (via JWK cache)
    - Token expiry (`exp` claim)
    - Audience matches target service
    - Entitlements (for `Entitled` policy routes)
 
    If the token has expired, return `UNAUTHENTICATED` and close the stream. The client must reconnect with a fresh token. This is the standard gRPC behavior — auth metadata is sent once in the initial HEADERS frame and cannot be updated mid-stream.
+
+   W2S WebSocket streams differ because each inbound data frame carries its own `authorization` value. The gateway validates and authorizes that token per message before forwarding the original protobuf frame to the backend.
 5. **Extract trace_id** — If proto field 200 (`trace_id`) is non-empty, publish a `TraceEvent` for the gateway hop.
 6. **Forward original bytes** — Write the original gRPC frame bytes (not re-serialized) to the resolved backend channel. The deserialized message from step 2 is discarded after validation.
 
@@ -101,15 +103,15 @@ Converts REST HTTP requests into gRPC messages, then delegates to `proxy_grpc`.
 7. **Convert proto to JSON** — Using the tacplus-generated `*_to_json()` function for the RPC's response type. No hand-written JSON — always use the generated typed helpers.
 8. **Return JSON** — Send the JSON response to the REST client.
 
-**No auth at this layer.** The REST layer does not validate tokens, check entitlements, or verify message types. All of that happens in `proxy_grpc`. This eliminates duplicated auth logic and ensures a single code path for all security enforcement.
+**Auth boundary.** Unary REST and SSE REST do not validate tokens, check entitlements, or verify message types in `rest_translation`; they delegate to `proxy_grpc`. W2S WebSocket requests validate JSON shape, proto constraints, target namespace, and token authorization per data frame in `rest_translation` because per-message WebSocket tokens cannot be represented as changing gRPC request metadata.
 
 **Server-streaming REST (SSE):** For server-streaming RPCs accessed via REST, `rest_translation` returns a Server-Sent Events (SSE) stream. Each response frame from `proxy_grpc` is converted to JSON using the generated `*_to_json()` helper and sent as an SSE `data:` event. This is how the current `rest_dispatch::dispatch_stream()` works — it must be preserved in the new architecture.
 
-> **TODO:** Implement SSE streaming in `rest_translation` for server-streaming RPCs. The current `rest_dispatch::dispatch_stream()` already does this (axum SSE with `Event::default().data(json)`) — the new implementation must follow the same pattern but route through `proxy_grpc` instead of making a direct client call.
+SSE responses inspect backend gRPC trailers. A non-zero gRPC status becomes an SSE `error` event and terminates the stream.
 
 **Bidirectional-streaming REST (WebSocket):** For bidi-streaming RPCs accessed via REST, `rest_translation` upgrades the HTTP connection to a WebSocket. Each client message is JSON, converted to proto via `*_from_json()`, framed as gRPC, and sent through `proxy_grpc`. Each response frame from `proxy_grpc` is converted back to JSON via `*_to_json()` and sent as a WebSocket text message.
 
-> **TODO:** Implement WebSocket transport in `rest_translation` for bidirectional-streaming RPCs (e.g., Session, WatchTrace). This enables REST clients (browsers, curl) to use bidi RPCs that are currently only accessible via native gRPC.
+Authenticated WebSocket data frames must use a `type=message` envelope with an `authorization` field. If validation, authorization, response serialization, or backend trailer status fails, the gateway sends an error frame and closes the socket.
 
 ### Mint (gateway-native service)
 
@@ -132,6 +134,13 @@ gRPC sends auth metadata in the initial HEADERS frame only. There is no mechanis
 - On **every message frame**, the gateway re-checks the token's `exp` claim against the current time.
 - When the token expires, the gateway closes the stream with `UNAUTHENTICATED` (gRPC status code 16).
 - The client obtains a fresh token and reconnects. This is standard gRPC client behavior — `CallCredentials` / per-RPC credentials handle this automatically.
+
+W2S WebSocket streams are message-tokened instead of header-tokened:
+
+- The WebSocket channel may stay open across token rotations.
+- Every authenticated data frame must carry a current bearer token in its `authorization` field.
+- If the identity manager cannot provide a valid token for a message, the client must not send that message.
+- Auth-disabled routes are exempt, but message constraints are still validated.
 
 ### Auth Policies
 
