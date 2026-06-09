@@ -13,7 +13,7 @@ use tower::{Service, ServiceExt};
 use crate::auth::GatewayAuth;
 use crate::resolver::Resolver;
 
-use gateway_tacplus::types::libs::trace::{TraceEvent, TraceEventKind, TraceRound};
+use gateway_model::types::libs::trace::{TraceEvent, TraceEventKind, TraceRound};
 
 const MAX_GRPC_MESSAGE_BYTES: usize = 10 * 1024 * 1024;
 
@@ -136,7 +136,7 @@ fn validated_streaming_body(
     path: String,
     service_id: String,
     entitlement_service: String,
-    auth_policy: gateway_tacplus::s2sm::rest_dispatch::AuthPolicy,
+    auth_policy: gateway_model::s2sm::rest_dispatch::AuthPolicy,
     auth_header: Option<String>,
 ) -> Body {
     let auth = Arc::clone(&proxy.auth);
@@ -206,7 +206,7 @@ fn validated_streaming_body(
                 let proto_bytes = &grpc_frame[5..];
 
                 if let Err(status) =
-                    gateway_tacplus::s2sm::proxy_dispatch::validate_request(&path, proto_bytes)
+                    gateway_model::s2sm::proxy_dispatch::validate_request(&path, proto_bytes)
                 {
                     tracing::warn!(
                         path = %path,
@@ -223,7 +223,7 @@ fn validated_streaming_body(
                 }
 
                 let target_namespace =
-                    match gateway_tacplus::s2sm::proxy_dispatch::request_target_namespace(
+                    match gateway_model::s2sm::proxy_dispatch::request_target_namespace(
                         &path,
                         proto_bytes,
                     ) {
@@ -329,12 +329,12 @@ async fn handle_inner(
 
     // Look up route info from the generated ROUTES table.
     // Default to Entitled (most restrictive) for routes not in the table.
-    let route_info = gateway_tacplus::s2sm::rest_dispatch::ROUTES
+    let route_info = gateway_model::s2sm::rest_dispatch::ROUTES
         .iter()
         .find(|r| r.grpc_path == path);
     let auth_policy = route_info
         .map(|r| r.auth_policy)
-        .unwrap_or(gateway_tacplus::s2sm::rest_dispatch::AuthPolicy::Entitled);
+        .unwrap_or(gateway_model::s2sm::rest_dispatch::AuthPolicy::Entitled);
     let entitlement_service = route_info
         .and_then(|r| r.entitlement_service)
         .unwrap_or(service_id);
@@ -410,14 +410,14 @@ async fn handle_inner(
             Ok(proto_bytes) => {
                 // Validate: deserialize into typed message and run validation.
                 if let Err(status) =
-                    gateway_tacplus::s2sm::proxy_dispatch::validate_request(&path, proto_bytes)
+                    gateway_model::s2sm::proxy_dispatch::validate_request(&path, proto_bytes)
                 {
                     tracing::warn!(path = %path, error = %status.message(), "request validation failed");
                     return tonic_status_to_response(status);
                 }
 
                 let target_namespace =
-                    match gateway_tacplus::s2sm::proxy_dispatch::request_target_namespace(
+                    match gateway_model::s2sm::proxy_dispatch::request_target_namespace(
                         &path,
                         proto_bytes,
                     ) {

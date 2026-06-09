@@ -19,11 +19,11 @@ use tokio::time::{timeout, Duration};
 use tokio_stream::StreamExt;
 use tracing_subscriber::EnvFilter;
 
-use gateway_tacplus::s2sm::ServiceManager;
-use gateway_tacplus::types::libs::host::host::Host;
-use gateway_tacplus::types::services::gateway::gateway::ExternalTlsMode;
-use gateway_tacplus::types::services::letsencrypt::letsencrypt::lets_encrypt_state_service_client::LetsEncryptStateServiceClient;
-use gateway_tacplus::types::services::letsencrypt::letsencrypt::LetsEncryptCertData;
+use gateway_model::s2sm::ServiceManager;
+use gateway_model::types::libs::host::host::Host;
+use gateway_model::types::services::gateway::gateway::ExternalTlsMode;
+use gateway_model::types::services::letsencrypt::letsencrypt::lets_encrypt_state_service_client::LetsEncryptStateServiceClient;
+use gateway_model::types::services::letsencrypt::letsencrypt::LetsEncryptCertData;
 use crate::health::TokenProvider;
 
 #[tokio::main]
@@ -191,7 +191,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let grpc_router = {
-        use gateway_tacplus::types::services::gateway::gateway::mint_server::MintServer;
+        use gateway_model::types::services::gateway::gateway::mint_server::MintServer;
         let (health_reporter, health_service) = tonic_health::server::health_reporter();
         health_reporter
             .set_service_status("", tonic_health::ServingStatus::Serving)
@@ -221,8 +221,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // 13. Layer the routers: Mint (tonic) → gRPC proxy → IDP proxy → REST/SPA.
     // Mint is a native tonic service; all other gRPC requests are proxied
     // as raw HTTP/2 through the resolver to backend services.
-    let registry_route = format!("{}/registry/{{file}}", gateway_tacplus::s2sm::rest_dispatch::REST_ROOT_PATH);
-    let client_route = format!("{}/client/{{os}}/{{arch}}", gateway_tacplus::s2sm::rest_dispatch::REST_ROOT_PATH);
+    let registry_route = format!("{}/registry/{{file}}", gateway_model::s2sm::rest_dispatch::REST_ROOT_PATH);
+    let client_route = format!("{}/client/{{os}}/{{arch}}", gateway_model::s2sm::rest_dispatch::REST_ROOT_PATH);
     let client_auth = Arc::clone(&gateway_auth);
     let spa_and_rest = rest_translation::router(rest_state)
         .route("/healthz", get(healthz))
@@ -398,7 +398,7 @@ async fn healthz() -> StatusCode {
 fn spawn_ca_cert_watcher(
     channel: tonic::transport::Channel,
     token_provider: TokenProvider,
-    ca_certs_store: Arc<tokio::sync::RwLock<Vec<gateway_tacplus::types::libs::x509::x509::X509Cert>>>,
+    ca_certs_store: Arc<tokio::sync::RwLock<Vec<gateway_model::types::libs::x509::x509::X509Cert>>>,
 ) {
     tokio::spawn(async move {
         loop {
@@ -416,9 +416,9 @@ fn spawn_ca_cert_watcher(
 async fn watch_ca_cert_updates(
     channel: tonic::transport::Channel,
     token_provider: &TokenProvider,
-    ca_certs_store: &tokio::sync::RwLock<Vec<gateway_tacplus::types::libs::x509::x509::X509Cert>>,
+    ca_certs_store: &tokio::sync::RwLock<Vec<gateway_model::types::libs::x509::x509::X509Cert>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    use gateway_tacplus::types::services::kernel::kernel::ca_state_service_client::CaStateServiceClient;
+    use gateway_model::types::services::kernel::kernel::ca_state_service_client::CaStateServiceClient;
 
     let mut client = CaStateServiceClient::new(channel);
 
@@ -459,8 +459,8 @@ async fn watch_ca_cert_updates(
 async fn wait_for_ca_certs(
     channel: tonic::transport::Channel,
     token_provider: &TokenProvider,
-) -> Result<Vec<gateway_tacplus::types::libs::x509::x509::X509Cert>, Box<dyn std::error::Error>> {
-    use gateway_tacplus::types::services::kernel::kernel::ca_state_service_client::CaStateServiceClient;
+) -> Result<Vec<gateway_model::types::libs::x509::x509::X509Cert>, Box<dyn std::error::Error>> {
+    use gateway_model::types::services::kernel::kernel::ca_state_service_client::CaStateServiceClient;
 
     let mut client = CaStateServiceClient::new(channel);
 
@@ -512,8 +512,8 @@ async fn wait_for_ca_certs(
 
 /// Build the raw PEM bundle of all CA certificates (bootstrap + dynamic).
 fn build_ca_pem_bundle(
-    config: &gateway_tacplus::types::libs::grpcconfig::grpcconfig::Config,
-    dynamic_cas: &[gateway_tacplus::types::libs::x509::x509::X509Cert],
+    config: &gateway_model::types::libs::grpcconfig::grpcconfig::Config,
+    dynamic_cas: &[gateway_model::types::libs::x509::x509::X509Cert],
 ) -> String {
     let mut pem_bundle = String::new();
     tracing::info!(count = config.trusted_cas.len(), "loading bootstrap CAs");

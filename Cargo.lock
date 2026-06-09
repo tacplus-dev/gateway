@@ -32,7 +32,7 @@ dependencies = [
 name = "am"
 version = "0.1.0"
 dependencies = [
- "gateway-tacplus-types",
+ "gateway-model-types",
  "tonic",
  "tracing",
 ]
@@ -295,7 +295,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "c2ld"
+name = "c2d"
 version = "0.1.0"
 dependencies = [
  "hyper",
@@ -367,10 +367,19 @@ name = "client_im"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
- "gateway-tacplus-types",
+ "gateway-model-types",
  "tokio",
  "tonic",
  "tracing",
+]
+
+[[package]]
+name = "collection"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "tokio-stream",
+ "tonic",
 ]
 
 [[package]]
@@ -533,7 +542,7 @@ version = "1.0.0"
 dependencies = [
  "bzip2",
  "flate2",
- "gateway-tacplus-types",
+ "gateway-model-types",
  "log",
  "serde",
  "serde_json",
@@ -822,7 +831,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "futures",
- "gateway-tacplus",
+ "gateway-model",
  "grpcserver",
  "http",
  "http-body",
@@ -853,18 +862,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "gateway-tacplus"
+name = "gateway-model"
 version = "1.0.0"
 dependencies = [
  "am",
  "async-trait",
  "axum",
  "base64 0.21.7",
- "c2ld",
+ "c2d",
  "client_im",
+ "collection",
  "diskstore",
  "futures",
- "gateway-tacplus-types",
+ "gateway-model-types",
  "grpcconfig",
  "grpcserver",
  "healthreporter",
@@ -896,7 +906,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gateway-tacplus-types"
+name = "gateway-model-types"
 version = "1.0.0"
 dependencies = [
  "base64 0.21.7",
@@ -981,7 +991,7 @@ dependencies = [
 name = "grpcconfig"
 version = "0.1.0"
 dependencies = [
- "gateway-tacplus-types",
+ "gateway-model-types",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -995,7 +1005,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "futures",
- "gateway-tacplus-types",
+ "gateway-model-types",
  "hyper",
  "hyper-util",
  "jwk",
@@ -1055,7 +1065,7 @@ checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 name = "healthreporter"
 version = "0.1.0"
 dependencies = [
- "gateway-tacplus-types",
+ "gateway-model-types",
  "tokio",
  "tonic",
  "tracing",
@@ -1136,7 +1146,7 @@ version = "1.0.0"
 dependencies = [
  "backoff",
  "base64 0.21.7",
- "gateway-tacplus-types",
+ "gateway-model-types",
  "log",
  "reqwest",
  "rustls",
@@ -1541,9 +1551,10 @@ name = "logger"
 version = "1.0.0"
 dependencies = [
  "chrono",
- "gateway-tacplus-types",
+ "gateway-model-types",
  "once_cell",
  "serde",
+ "serde_json",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2497,7 +2508,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "ecdsa",
- "gateway-tacplus-types",
+ "gateway-model-types",
  "key",
  "p256",
  "quick-xml",
@@ -2645,7 +2656,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "ed25519-dalek",
- "gateway-tacplus-types",
+ "gateway-model-types",
  "grpcconfig",
  "hex",
  "hmac",
@@ -2669,7 +2680,7 @@ dependencies = [
 name = "servicemanager"
 version = "0.1.0"
 dependencies = [
- "gateway-tacplus-types",
+ "gateway-model-types",
  "jwk",
  "prost",
  "rustls",
@@ -2993,7 +3004,7 @@ dependencies = [
  "chrono",
  "ecdsa",
  "ed25519-dalek",
- "gateway-tacplus-types",
+ "gateway-model-types",
  "jwk",
  "key",
  "p256",

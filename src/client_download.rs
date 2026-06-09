@@ -31,7 +31,7 @@ pub async fn handler(
         .and_then(|v| v.to_str().ok());
 
     if let Err((status, msg)) = auth.validate_c2s(
-        gateway_tacplus::s2sm::rest_dispatch::AuthPolicy::AnyUser,
+        gateway_model::s2sm::rest_dispatch::AuthPolicy::AnyUser,
         "gateway",
         "gateway",
         "/gateway/ClientDownload",

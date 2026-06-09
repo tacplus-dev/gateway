@@ -3,7 +3,7 @@ use std::sync::Arc;
 use http::StatusCode;
 
 use gateway_grpcserver::{authorizer::JwkCache, spiffe::is_at_or_below};
-use gateway_tacplus::types::libs::jwk::jwk::Jwk as ProtoJwk;
+use gateway_model::types::libs::jwk::jwk::Jwk as ProtoJwk;
 
 // Generated libs for JWT parsing (no crypto needed — authorizer handles verification)
 use gateway_token::token::Token;
@@ -45,13 +45,13 @@ impl GatewayAuth {
     /// When passthrough mode is enabled, all policies are treated as NoAuth.
     pub async fn validate_c2s(
         &self,
-        auth_policy: gateway_tacplus::s2sm::rest_dispatch::AuthPolicy,
+        auth_policy: gateway_model::s2sm::rest_dispatch::AuthPolicy,
         service_id: &str,
         entitlement_service: &str,
         grpc_path: &str,
         auth_header: Option<&str>,
     ) -> Result<(), (StatusCode, String)> {
-        use gateway_tacplus::s2sm::rest_dispatch::AuthPolicy;
+        use gateway_model::s2sm::rest_dispatch::AuthPolicy;
 
         if self.passthrough {
             return Ok(());
@@ -76,14 +76,14 @@ impl GatewayAuth {
     /// metadata exposes a target namespace, enforce the level-or-below rule.
     pub async fn validate_c2s_with_target_namespace(
         &self,
-        auth_policy: gateway_tacplus::s2sm::rest_dispatch::AuthPolicy,
+        auth_policy: gateway_model::s2sm::rest_dispatch::AuthPolicy,
         service_id: &str,
         entitlement_service: &str,
         grpc_path: &str,
         auth_header: Option<&str>,
         target_namespace: Option<&str>,
     ) -> Result<(), (StatusCode, String)> {
-        use gateway_tacplus::s2sm::rest_dispatch::AuthPolicy;
+        use gateway_model::s2sm::rest_dispatch::AuthPolicy;
 
         self.validate_c2s(
             auth_policy,

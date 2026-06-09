@@ -6,12 +6,12 @@ use tokio::sync::Notify;
 use tokio_stream::StreamExt;
 use tonic::transport::Channel;
 
-use gateway_tacplus::types::services::kernel::kernel::service_health_state_service_client::ServiceHealthStateServiceClient;
-use gateway_tacplus::types::services::kernel::kernel::InstancesEntriesResponse;
+use gateway_model::types::services::kernel::kernel::service_health_state_service_client::ServiceHealthStateServiceClient;
+use gateway_model::types::services::kernel::kernel::InstancesEntriesResponse;
 
 /// Token provider: returns a bearer token or an error.
 /// Re-exported from the generated ServiceManager.
-pub use gateway_tacplus::s2sm::TokenProvider;
+pub use gateway_model::s2sm::TokenProvider;
 
 /// A healthy service instance endpoint.
 #[derive(Debug, Clone)]
@@ -207,7 +207,7 @@ impl HealthWatcher {
 
 /// Returns true if the instance status is HEALTHY or DEGRADED.
 fn is_routable(status: i32) -> bool {
-    use gateway_tacplus::types::libs::healthreport::healthreport::InstanceStatus;
+    use gateway_model::types::libs::healthreport::healthreport::InstanceStatus;
     matches!(
         InstanceStatus::try_from(status),
         Ok(InstanceStatus::Healthy | InstanceStatus::Degraded)

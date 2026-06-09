@@ -6,7 +6,7 @@ use base64::Engine;
 use rustls::ServerConfig;
 use rustls::pki_types::CertificateDer;
 
-use gateway_tacplus::types::libs::x509::x509::X509CertChain;
+use gateway_model::types::libs::x509::x509::X509CertChain;
 
 /// Build a rustls ServerConfig from an X509CertChain proto.
 ///

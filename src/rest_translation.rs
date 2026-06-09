@@ -13,12 +13,12 @@ use tokio::time::{timeout, Duration};
 use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
 
-use gateway_tacplus::s2sm::rest_dispatch::{self, AuthPolicy, RouteInfo, REST_ROOT_PATH, ROUTES};
-use gateway_tacplus::s2sm::ServiceManager;
-use gateway_tacplus::types::libs::jwk::jwk::Jwk as ProtoJwk;
-use gateway_tacplus::types::libs::jwk::jwk::JwkUseType;
-use gateway_tacplus::types::libs::key::key::KeyType;
-use gateway_tacplus::types::libs::x509::x509::X509Cert;
+use gateway_model::s2sm::rest_dispatch::{self, AuthPolicy, RouteInfo, REST_ROOT_PATH, ROUTES};
+use gateway_model::s2sm::ServiceManager;
+use gateway_model::types::libs::jwk::jwk::Jwk as ProtoJwk;
+use gateway_model::types::libs::jwk::jwk::JwkUseType;
+use gateway_model::types::libs::key::key::KeyType;
+use gateway_model::types::libs::x509::x509::X509Cert;
 
 use crate::auth::GatewayAuth;
 use crate::proxy_grpc::{self, ProxyState};
@@ -390,7 +390,7 @@ async fn dispatch_via_proxy(
 ) -> axum::response::Response {
     // 1. Convert JSON to proto bytes.
     let proto_bytes =
-        match gateway_tacplus::s2sm::proxy_dispatch::request_json_to_proto(grpc_path, json_body) {
+        match gateway_model::s2sm::proxy_dispatch::request_json_to_proto(grpc_path, json_body) {
             Ok(b) => b,
             Err(e) => {
                 return (
@@ -478,7 +478,7 @@ async fn dispatch_via_proxy(
     let proto_end = 5 + msg_len;
     let response_proto = &response_bytes[5..proto_end];
 
-    match gateway_tacplus::s2sm::proxy_dispatch::response_to_json(grpc_path, response_proto) {
+    match gateway_model::s2sm::proxy_dispatch::response_to_json(grpc_path, response_proto) {
         Ok(json) => (
             StatusCode::OK,
             [(
@@ -505,7 +505,7 @@ async fn dispatch_stream_via_proxy(
 ) -> axum::response::Response {
     // Convert JSON to proto, frame as gRPC, build request.
     let proto_bytes =
-        match gateway_tacplus::s2sm::proxy_dispatch::request_json_to_proto(grpc_path, json_body) {
+        match gateway_model::s2sm::proxy_dispatch::request_json_to_proto(grpc_path, json_body) {
             Ok(b) => b,
             Err(e) => {
                 return (
@@ -559,7 +559,7 @@ async fn dispatch_stream_via_proxy(
             }
             match frames.next().await {
                 Some(Ok(proto_bytes)) => {
-                    match gateway_tacplus::s2sm::proxy_dispatch::response_to_json(
+                    match gateway_model::s2sm::proxy_dispatch::response_to_json(
                         &grpc_path,
                         &proto_bytes,
                     ) {
@@ -777,7 +777,7 @@ async fn handle_websocket_stream(
                 };
                 match frame {
                     Ok(proto_bytes) => {
-                        let json = match gateway_tacplus::s2sm::proxy_dispatch::response_to_json(
+                        let json = match gateway_model::s2sm::proxy_dispatch::response_to_json(
                             &grpc_path,
                             &proto_bytes,
                         ) {
@@ -907,16 +907,16 @@ async fn ws_frame_to_proto(
     route: &RouteInfo,
     frame: WsDataFrame,
 ) -> Result<Vec<u8>, String> {
-    let proto_bytes = gateway_tacplus::s2sm::proxy_dispatch::request_json_to_proto(
+    let proto_bytes = gateway_model::s2sm::proxy_dispatch::request_json_to_proto(
         route.grpc_path,
         &frame.json_bytes,
     )
     .map_err(|e| format!("invalid WebSocket request body: {e}"))?;
 
-    gateway_tacplus::s2sm::proxy_dispatch::validate_request(route.grpc_path, &proto_bytes)
+    gateway_model::s2sm::proxy_dispatch::validate_request(route.grpc_path, &proto_bytes)
         .map_err(|status| status.to_string())?;
 
-    let target_namespace = gateway_tacplus::s2sm::proxy_dispatch::request_target_namespace(
+    let target_namespace = gateway_model::s2sm::proxy_dispatch::request_target_namespace(
         route.grpc_path,
         &proto_bytes,
     )
@@ -1096,7 +1096,7 @@ async fn handle_mint(
         "/gateway.Mint/TokenMint" => {
             tracing::info!(request_id = %request_id, "routing TokenMint to mint");
             let req =
-                match gateway_tacplus::types::common::tokenrequest::token_mint_request_from_json(
+                match gateway_model::types::common::tokenrequest::token_mint_request_from_json(
                     body,
                 ) {
                     Ok(r) => r,
@@ -1128,7 +1128,7 @@ async fn handle_mint(
         }
         "/gateway.Mint/X509Mint" => {
             let req =
-                match gateway_tacplus::types::common::tokenrequest::x509_mint_request_from_json(
+                match gateway_model::types::common::tokenrequest::x509_mint_request_from_json(
                     body,
                 ) {
                     Ok(r) => r,

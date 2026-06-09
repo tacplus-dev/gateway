@@ -1,12 +1,12 @@
 /// Embedded registry.json from tacplus generation.
-const REGISTRY_JSON: &str = include_str!("../target/generated-sources/tacplus/registry.json");
+const REGISTRY_JSON: &str = include_str!("../target/generated-sources/model/registry.json");
 
 /// Embedded registry schema.
 const REGISTRY_SCHEMA_JSON: &str =
-    include_str!("../target/generated-sources/tacplus/registry.schema.json");
+    include_str!("../target/generated-sources/model/registry.schema.json");
 
 /// Embedded AGENT.md.
-const AGENT_MD: &str = include_str!("../target/generated-sources/tacplus/AGENT.md");
+const AGENT_MD: &str = include_str!("../target/generated-sources/model/AGENT.md");
 
 /// Registry provides access to embedded registry files for serving via REST.
 /// Route table and auth policies are generated at compile time in rest_dispatch.rs.
@@ -16,7 +16,7 @@ impl Registry {
     /// Log the compile-time route table size.
     pub fn load() -> Self {
         tracing::info!(
-            rest_routes = gateway_tacplus::s2sm::rest_dispatch::ROUTES.len(),
+            rest_routes = gateway_model::s2sm::rest_dispatch::ROUTES.len(),
             "registry loaded (compile-time route table)"
         );
         Self
