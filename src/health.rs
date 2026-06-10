@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, RwLock};
 
 use tokio::sync::Notify;
 use tokio_stream::StreamExt;
@@ -8,6 +8,8 @@ use tonic::transport::Channel;
 
 use gateway_model::types::services::kernel::kernel::service_health_state_service_client::ServiceHealthStateServiceClient;
 use gateway_model::types::services::kernel::kernel::InstancesEntriesResponse;
+
+const SERVICE_HEALTH_MAX_MESSAGE_BYTES: usize = 64 * 1024 * 1024;
 
 /// Token provider: returns a bearer token or an error.
 /// Re-exported from the generated ServiceManager.
@@ -102,14 +104,20 @@ impl HealthWatcher {
         }
     }
 
-    async fn start_watch(&self, channel: Channel, token_provider: &TokenProvider) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let mut client = ServiceHealthStateServiceClient::new(channel);
+    async fn start_watch(
+        &self,
+        channel: Channel,
+        token_provider: &TokenProvider,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let mut client = ServiceHealthStateServiceClient::new(channel)
+            .max_decoding_message_size(SERVICE_HEALTH_MAX_MESSAGE_BYTES);
 
         let mut request = tonic::Request::new(Default::default());
         if let Ok(token) = (token_provider)().await {
-            let val: tonic::metadata::MetadataValue<tonic::metadata::Ascii> = format!("Bearer {}", token)
-                .parse()
-                .map_err(|_| "invalid token metadata")?;
+            let val: tonic::metadata::MetadataValue<tonic::metadata::Ascii> =
+                format!("Bearer {}", token)
+                    .parse()
+                    .map_err(|_| "invalid token metadata")?;
             request.metadata_mut().insert("authorization", val);
         }
 
@@ -170,10 +178,7 @@ impl HealthWatcher {
                     // Index by SPIFFE path if present.
                     if !inst.spiffe_id.is_empty() {
                         if let Some(path) = extract_spiffe_service_path(&inst.spiffe_id) {
-                            spiffe_grouped
-                                .entry(path)
-                                .or_default()
-                                .push(endpoint);
+                            spiffe_grouped.entry(path).or_default().push(endpoint);
                         }
                     }
                 }
@@ -181,7 +186,10 @@ impl HealthWatcher {
         }
 
         for (sid, eps) in &grouped {
-            let addrs: Vec<String> = eps.iter().map(|e| format!("{}:{}", e.host, e.port)).collect();
+            let addrs: Vec<String> = eps
+                .iter()
+                .map(|e| format!("{}:{}", e.host, e.port))
+                .collect();
             tracing::info!(
                 service = %sid,
                 instances = eps.len(),
@@ -225,8 +233,8 @@ fn extract_spiffe_service_path(spiffe_id: &str) -> Option<String> {
     let stripped = spiffe_id.strip_prefix("spiffe://")?;
     // Split: org / cluster / service [/ child / ...]
     let mut parts = stripped.splitn(3, '/');
-    let _org = parts.next()?;       // e.g., "cavalier"
-    let _cluster = parts.next()?;   // e.g., "cluster-prod"
+    let _org = parts.next()?; // e.g., "cavalier"
+    let _cluster = parts.next()?; // e.g., "cluster-prod"
     let service_path = parts.next()?; // e.g., "mud-controller/agent-42"
     if service_path.is_empty() {
         return None;
