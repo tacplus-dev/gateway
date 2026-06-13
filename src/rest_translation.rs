@@ -1095,19 +1095,18 @@ async fn handle_mint(
         }
         "/gateway.Mint/TokenMint" => {
             tracing::info!(request_id = %request_id, "routing TokenMint to mint");
-            let req =
-                match gateway_model::types::common::tokenrequest::token_mint_request_from_json(
-                    body,
-                ) {
-                    Ok(r) => r,
-                    Err(e) => {
-                        return (
-                            StatusCode::BAD_REQUEST,
-                            format!("{{\"error\":\"invalid request body: {}\"}}", e),
-                        )
-                            .into_response()
-                    }
-                };
+            let req = match gateway_model::types::common::tokenrequest::token_mint_request_from_json(
+                body,
+            ) {
+                Ok(r) => r,
+                Err(e) => {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        format!("{{\"error\":\"invalid request body: {}\"}}", e),
+                    )
+                        .into_response()
+                }
+            };
             let grpc_req = rest_dispatch::with_metadata(req, auth_header, request_id);
             // TokenMint is proxied to kernel.Mint (the sole token authority).
             match state
@@ -1128,9 +1127,8 @@ async fn handle_mint(
         }
         "/gateway.Mint/X509Mint" => {
             let req =
-                match gateway_model::types::common::tokenrequest::x509_mint_request_from_json(
-                    body,
-                ) {
+                match gateway_model::types::common::tokenrequest::x509_mint_request_from_json(body)
+                {
                     Ok(r) => r,
                     Err(e) => {
                         return (
@@ -1230,6 +1228,8 @@ mod tests {
             entitlement_service: None,
             http_methods: &["POST"],
             auth_policy,
+            entitlement_scopes: &[],
+            capability_scope: None,
             server_streaming: true,
             client_streaming: true,
             target_namespace_field: None,

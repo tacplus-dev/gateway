@@ -3,6 +3,7 @@ use std::sync::Arc;
 use http::StatusCode;
 
 use gateway_grpcserver::{authorizer::JwkCache, spiffe::is_at_or_below};
+use gateway_model::grants;
 use gateway_model::types::libs::jwk::jwk::Jwk as ProtoJwk;
 
 // Generated libs for JWT parsing (no crypto needed — authorizer handles verification)
@@ -65,8 +66,7 @@ impl GatewayAuth {
             }
             AuthPolicy::Entitled => {
                 self.authenticate(service_id, auth_header)?;
-                let method = grpc_path.rsplit('/').next().unwrap_or(grpc_path);
-                self.check_entitlements(auth_header.unwrap_or(""), entitlement_service, method)?;
+                self.check_entitlements(auth_header.unwrap_or(""), entitlement_service, grpc_path)?;
                 Ok(())
             }
         }
@@ -199,8 +199,9 @@ impl GatewayAuth {
         &self,
         auth_header: &str,
         target_service: &str,
-        method: &str,
+        grpc_path: &str,
     ) -> Result<(), (StatusCode, String)> {
+        let method = grpc_path.rsplit('/').next().unwrap_or(grpc_path);
         let token_str = extract_bearer(auth_header).ok_or_else(|| {
             (
                 StatusCode::UNAUTHORIZED,
@@ -227,6 +228,10 @@ impl GatewayAuth {
 
         // Global all-entitlements bypass (admin users): {"all": true}
         if se_obj.get("all").and_then(|v| v.as_bool()).unwrap_or(false) {
+            return Ok(());
+        }
+
+        if flat_grants_allow(&se_obj, target_service, grpc_path) {
             return Ok(());
         }
 
@@ -370,4 +375,156 @@ fn ensure_not_expired(token: &Token) -> Result<(), (StatusCode, String)> {
     }
 
     Ok(())
+}
+
+fn flat_grants_allow(se_obj: &serde_json::Value, target_service: &str, grpc_path: &str) -> bool {
+    let grant_tokens = collect_flat_grants(se_obj);
+    if grant_tokens.is_empty() {
+        return false;
+    }
+
+    let service_part = grant_token_part(target_service);
+    let exact = method_grant_token(target_service, grpc_path);
+    let normalized = grants::normalize(grant_tokens.iter().map(String::as_str));
+
+    grant_tokens.iter().any(|token| {
+        let upper = token.to_ascii_uppercase();
+        upper == "ANY"
+            || upper == format!("{service_part}_ANY")
+            || upper == format!("{service_part}_RPCS_ANY")
+            || exact
+                .as_ref()
+                .is_some_and(|expected| upper == expected.as_str())
+    }) || exact
+        .as_ref()
+        .is_some_and(|expected| normalized.iter().any(|token| token == expected))
+}
+
+fn collect_flat_grants(value: &serde_json::Value) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Some(grants) = value.get("grants") {
+        collect_grant_tokens(grants, &mut out);
+    }
+    dedupe_preserving_order(out)
+}
+
+fn collect_grant_tokens(value: &serde_json::Value, out: &mut Vec<String>) {
+    match value {
+        serde_json::Value::String(s) if !s.is_empty() => out.push(s.to_ascii_uppercase()),
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_grant_tokens(item, out);
+            }
+        }
+        serde_json::Value::Object(obj) => {
+            if let Some(token) = obj.get("token").and_then(|v| v.as_str()) {
+                if !token.is_empty() {
+                    out.push(token.to_ascii_uppercase());
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn method_grant_token(target_service: &str, grpc_path: &str) -> Option<String> {
+    let path = grpc_path.trim_start_matches('/');
+    let (qualified_service, method) = path.split_once('/')?;
+    if method.is_empty() {
+        return None;
+    }
+    let service = qualified_service
+        .rsplit('.')
+        .next()
+        .filter(|s| !s.is_empty())?;
+    Some(format!(
+        "{}_{}_{}",
+        grant_token_part(target_service),
+        grant_token_part(service),
+        grant_token_part(method)
+    ))
+}
+
+fn grant_token_part(input: &str) -> String {
+    let mut out = String::with_capacity(input.len() + 8);
+    let mut prev_was_sep = true;
+    let mut prev_was_lower_or_digit = false;
+    for ch in input.chars() {
+        if ch.is_ascii_alphanumeric() {
+            let is_upper = ch.is_ascii_uppercase();
+            if is_upper && prev_was_lower_or_digit && !prev_was_sep {
+                out.push('_');
+            }
+            out.push(ch.to_ascii_uppercase());
+            prev_was_sep = false;
+            prev_was_lower_or_digit = ch.is_ascii_lowercase() || ch.is_ascii_digit();
+        } else if !out.ends_with('_') && !out.is_empty() {
+            out.push('_');
+            prev_was_sep = true;
+            prev_was_lower_or_digit = false;
+        }
+    }
+    while out.ends_with('_') {
+        out.pop();
+    }
+    out
+}
+
+fn dedupe_preserving_order(input: Vec<String>) -> Vec<String> {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut out = Vec::with_capacity(input.len());
+    for item in input {
+        if seen.insert(item.clone()) {
+            out.push(item);
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn flat_grants_accept_legacy_service_wildcard() {
+        let entitlements = serde_json::json!({"grants": ["OPENAI_RPCS_ANY"]});
+        assert!(flat_grants_allow(
+            &entitlements,
+            "openai",
+            "/openai.Proxy/CreateChatCompletion"
+        ));
+        assert!(!flat_grants_allow(
+            &entitlements,
+            "anthropic",
+            "/anthropic.Proxy/CreateMessage"
+        ));
+    }
+
+    #[test]
+    fn flat_grants_accept_generated_package_wildcard() {
+        let entitlements = serde_json::json!({"grants": ["OPENAI_ANY"]});
+        assert!(flat_grants_allow(
+            &entitlements,
+            "openai",
+            "/openai.Proxy/CreateChatCompletion"
+        ));
+    }
+
+    #[test]
+    fn flat_grants_accept_legacy_object_wrapper_during_rollout() {
+        let entitlements = serde_json::json!({"grants": [{"token": "ANTHROPIC_RPCS_ANY"}]});
+        assert!(flat_grants_allow(
+            &entitlements,
+            "anthropic",
+            "/anthropic.Proxy/CreateMessage"
+        ));
+    }
+
+    #[test]
+    fn method_grant_token_matches_catalog_shape() {
+        assert_eq!(
+            method_grant_token("openai", "/openai.Proxy/CreateChatCompletion").as_deref(),
+            Some("OPENAI_PROXY_CREATE_CHAT_COMPLETION")
+        );
+    }
 }
