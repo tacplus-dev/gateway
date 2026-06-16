@@ -117,8 +117,8 @@ Authenticated WebSocket data frames must use a `type=message` envelope with an `
 
 The `gateway.Mint` service remains a native tonic service, not proxied. It handles:
 
-- `OpenIdConfig` — OIDC discovery (served locally)
-- `Jwks` — JWK set (served locally from kernel-watched keys)
+- `GetOpenIdConfig` — OIDC discovery (served locally)
+- `ListJwks` — JWK set (served locally from kernel-watched keys)
 - `TokenMint` — Proxied to kernel's MintService
 - `X509Mint` — Proxied to kernel's MintService
 

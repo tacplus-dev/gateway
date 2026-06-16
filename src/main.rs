@@ -138,7 +138,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let backend_tls = build_backend_tls_config_from_pem(&ca_pem_bundle);
     let resolver = Arc::new(resolver::Resolver::new(health_watcher.clone(), backend_tls));
 
-    // Store CA certs in a shared RwLock so the Mint service can serve them via PublicCa.
+    // Store CA certs in a shared RwLock so the Mint service can serve them via ListPublicCa.
     let ca_certs_store = Arc::new(tokio::sync::RwLock::new(initial_cas));
     spawn_ca_cert_watcher(kernel_channel.clone(), token_provider.clone(), Arc::clone(&ca_certs_store));
 
@@ -170,7 +170,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // 8. Build gateway Mint service (local OIDC/JWKS, delegates TokenMint/X509Mint to kernel).
     // root_ca comes from config — the CA that signed the external TLS cert.
-    // Clients call PublicCa to retrieve it for TLS trust configuration.
+    // Clients call ListPublicCa to retrieve it for TLS trust configuration.
     let mint_service = mint::GatewayMintService::new(
         Arc::clone(&sm),
         Arc::clone(&gateway_auth),
@@ -179,7 +179,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // 9. Create trace publisher (shared between gRPC proxy and REST handler).
-    let trace_publisher = sm.create_trace_publisher().await;
+    let trace_publish = sm.create_trace_publisher().await;
+    let trace_publisher: Arc<
+        dyn Fn(gateway_model::types::libs::trace::TraceEvent) + Send + Sync,
+    > = Arc::new(move |event| {
+        if trace_publish(event).is_err() {
+            tracing::warn!("trace publisher queue full, dropping trace event");
+        }
+    });
 
     // 10. Build gRPC router: Mint (native tonic) + raw proxy for all other services.
     let sm_for_grpc_trace = Arc::clone(&sm);

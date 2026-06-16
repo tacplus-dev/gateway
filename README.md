@@ -55,8 +55,8 @@ resolution. Exact match only — no hierarchical fallback.
 
 | RPC | Description |
 |-----|-------------|
-| `OpenIdConfig` | OIDC discovery document (served locally) |
-| `Jwks` | JSON Web Key Set (served locally from kernel-watched keys) |
+| `GetOpenIdConfig` | OIDC discovery document (served locally) |
+| `ListJwks` | JSON Web Key Set (served locally from kernel-watched keys) |
 | `TokenMint` | Proxied to kernel's MintService |
 | `X509Mint` | Proxied to kernel's MintService |
 

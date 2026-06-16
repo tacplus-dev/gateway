@@ -11,11 +11,11 @@ use crate::auth::GatewayAuth;
 
 /// Gateway Mint service implementation.
 ///
-/// OpenIdConfig and Jwks are served locally from watched JWK keys.
+/// GetOpenIdConfig and ListJwks are served locally from watched JWK keys.
 /// TokenMint and X509Mint are delegated to kernel.Mint — kernel is the cluster
 /// trust root and the sole token + cert signing authority
 /// (sm.s2s().kernel().mint_client()).
-/// PublicCa serves the root CA cert(s) from gateway config — the CA that
+/// ListPublicCa serves the root CA cert(s) from gateway config — the CA that
 /// signed the external TLS cert, which clients need to configure TLS trust.
 pub struct GatewayMintService {
     sm: Arc<ServiceManager>,
@@ -67,37 +67,37 @@ impl GatewayMintService {
 #[tonic::async_trait]
 impl Mint for GatewayMintService
 {
-    async fn open_id_config(
+    async fn get_open_id_config(
         &self,
         _request: tonic::Request<TraceRequest>,
     ) -> Result<tonic::Response<OpenIdConfiguration>, tonic::Status> {
         Ok(tonic::Response::new(self.build_openid_config()))
     }
 
-    async fn jwks(
+    async fn list_jwks(
         &self,
         _request: tonic::Request<TraceRequest>,
     ) -> Result<tonic::Response<Jwks>, tonic::Status> {
         Ok(tonic::Response::new(self.build_jwks()))
     }
 
-    async fn token_mint(
+    async fn mint_token(
         &self,
         request: tonic::Request<TokenMintRequest>,
     ) -> Result<tonic::Response<TokenMintResponse>, tonic::Status> {
         // TokenMint is proxied to kernel.Mint (the sole token authority).
-        self.sm.s2s().kernel().mint_client().token_mint(request).await
+        self.sm.s2s().kernel().mint_client().mint_token(request).await
     }
 
-    async fn x509_mint(
+    async fn mint_x509_cert(
         &self,
         request: tonic::Request<X509MintRequest>,
     ) -> Result<tonic::Response<X509CertChain>, tonic::Status> {
         // X509Mint is proxied to kernel.Mint (the sole cert signing authority).
-        self.sm.s2s().kernel().mint_client().x509_mint(request).await
+        self.sm.s2s().kernel().mint_client().mint_x509_cert(request).await
     }
 
-    async fn public_ca(
+    async fn list_public_ca(
         &self,
         _request: tonic::Request<TraceRequest>,
     ) -> Result<tonic::Response<PublicCaResponse>, tonic::Status> {

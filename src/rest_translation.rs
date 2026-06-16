@@ -1060,7 +1060,7 @@ impl futures::Stream for GrpcFrameStream {
     }
 }
 
-/// Handle Mint RPCs: OpenIdConfig/Jwks/PublicCa locally, TokenMint/X509Mint via kernel.
+/// Handle Mint RPCs: GetOpenIdConfig/ListJwks/ListPublicCa locally, MintToken/MintX509Cert via kernel.
 async fn handle_mint(
     route: &RouteInfo,
     state: &RestState,
@@ -1069,7 +1069,7 @@ async fn handle_mint(
     request_id: &str,
 ) -> axum::response::Response {
     match route.grpc_path {
-        "/gateway.Mint/OpenIdConfig" => {
+        "/gateway.Mint/GetOpenIdConfig" => {
             // issuer is the gateway's configured public URL (not the Host header,
             // which can be lost across HTTP/2 / TLS termination boundaries).
             let base = &state.issuer_url;
@@ -1084,7 +1084,7 @@ async fn handle_mint(
             };
             json_response(&config)
         }
-        "/gateway.Mint/Jwks" => {
+        "/gateway.Mint/ListJwks" => {
             let keys: Vec<PublicJwk> = state
                 .auth
                 .get_raw_jwks()
@@ -1114,7 +1114,7 @@ async fn handle_mint(
                 .s2s()
                 .kernel()
                 .mint_client()
-                .token_mint(grpc_req)
+                .mint_token(grpc_req)
                 .await
             {
                 Ok(resp) => json_response(&resp.into_inner()),
@@ -1145,7 +1145,7 @@ async fn handle_mint(
                 .s2s()
                 .kernel()
                 .mint_client()
-                .x509_mint(grpc_req)
+                .mint_x509_cert(grpc_req)
                 .await
             {
                 Ok(resp) => json_response(&resp.into_inner()),
@@ -1156,7 +1156,7 @@ async fn handle_mint(
                 }
             }
         }
-        "/gateway.Mint/PublicCa" => {
+        "/gateway.Mint/ListPublicCa" => {
             let certs = state.ca_certs.read().await;
             let items: Vec<serde_json::Value> = certs
                 .iter()
