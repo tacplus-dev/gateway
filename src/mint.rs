@@ -9,6 +9,8 @@ use gateway_model::types::services::gateway::gateway::{PublicCaResponse, mint_se
 
 use crate::auth::GatewayAuth;
 
+const ID_TOKEN_SIGNING_ALGS_SUPPORTED: &[&str] = &["EdDSA", "ES256"];
+
 /// Gateway Mint service implementation.
 ///
 /// GetOpenIdConfig and ListJwks are served locally from watched JWK keys.
@@ -46,7 +48,7 @@ impl GatewayMintService {
             jwks_uri: format!("{}/.well-known/jwks.json", issuer),
             token_endpoint: format!("{}/gateway/TokenMint", issuer),
             subject_types_supported: vec!["public".to_string()],
-            id_token_signing_alg_values_supported: vec!["EdDSA".to_string()],
+            id_token_signing_alg_values_supported: ID_TOKEN_SIGNING_ALGS_SUPPORTED.iter().map(|alg| (*alg).to_string()).collect(),
             response_types_supported: vec!["token".to_string()],
             grant_types_supported: vec!["urn:ietf:params:oauth:grant-type:token-exchange".to_string()],
             ..Default::default()

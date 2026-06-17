@@ -24,6 +24,7 @@ use crate::auth::GatewayAuth;
 use crate::proxy_grpc::{self, ProxyState};
 
 const MAX_JSON_BODY_BYTES: usize = 10 * 1024 * 1024;
+const ID_TOKEN_SIGNING_ALGS_SUPPORTED: &[&str] = &["EdDSA", "ES256"];
 
 /// Application state for REST translation.
 pub struct RestState {
@@ -1079,7 +1080,7 @@ async fn handle_mint(
                 response_types_supported: &["token"],
                 grant_types_supported: &["urn:ietf:params:oauth:grant-type:token-exchange"],
                 subject_types_supported: &["public"],
-                id_token_signing_alg_values_supported: &["EdDSA"],
+                id_token_signing_alg_values_supported: ID_TOKEN_SIGNING_ALGS_SUPPORTED,
             };
             json_response(&config)
         }
