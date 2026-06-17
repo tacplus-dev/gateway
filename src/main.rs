@@ -19,7 +19,7 @@ use tokio::time::{timeout, Duration};
 use tokio_stream::StreamExt;
 use tracing_subscriber::EnvFilter;
 
-use gateway_model::s2sm::ServiceManager;
+use gateway_model::s2sm::{rest_dispatch::REST_ROOT_PATH, ServiceManager};
 use gateway_model::types::libs::host::host::Host;
 use gateway_model::types::services::gateway::gateway::ExternalTlsMode;
 use gateway_model::types::services::letsencrypt::letsencrypt::lets_encrypt_state_service_client::LetsEncryptStateServiceClient;
@@ -157,14 +157,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         auth_passthrough,
     ));
 
-    // Derive the public issuer URL from configured external_hostnames.
-    // This is the base for the OIDC `iss` claim and jwks_uri/token_endpoint
-    // in the discovery doc — external OIDC verifiers (e.g. Anthropic) will
-    // fetch JWKS by appending well-known paths to this URL.
+    // Derive the public OIDC issuer URL from configured external_hostnames.
+    // Kernel signs JWTs with `https://<host>/api/v1` as `iss`; discovery must
+    // advertise that exact value for external verifiers such as Anthropic WIF.
     let issuer_url = cfg
         .external_hostnames
         .first()
-        .map(|h| format!("https://{}", h))
+        .map(|h| format!("https://{}{}", h, REST_ROOT_PATH))
         .ok_or("gateway config has no external_hostnames; cannot build issuer URL")?;
     tracing::info!(issuer_url = %issuer_url, "OIDC issuer URL derived from external_hostnames");
 

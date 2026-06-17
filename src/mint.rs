@@ -40,11 +40,11 @@ impl GatewayMintService {
     }
 
     fn build_openid_config(&self) -> OpenIdConfiguration {
-        let base = &self.issuer_url;
+        let issuer = &self.issuer_url;
         OpenIdConfiguration {
-            issuer: base.clone(),
-            jwks_uri: format!("{}{}/.well-known/jwks.json", base, gateway_model::s2sm::rest_dispatch::REST_ROOT_PATH),
-            token_endpoint: format!("{}{}/gateway/TokenMint", base, gateway_model::s2sm::rest_dispatch::REST_ROOT_PATH),
+            issuer: issuer.clone(),
+            jwks_uri: format!("{}/.well-known/jwks.json", issuer),
+            token_endpoint: format!("{}/gateway/TokenMint", issuer),
             subject_types_supported: vec!["public".to_string()],
             id_token_signing_alg_values_supported: vec!["EdDSA".to_string()],
             response_types_supported: vec!["token".to_string()],

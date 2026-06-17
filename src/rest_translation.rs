@@ -31,9 +31,8 @@ pub struct RestState {
     pub sm: Arc<ServiceManager>,
     pub auth: Arc<GatewayAuth>,
     pub ca_certs: Arc<RwLock<Vec<X509Cert>>>,
-    /// Public base URL (scheme + host) used as the OIDC `iss` claim and the
-    /// base for jwks_uri / token_endpoint. Sourced from gateway config's
-    /// external_hostnames at startup.
+    /// Public OIDC issuer URL used as the JWT `iss` claim and discovery
+    /// issuer. Sourced from gateway config's external_hostnames at startup.
     pub issuer_url: String,
 }
 
@@ -1070,13 +1069,13 @@ async fn handle_mint(
 ) -> axum::response::Response {
     match route.grpc_path {
         "/gateway.Mint/GetOpenIdConfig" => {
-            // issuer is the gateway's configured public URL (not the Host header,
-            // which can be lost across HTTP/2 / TLS termination boundaries).
-            let base = &state.issuer_url;
+            // issuer is the configured public OIDC issuer URL, not the Host
+            // header, which can be lost across HTTP/2 / TLS termination.
+            let issuer = &state.issuer_url;
             let config = OidcDiscoveryDoc {
-                issuer: base,
-                jwks_uri: format!("{}{}/.well-known/jwks.json", base, REST_ROOT_PATH),
-                token_endpoint: format!("{}{}/gateway/TokenMint", base, REST_ROOT_PATH),
+                issuer,
+                jwks_uri: format!("{}/.well-known/jwks.json", issuer),
+                token_endpoint: format!("{}/gateway/TokenMint", issuer),
                 response_types_supported: &["token"],
                 grant_types_supported: &["urn:ietf:params:oauth:grant-type:token-exchange"],
                 subject_types_supported: &["public"],
