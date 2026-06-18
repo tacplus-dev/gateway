@@ -26,6 +26,17 @@ use crate::proxy_grpc::{self, ProxyState};
 const MAX_JSON_BODY_BYTES: usize = 10 * 1024 * 1024;
 const ID_TOKEN_SIGNING_ALGS_SUPPORTED: &[&str] = &["EdDSA", "ES256"];
 
+fn is_mint_token_grpc_path(path: &str) -> bool {
+    matches!(path, "/gateway.Mint/MintToken" | "/gateway.Mint/TokenMint")
+}
+
+fn is_mint_x509_grpc_path(path: &str) -> bool {
+    matches!(
+        path,
+        "/gateway.Mint/MintX509Cert" | "/gateway.Mint/X509Mint"
+    )
+}
+
 /// Application state for REST translation.
 pub struct RestState {
     pub proxy: Arc<ProxyState>,
@@ -1093,8 +1104,8 @@ async fn handle_mint(
                 .collect();
             json_response(&PublicJwks { keys })
         }
-        "/gateway.Mint/TokenMint" => {
-            tracing::info!(request_id = %request_id, "routing TokenMint to mint");
+        path if is_mint_token_grpc_path(path) => {
+            tracing::info!(request_id = %request_id, "routing MintToken to kernel mint");
             let req = match gateway_model::types::common::tokenrequest::token_mint_request_from_json(
                 body,
             ) {
@@ -1125,7 +1136,7 @@ async fn handle_mint(
                 }
             }
         }
-        "/gateway.Mint/X509Mint" => {
+        path if is_mint_x509_grpc_path(path) => {
             let req =
                 match gateway_model::types::common::tokenrequest::x509_mint_request_from_json(body)
                 {
@@ -1234,6 +1245,14 @@ mod tests {
             client_streaming: true,
             target_namespace_field: None,
         }
+    }
+
+    #[test]
+    fn mint_gateway_accepts_generated_and_legacy_method_names() {
+        assert!(is_mint_token_grpc_path("/gateway.Mint/MintToken"));
+        assert!(is_mint_token_grpc_path("/gateway.Mint/TokenMint"));
+        assert!(is_mint_x509_grpc_path("/gateway.Mint/MintX509Cert"));
+        assert!(is_mint_x509_grpc_path("/gateway.Mint/X509Mint"));
     }
 
     #[test]
