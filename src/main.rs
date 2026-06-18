@@ -130,12 +130,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         Err(_) => tracing::warn!("timed out waiting for health data, proceeding with available endpoints"),
     }
 
-    // 6. Fetch dynamic CAs from kernel's CaState and build backend TLS config.
+    // 6. Fetch dynamic CAs from kernel's CaState and build backend TLS verifier.
     // CaState.ca_certs contains the runtime CA(s) that sign per-service intermediate CAs
     // via X509Mint. Without these, the resolver can't verify backend service TLS certs.
     let initial_cas = wait_for_ca_certs(kernel_channel.clone(), &token_provider).await?;
     let ca_pem_bundle = build_ca_pem_bundle(sm.config(), &initial_cas);
-    let backend_tls = build_backend_tls_config_from_pem(&ca_pem_bundle);
+    let backend_tls =
+        build_backend_tls_verifier_from_pem(&ca_pem_bundle, &sm.config().spiffe_trust_domain)?;
     let resolver = Arc::new(resolver::Resolver::new(health_watcher.clone(), backend_tls));
 
     // Store CA certs in a shared RwLock so the Mint service can serve them via ListPublicCa.
@@ -538,14 +539,17 @@ fn build_ca_pem_bundle(
     pem_bundle
 }
 
-/// Build a ClientTlsConfig for gRPC backend connections from a PEM CA bundle.
-fn build_backend_tls_config_from_pem(ca_pem_bundle: &str) -> tonic::transport::ClientTlsConfig {
-    let mut tls_config = tonic::transport::ClientTlsConfig::new();
-    if !ca_pem_bundle.is_empty() {
-        let ca_cert = tonic::transport::Certificate::from_pem(ca_pem_bundle);
-        tls_config = tls_config.ca_certificate(ca_cert);
+/// Build a SPIFFE-aware verifier for gRPC backend connections from a PEM CA bundle.
+fn build_backend_tls_verifier_from_pem(
+    ca_pem_bundle: &str,
+    spiffe_trust_domain: &str,
+) -> Result<Arc<gateway_servicemanager::SpiffeServerCertVerifier>, Box<dyn std::error::Error>> {
+    let (root_store, added) = gateway_servicemanager::spiffe::build_root_store(ca_pem_bundle);
+    if added == 0 {
+        return Err("no CA certificates available for backend TLS".into());
     }
-    tls_config
+    gateway_servicemanager::SpiffeServerCertVerifier::new(spiffe_trust_domain, root_store)
+        .map_err(|e| format!("backend SPIFFE TLS verifier: {e}").into())
 }
 
 /// Decode a base64-encoded PEM certificate and append to the bundle.

@@ -1,5 +1,9 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
+use gateway_servicemanager::SpiffeServerCertVerifier;
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 
 use crate::health::HealthWatcher;
@@ -13,15 +17,15 @@ use crate::health::HealthWatcher;
 /// for hours without disconnects).
 pub struct Resolver {
     health: HealthWatcher,
-    tls_config: ClientTlsConfig,
+    tls_verifier: Arc<SpiffeServerCertVerifier>,
     counter: AtomicUsize,
 }
 
 impl Resolver {
-    pub fn new(health: HealthWatcher, tls_config: ClientTlsConfig) -> Self {
+    pub fn new(health: HealthWatcher, tls_verifier: Arc<SpiffeServerCertVerifier>) -> Self {
         Self {
             health,
-            tls_config,
+            tls_verifier,
             counter: AtomicUsize::new(0),
         }
     }
@@ -65,10 +69,10 @@ impl Resolver {
             .unwrap_or(false);
 
             if reachable {
-                let tls = self.tls_config.clone().domain_name(service_id);
+                let verifier = self.tls_verifier(service_id);
                 let uri = format!("https://{}", ep);
                 tracing::debug!(service = %service_id, endpoint = %ep, "dial_ready_any: found live endpoint");
-                match Self::connect_eager(&uri, tls).await {
+                match Self::connect_eager(&uri, verifier).await {
                     Ok(ch) => return ch,
                     Err(e) => {
                         tracing::warn!(service = %service_id, endpoint = %ep, error = %e, "eager connect failed after TCP probe");
@@ -101,9 +105,9 @@ impl Resolver {
         };
 
         let uri = format!("https://{}", endpoints[idx]);
-        let tls = self.tls_config.clone().domain_name(label);
+        let verifier = self.tls_verifier(label);
 
-        match Self::connect_eager(&uri, tls.clone()).await {
+        match Self::connect_eager(&uri, verifier.clone()).await {
             Ok(ch) => {
                 tracing::debug!(service = %label, endpoint = %uri, "connected");
                 ch
@@ -113,7 +117,7 @@ impl Resolver {
                 tracing::warn!(service = %label, endpoint = %uri, error = %e, "eager connect failed, falling back to lazy");
                 Endpoint::from_shared(uri)
                     .expect("valid endpoint URI")
-                    .tls_config(tls)
+                    .tls_config_with_verifier(ClientTlsConfig::new(), verifier)
                     .expect("valid TLS config")
                     .connect_lazy()
             }
@@ -129,13 +133,20 @@ impl Resolver {
     /// authenticates in the browser) and `eventbus.Trace.WatchTrace` must not
     /// be capped here. HTTP/2 keep-alive pings detect dead peers; per-call
     /// deadlines belong on individual unary calls, not on the channel.
-    async fn connect_eager(uri: &str, tls: ClientTlsConfig) -> Result<Channel, Box<dyn std::error::Error>> {
+    async fn connect_eager(
+        uri: &str,
+        verifier: Arc<dyn rustls::client::danger::ServerCertVerifier>,
+    ) -> Result<Channel, Box<dyn std::error::Error>> {
         let endpoint = Endpoint::from_shared(uri.to_string())?
-            .tls_config(tls)?
+            .tls_config_with_verifier(ClientTlsConfig::new(), verifier)?
             .http2_keep_alive_interval(std::time::Duration::from_secs(10))
             .keep_alive_while_idle(true)
             .keep_alive_timeout(std::time::Duration::from_secs(60));
         let channel = endpoint.connect().await?;
         Ok(channel)
+    }
+
+    fn tls_verifier(&self, service_id: &str) -> Arc<dyn rustls::client::danger::ServerCertVerifier> {
+        self.tls_verifier.clone().expect_service(service_id)
     }
 }
