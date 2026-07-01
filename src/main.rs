@@ -239,7 +239,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .fallback(spa::spa_handler);
 
     // Intercept gRPC requests before they reach REST/SPA routing.
-    // Native gRPC clients (cavalierctl, service-to-service) send content-type: application/grpc.
+    // Native gRPC clients (operator, service-to-service) send content-type: application/grpc.
     // These are proxied as raw HTTP/2 to backend services. Non-gRPC requests pass through
     // to the IDP proxy check, then REST routes and SPA handler.
     let proxy_state_clone = Arc::clone(&proxy_state);
