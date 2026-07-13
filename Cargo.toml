@@ -33,7 +33,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
 mime_guess = "2"
 gateway-model = { path = "target/generated-sources/model" }
-gateway-jwk = { package = "jwk", path = "target/generated-sources/model/libs/jwk" }
-gateway-servicemanager = { package = "servicemanager", path = "target/generated-sources/model/libs/servicemanager" }
-gateway-token = { package = "token", path = "target/generated-sources/model/libs/token" }
-gateway-grpcserver = { package = "grpcserver", path = "target/generated-sources/model/libs/grpcserver" }
+gateway-jwk = { package = "jwk", path = "target/generated-sources/model/chassis/jwk" }
+gateway-servicemanager = { package = "servicemanager", path = "target/generated-sources/model/chassis/servicemanager" }
+gateway-token = { package = "token", path = "target/generated-sources/model/chassis/token" }
+gateway-grpcserver = { package = "grpcserver", path = "target/generated-sources/model/chassis/grpcserver" }

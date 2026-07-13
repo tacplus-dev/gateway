@@ -4,7 +4,7 @@ use http::StatusCode;
 
 use gateway_grpcserver::{authorizer::JwkCache, spiffe::is_at_or_below};
 use gateway_model::grants;
-use gateway_model::types::libs::jwk::jwk::Jwk as ProtoJwk;
+use gateway_model::types::sys::jwk::jwk::Jwk as ProtoJwk;
 
 // Generated libs for JWT parsing (no crypto needed — authorizer handles verification)
 use gateway_token::token::Token;

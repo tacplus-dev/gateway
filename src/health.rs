@@ -215,7 +215,7 @@ impl HealthWatcher {
 
 /// Returns true if the instance status is HEALTHY or DEGRADED.
 fn is_routable(status: i32) -> bool {
-    use gateway_model::types::libs::healthreport::healthreport::InstanceStatus;
+    use gateway_model::types::sys::healthreport::healthreport::InstanceStatus;
     matches!(
         InstanceStatus::try_from(status),
         Ok(InstanceStatus::Healthy | InstanceStatus::Degraded)

@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use gateway_model::s2sm::ServiceManager;
-use gateway_model::types::common::tokenrequest::{TokenMintRequest, TokenMintResponse, X509MintRequest};
-use gateway_model::types::libs::jwk::jwk::{Jwks, OpenIdConfiguration};
-use gateway_model::types::libs::trace::trace::TraceRequest;
-use gateway_model::types::libs::x509::x509::{X509CertChain, X509Cert};
+use gateway_model::types::sys::tokenrequest::{TokenMintRequest, TokenMintResponse, X509MintRequest};
+use gateway_model::types::sys::jwk::jwk::{Jwks, OpenIdConfiguration};
+use gateway_model::types::sys::trace::trace::TraceRequest;
+use gateway_model::types::sys::x509::x509::{X509CertChain, X509Cert};
 use gateway_model::types::services::gateway::gateway::{PublicCaResponse, mint_server::Mint};
 
 use crate::auth::GatewayAuth;

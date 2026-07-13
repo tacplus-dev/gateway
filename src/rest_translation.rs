@@ -15,10 +15,10 @@ use uuid::Uuid;
 
 use gateway_model::s2sm::rest_dispatch::{self, AuthPolicy, RouteInfo, REST_ROOT_PATH, ROUTES};
 use gateway_model::s2sm::ServiceManager;
-use gateway_model::types::libs::jwk::jwk::Jwk as ProtoJwk;
-use gateway_model::types::libs::jwk::jwk::JwkUseType;
-use gateway_model::types::libs::key::key::KeyType;
-use gateway_model::types::libs::x509::x509::X509Cert;
+use gateway_model::types::sys::jwk::jwk::Jwk as ProtoJwk;
+use gateway_model::types::sys::jwk::jwk::JwkUseType;
+use gateway_model::types::sys::key::key::KeyType;
+use gateway_model::types::sys::x509::x509::X509Cert;
 
 use crate::auth::GatewayAuth;
 use crate::proxy_grpc::{self, ProxyState};
@@ -1106,7 +1106,7 @@ async fn handle_mint(
         }
         path if is_mint_token_grpc_path(path) => {
             tracing::info!(request_id = %request_id, "routing MintToken to kernel mint");
-            let req = match gateway_model::types::common::tokenrequest::token_mint_request_from_json(
+            let req = match gateway_model::types::sys::tokenrequest::token_mint_request_from_json(
                 body,
             ) {
                 Ok(r) => r,
@@ -1138,7 +1138,7 @@ async fn handle_mint(
         }
         path if is_mint_x509_grpc_path(path) => {
             let req =
-                match gateway_model::types::common::tokenrequest::x509_mint_request_from_json(body)
+                match gateway_model::types::sys::tokenrequest::x509_mint_request_from_json(body)
                 {
                     Ok(r) => r,
                     Err(e) => {

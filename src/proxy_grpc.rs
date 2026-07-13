@@ -13,7 +13,7 @@ use tower::{Service, ServiceExt};
 use crate::auth::GatewayAuth;
 use crate::resolver::Resolver;
 
-use gateway_model::types::libs::trace::{TraceEvent, TraceEventKind, TraceRound};
+use gateway_model::types::sys::trace::{TraceEvent, TraceEventKind, TraceRound};
 
 const MAX_GRPC_MESSAGE_BYTES: usize = 10 * 1024 * 1024;
 

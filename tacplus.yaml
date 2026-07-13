@@ -2,8 +2,3 @@ tacplus-version: "1.2.x"
 language: rust
 pkg: com.gitlab.secondstarcavalier.controlplane.cavalier.services.gateway
 output-dir: target/generated-sources/model
-clients:
-  c2s:
-    enabled: true
-  w2s:
-    enabled: false

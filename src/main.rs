@@ -20,7 +20,7 @@ use tokio_stream::StreamExt;
 use tracing_subscriber::EnvFilter;
 
 use gateway_model::s2sm::{rest_dispatch::REST_ROOT_PATH, ServiceManager};
-use gateway_model::types::libs::host::host::Host;
+use gateway_model::types::sys::host::host::Host;
 use gateway_model::types::services::gateway::gateway::ExternalTlsMode;
 use gateway_model::types::services::letsencrypt::letsencrypt::lets_encrypt_state_service_client::LetsEncryptStateServiceClient;
 use gateway_model::types::services::letsencrypt::letsencrypt::LetsEncryptCertData;
@@ -181,7 +181,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // 9. Create trace publisher (shared between gRPC proxy and REST handler).
     let trace_publish = sm.create_trace_publisher().await;
     let trace_publisher: Arc<
-        dyn Fn(gateway_model::types::libs::trace::TraceEvent) + Send + Sync,
+        dyn Fn(gateway_model::types::sys::trace::TraceEvent) + Send + Sync,
     > = Arc::new(move |event| {
         if trace_publish(event).is_err() {
             tracing::warn!("trace publisher queue full, dropping trace event");
@@ -405,7 +405,7 @@ async fn healthz() -> StatusCode {
 fn spawn_ca_cert_watcher(
     channel: tonic::transport::Channel,
     token_provider: TokenProvider,
-    ca_certs_store: Arc<tokio::sync::RwLock<Vec<gateway_model::types::libs::x509::x509::X509Cert>>>,
+    ca_certs_store: Arc<tokio::sync::RwLock<Vec<gateway_model::types::sys::x509::x509::X509Cert>>>,
 ) {
     tokio::spawn(async move {
         loop {
@@ -423,7 +423,7 @@ fn spawn_ca_cert_watcher(
 async fn watch_ca_cert_updates(
     channel: tonic::transport::Channel,
     token_provider: &TokenProvider,
-    ca_certs_store: &tokio::sync::RwLock<Vec<gateway_model::types::libs::x509::x509::X509Cert>>,
+    ca_certs_store: &tokio::sync::RwLock<Vec<gateway_model::types::sys::x509::x509::X509Cert>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use gateway_model::types::services::kernel::kernel::ca_state_service_client::CaStateServiceClient;
 
@@ -466,7 +466,7 @@ async fn watch_ca_cert_updates(
 async fn wait_for_ca_certs(
     channel: tonic::transport::Channel,
     token_provider: &TokenProvider,
-) -> Result<Vec<gateway_model::types::libs::x509::x509::X509Cert>, Box<dyn std::error::Error>> {
+) -> Result<Vec<gateway_model::types::sys::x509::x509::X509Cert>, Box<dyn std::error::Error>> {
     use gateway_model::types::services::kernel::kernel::ca_state_service_client::CaStateServiceClient;
 
     let mut client = CaStateServiceClient::new(channel);
@@ -519,8 +519,8 @@ async fn wait_for_ca_certs(
 
 /// Build the raw PEM bundle of all CA certificates (bootstrap + dynamic).
 fn build_ca_pem_bundle(
-    config: &gateway_model::types::libs::grpcconfig::grpcconfig::Config,
-    dynamic_cas: &[gateway_model::types::libs::x509::x509::X509Cert],
+    config: &gateway_model::types::sys::grpcconfig::grpcconfig::Config,
+    dynamic_cas: &[gateway_model::types::sys::x509::x509::X509Cert],
 ) -> String {
     let mut pem_bundle = String::new();
     tracing::info!(count = config.trusted_cas.len(), "loading bootstrap CAs");
