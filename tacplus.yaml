@@ -1,4 +1,4 @@
-tacplus-version: "1.2.x"
 language: rust
 pkg: com.gitlab.secondstarcavalier.controlplane.cavalier.services.gateway
 output-dir: target/generated-sources/model
+src: https://gitlab.com/secondstarcavalier/schematic/platform/proto-base.git
