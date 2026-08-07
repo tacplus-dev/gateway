@@ -2,6 +2,14 @@
 target/
 dist/
 
+# Webapp and client artifacts consumed by the Dockerfile (COPY webapp-dist/,
+# COPY clients/). These are CI-built. Local bring-up needs the paths to exist or
+# `docker build` fails, so placeholders get created here — but they must NOT be
+# committed: a checked-in stub would silently ship in place of a real webapp if a
+# CI build ever failed to produce one.
+webapp-dist/
+clients/
+
 # Generated code
 tacplus/
 
