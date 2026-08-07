@@ -21,6 +21,7 @@ use tracing_subscriber::EnvFilter;
 
 use gateway_model::s2sm::{rest_dispatch::REST_ROOT_PATH, ServiceManager};
 use gateway_model::types::sys::host::host::Host;
+use gateway_model::types::services::gateway::gateway::Config as GatewayConfig;
 use gateway_model::types::services::gateway::gateway::ExternalTlsMode;
 use gateway_model::types::services::letsencrypt::letsencrypt::lets_encrypt_state_service_client::LetsEncryptStateServiceClient;
 use gateway_model::types::services::letsencrypt::letsencrypt::LetsEncryptCertData;
@@ -113,9 +114,23 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
     let tls_acceptor = axum_server::tls_rustls::RustlsConfig::from_config(tls_config);
 
-    // Spawn cert hot-reload watcher for letsencrypt mode (cert_chain is static config).
+    // Spawn cert hot-reload watchers. BOTH external TLS modes need one.
+    //
+    // cert_chain was previously treated as static config, read once by the fetch()
+    // above and never looked at again. But a supplied certificate expires just as
+    // a letsencrypt one does -- a public CA cert is typically 90 days, a private
+    // CA cert whatever the issuer sets -- and the renewed PEM is delivered through
+    // GatewayConfigState like any other runtime config. With no watcher, gateway
+    // kept serving the superseded certificate until someone restarted the pod, and
+    // then served an EXPIRED one once the old cert ran out. Nothing logged, and
+    // updating the config appeared to succeed.
+    //
+    // The generated state client already maintains the watch and exposes
+    // on_change; only the call site was missing.
     if cfg.external_tls_mode() == ExternalTlsMode::Letsencrypt {
         spawn_cert_watcher(kernel_channel.clone(), token_provider.clone(), tls_acceptor.clone());
+    } else if cfg.external_tls_mode() == ExternalTlsMode::CertChain {
+        spawn_cert_chain_reloader(sm.clone(), tls_acceptor.clone(), &cfg);
     }
 
     // 4. Log the compile-time route table.
@@ -346,6 +361,70 @@ async fn wait_for_tls_cert(
         Ok(inner) => inner,
         Err(_) => Err("no TLS certificate received within 60 seconds — shutting down".into()),
     }
+}
+
+/// Hot-reload the external TLS certificate in cert_chain mode when a renewed
+/// cert/key is written to GatewayConfigState.
+///
+/// Registers a change callback on the generated state client, which already
+/// maintains the watch -- no hand-rolled stream, per the tacplus rule that
+/// generated capabilities are used rather than duplicated.
+///
+/// The callback fires on ANY gateway config change, so it compares the PEMs
+/// against the ones currently being served and does nothing unless they actually
+/// differ. Without that, toggling an unrelated field would rebuild and swap the
+/// TLS config for no reason.
+///
+/// A rejected certificate is logged and DISCARDED: the previously loaded, working
+/// certificate keeps serving. Swapping in a broken cert because someone pasted a
+/// malformed PEM would take the public endpoint down, which is strictly worse than
+/// continuing on the old one until it is corrected.
+fn spawn_cert_chain_reloader(
+    sm: Arc<ServiceManager>,
+    tls_config: axum_server::tls_rustls::RustlsConfig,
+    initial: &GatewayConfig,
+) {
+    let serving = Arc::new(std::sync::Mutex::new((
+        initial.external_cert_pem.clone(),
+        initial.external_key_pem.clone(),
+    )));
+
+    sm.state_clients()
+        .services()
+        .gateway_config_state()
+        .config()
+        .on_change(Arc::new(move |new_cfg: &GatewayConfig| {
+            if new_cfg.external_tls_mode() != ExternalTlsMode::CertChain {
+                return;
+            }
+            {
+                let current = serving.lock().unwrap();
+                if current.0 == new_cfg.external_cert_pem && current.1 == new_cfg.external_key_pem {
+                    return;
+                }
+            }
+            match tls::build_server_config_from_pem(
+                &new_cfg.external_cert_pem,
+                &new_cfg.external_key_pem,
+            ) {
+                Ok(new_config) => {
+                    tls_config.reload_from_config(new_config);
+                    let mut current = serving.lock().unwrap();
+                    *current = (
+                        new_cfg.external_cert_pem.clone(),
+                        new_cfg.external_key_pem.clone(),
+                    );
+                    tracing::info!("external TLS certificate hot-reloaded from gateway config");
+                }
+                Err(e) => tracing::error!(
+                    error = %e,
+                    "renewed external_cert_pem/external_key_pem rejected; \
+                     continuing to serve the previous certificate"
+                ),
+            }
+        }));
+
+    tracing::info!("cert_chain hot-reload watcher registered");
 }
 
 /// Spawn a background task that watches LetsEncryptState.cert_data and
