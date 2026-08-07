@@ -268,6 +268,22 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // 13. Start TLS listener — serves both HTTP and gRPC on the same port.
     tracing::info!(addr = %tcp_addr, "listening (TLS, HTTP+gRPC)");
 
+    // Gateway builds the ServiceManager with new() but never calls run(), because
+    // it serves external TLS (LetsEncrypt / CertChain) rather than the SM's
+    // auto-TLS. The SM sets grpc_health to NOT_SERVING in new() and flips it to
+    // SERVING inside run() — so without this call the plaintext health listener on
+    // 8444 stays NOT_SERVING forever and k8s startup probes fail indefinitely
+    // ("service unhealthy (responded with NOT_SERVING)", observed 114 times).
+    //
+    // set_serving drives the SAME handle that serves 8444. Do NOT substitute a
+    // locally-created tonic health reporter: that is a different health service
+    // from the one being probed, and it silently does nothing for k8s.
+    //
+    // Placed here because bootstrap is complete — identity, state clients, TLS
+    // material and the full router are all built — and the listener is about to
+    // accept. Reporting SERVING any earlier would be a lie.
+    sm.set_serving(true).await;
+
     axum_server::bind_rustls(tcp_addr, tls_acceptor)
         .serve(app.into_make_service())
         .await?;
