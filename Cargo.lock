@@ -1000,6 +1000,7 @@ name = "grpcconfig"
 version = "0.1.0"
 dependencies = [
  "gateway-model-types",
+ "logger",
  "serde",
  "serde_json",
  "serde_yaml",
