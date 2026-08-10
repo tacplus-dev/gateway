@@ -487,44 +487,44 @@ mod tests {
 
     #[test]
     fn flat_grants_accept_legacy_service_wildcard() {
-        let entitlements = serde_json::json!({"grants": ["OPENAI_RPCS_ANY"]});
+        let entitlements = serde_json::json!({"grants": ["ECHO_RPCS_ANY"]});
         assert!(flat_grants_allow(
             &entitlements,
-            "openai",
-            "/openai.Proxy/CreateChatCompletion"
+            "echo",
+            "/echo.Echo/Ping"
         ));
         assert!(!flat_grants_allow(
             &entitlements,
-            "anthropic",
-            "/anthropic.Proxy/CreateMessage"
+            "sentinel",
+            "/sentinel.Dashboard/GetDashboard"
         ));
     }
 
     #[test]
     fn flat_grants_accept_generated_package_wildcard() {
-        let entitlements = serde_json::json!({"grants": ["OPENAI_ANY"]});
+        let entitlements = serde_json::json!({"grants": ["ECHO_ANY"]});
         assert!(flat_grants_allow(
             &entitlements,
-            "openai",
-            "/openai.Proxy/CreateChatCompletion"
+            "echo",
+            "/echo.Echo/Ping"
         ));
     }
 
     #[test]
     fn flat_grants_accept_legacy_object_wrapper_during_rollout() {
-        let entitlements = serde_json::json!({"grants": [{"token": "ANTHROPIC_RPCS_ANY"}]});
+        let entitlements = serde_json::json!({"grants": [{"token": "ECHO_RPCS_ANY"}]});
         assert!(flat_grants_allow(
             &entitlements,
-            "anthropic",
-            "/anthropic.Proxy/CreateMessage"
+            "echo",
+            "/echo.Echo/Ping"
         ));
     }
 
     #[test]
     fn method_grant_token_matches_catalog_shape() {
         assert_eq!(
-            method_grant_token("openai", "/openai.Proxy/CreateChatCompletion").as_deref(),
-            Some("OPENAI_PROXY_CREATE_CHAT_COMPLETION")
+            method_grant_token("echo", "/echo.Echo/Ping").as_deref(),
+            Some("ECHO_ECHO_PING")
         );
     }
 }
