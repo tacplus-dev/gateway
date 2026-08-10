@@ -1,6 +1,6 @@
 # Gateway
 
-Gateway is the edge proxy for the Cavalier control plane. All external traffic
+Gateway is the edge proxy for the Schematic control plane. All external traffic
 enters the cluster through gateway, which routes REST and gRPC requests to
 backend services, serves OIDC discovery and JWKS endpoints, handles token
 minting delegation to kernel, and provides SPIFFE-based workload routing.

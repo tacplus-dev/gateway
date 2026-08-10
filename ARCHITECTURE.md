@@ -1,6 +1,6 @@
 # Gateway Architecture
 
-This document defines the target architecture for the Cavalier gateway. It supersedes the current implementation described in `README.md`.
+This document defines the target architecture for the Schematic gateway. It supersedes the current implementation described in `README.md`.
 
 ## Design Principles
 

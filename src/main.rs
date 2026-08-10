@@ -82,7 +82,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         None => tracing::info!("SPA: serving from embedded assets"),
     }
 
-    // Initialize bootstrap config for SPA — webapp reads window.__CAVALIER__ for gateway URL.
+    // Initialize bootstrap config for SPA — webapp reads window.__SCHEMATIC__ for gateway URL.
     // Empty string = same origin (webapp is served by the gateway itself).
     spa::init_bootstrap("");
 

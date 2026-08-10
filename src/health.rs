@@ -223,7 +223,7 @@ fn is_routable(status: i32) -> bool {
 }
 
 /// Extracts the service-relative path from a SPIFFE URI.
-/// Input:  "spiffe://cavalier/cluster-prod/mud-controller/agent-42"
+/// Input:  "spiffe://schematic/cluster-prod/mud-controller/agent-42"
 /// Output: "mud-controller/agent-42"
 ///
 /// The SPIFFE URI format is spiffe://<org>/<cluster>/<service>[/<child>/...].
@@ -233,7 +233,7 @@ fn extract_spiffe_service_path(spiffe_id: &str) -> Option<String> {
     let stripped = spiffe_id.strip_prefix("spiffe://")?;
     // Split: org / cluster / service [/ child / ...]
     let mut parts = stripped.splitn(3, '/');
-    let _org = parts.next()?; // e.g., "cavalier"
+    let _org = parts.next()?; // e.g., "schematic"
     let _cluster = parts.next()?; // e.g., "cluster-prod"
     let service_path = parts.next()?; // e.g., "mud-controller/agent-42"
     if service_path.is_empty() {

@@ -6,7 +6,7 @@ use axum::response::{IntoResponse, Response};
 
 use crate::registry::Registry;
 
-/// Bootstrap config injected into index.html as `window.__CAVALIER__`.
+/// Bootstrap config injected into index.html as `window.__SCHEMATIC__`.
 /// Web clients (w2sm) read this to discover the gateway URL for gRPC-over-REST.
 static BOOTSTRAP_SCRIPT: OnceLock<String> = OnceLock::new();
 
@@ -18,7 +18,7 @@ pub fn init_bootstrap(gateway_url: &str) {
         "gatewayUrl": gateway_url,
     });
     let script = format!(
-        "<script>window.__CAVALIER__={}</script>",
+        "<script>window.__SCHEMATIC__={}</script>",
         serde_json::to_string(&json).unwrap()
     );
     BOOTSTRAP_SCRIPT.set(script).ok();

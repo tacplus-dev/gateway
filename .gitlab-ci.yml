@@ -43,7 +43,7 @@ compute-image:
 variables:
   DOCKER_TLS_CERTDIR: ""
   WEBAPP_PROJECT_ID: "81967224"
-  CAVALIER_PROJECT_ID: "81967223"
+  SCHEMATIC_PROJECT_ID: "81967223"
   CARGO_HOME: "$CI_PROJECT_DIR/.cargo-home"
 
 .parse-version: &parse-version
@@ -57,7 +57,7 @@ variables:
   - printf "machine gitlab.com\nlogin gitlab-ci-token\npassword %s\n" "$CI_JOB_TOKEN" > ~/.netrc
 
 # ---------------------------------------------------------------------------
-# Build: compile the gateway binary only (no webapp, no cavalier clients).
+# Build: compile the gateway binary only (no webapp, no schematic clients).
 # Webapp and clients are installed in the container at package time.
 # ---------------------------------------------------------------------------
 .build-arch:
@@ -90,8 +90,8 @@ build-arm64:
     ARCH: arm64
 
 # ---------------------------------------------------------------------------
-# Package: download webapp + cavalier clients, bake into container.
-# When only webapp or cavalier changes, retag gateway to rebuild just this.
+# Package: download webapp + schematic clients, bake into container.
+# When only webapp or schematic changes, retag gateway to rebuild just this.
 # ---------------------------------------------------------------------------
 .package-arch:
   stage: package
@@ -115,16 +115,16 @@ build-arm64:
         "${CI_API_V4_URL}/projects/${WEBAPP_PROJECT_ID}/packages/generic/${WEBAPP_PKG}/latest/${WEBAPP_PKG}-latest.tgz" \
         || echo "WARN: webapp not available"
       [ -f webapp.tgz ] && tar -xzf webapp.tgz -C webapp-dist && rm webapp.tgz || true
-    # Download cavalier client binaries
+    # Download schematic client binaries
     - |
-      CAVALIER_PKG="cavalier-${MAJOR}-${MINOR}"
-      echo "Downloading cavalier client binaries..."
+      SCHEMATIC_PKG="schematic-${MAJOR}-${MINOR}"
+      echo "Downloading schematic client binaries..."
       mkdir -p clients
       for target in linux-arm64 linux-amd64 darwin-arm64 windows-amd64.exe; do
         echo "  ${target}..."
         wget -q --header="JOB-TOKEN: $CI_JOB_TOKEN" \
-          -O "clients/cavalier-${target}" \
-          "${CI_API_V4_URL}/projects/${CAVALIER_PROJECT_ID}/packages/generic/${CAVALIER_PKG}/latest/${CAVALIER_PKG}-latest-${target}" \
+          -O "clients/schematic-${target}" \
+          "${CI_API_V4_URL}/projects/${SCHEMATIC_PROJECT_ID}/packages/generic/${SCHEMATIC_PKG}/latest/${SCHEMATIC_PKG}-latest-${target}" \
           || echo "  WARN: ${target} not available, skipping"
       done
       ls -lh clients/

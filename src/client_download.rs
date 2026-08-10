@@ -6,8 +6,8 @@ use axum::response::{IntoResponse, Response};
 
 use crate::auth::GatewayAuth;
 
-/// Directory containing cavalier client binaries (baked into the container).
-const CLIENT_DIR: &str = "/opt/cavalier/clients";
+/// Directory containing schematic client binaries (baked into the container).
+const CLIENT_DIR: &str = "/opt/schematic/clients";
 
 /// Valid os/arch combinations.
 const VALID_TARGETS: &[(&str, &str)] = &[
@@ -17,7 +17,7 @@ const VALID_TARGETS: &[(&str, &str)] = &[
     ("windows", "amd64"),
 ];
 
-/// Serve cavalier client binary downloads.
+/// Serve schematic client binary downloads.
 /// Route: GET /api/v1/client/:os/:arch
 /// Auth: AnyUser (valid token required, no entitlement check).
 pub async fn handler(
@@ -48,9 +48,9 @@ pub async fn handler(
     }
 
     let filename = if os == "windows" {
-        format!("cavalier-{os}-{arch}.exe")
+        format!("schematic-{os}-{arch}.exe")
     } else {
-        format!("cavalier-{os}-{arch}")
+        format!("schematic-{os}-{arch}")
     };
     let file_path = format!("{CLIENT_DIR}/{filename}");
 
