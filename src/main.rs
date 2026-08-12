@@ -33,11 +33,24 @@ async fn main() {
         .install_default()
         .expect("Failed to install rustls crypto provider");
 
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::from_default_env().add_directive("gateway=info".parse().unwrap()),
-        )
-        .init();
+    // The chassis logger, installed through its reload layer.
+    //
+    // NOT `tracing_subscriber::fmt()`: `tracing` allows exactly ONE global
+    // subscriber per process, so a service that builds its own wins permanently
+    // and the chassis's config-driven install can only fail. That is what
+    // happened here — the failure was discarded by grpcconfig's loader, and the
+    // redacting layer was linked into this binary and never received a line.
+    // Runtime proof at the time: this service emitted the default console format
+    // with ANSI escapes, while the java services emitted chassis JSON.
+    //
+    // install_bootstrap redacts from the first line and leaves the layer
+    // swappable, so load_config can still apply the typed logger config. The
+    // per-crate `<svc>=info` directive is dropped: the level now comes from the
+    // typed logger config, which is the point of routing through the chassis.
+    if let Err(e) = gateway_logger::install_bootstrap() {
+        eprintln!("FATAL: could not install the redacting logger: {e}");
+        std::process::exit(1);
+    }
 
     if let Err(e) = run().await {
         tracing::error!(error = %e, "gateway failed");

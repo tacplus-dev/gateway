@@ -839,6 +839,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "jwk",
+ "logger",
  "mime_guess",
  "prost",
  "prost-types",
