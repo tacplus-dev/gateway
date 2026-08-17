@@ -1,11 +1,50 @@
 # Gateway Questions
 
-1. **SM needs to expose grpc_health reporter for services that bypass `run()`.**
-   Gateway cannot use `sm.run()` because it needs custom external TLS (LetsEncrypt/CertChain mode)
-   that differs from the SM's auto-TLS (kernel-issued SPIFFE cert). The SM's health probe on 8444
-   starts as NOT_SERVING in `new()` and only transitions to SERVING inside `run()` (mod.rs:1170).
-   Since gateway never calls `run()`, the k8s startup probe on 8444 permanently returns NOT_SERVING.
-   **Need**: A public method on SM like `set_health_serving()` or `health_reporter()` so gateway
-   can manage the health probe after its own bootstrap completes. Default taken: gateway classifies
-   health correctly on its main-port health service (the one k8s CAN reach); the 8444 probe remains
-   stuck until this tacplus gap is closed.
+_No open questions._
+
+---
+
+# ANSWERED
+
+## 1. SM needs to expose grpc_health reporter for services that bypass `run()` — RESOLVED
+
+**Answered/verified:** 2026-08-16 (fix itself landed 2026-08-06).
+
+The report was correct. Gateway builds the ServiceManager with `new()` but never calls
+`run()`, because it serves external TLS (LetsEncrypt / CertChain) rather than the SM's
+auto-TLS. The SM sets its gRPC health handle to NOT_SERVING in `new()` and only flipped
+it to SERVING inside `run()` — so the plaintext health listener on 8444 stayed
+NOT_SERVING forever for any service that bootstraps itself.
+
+**Fixed in tacplus** (`07223a0c`,
+`pkg/templates/rust/types/service_manager.rs.tmpl:853`): the SM now exposes
+
+```rust
+pub async fn set_serving(&self, serving: bool)
+```
+
+which drives the *same* `grpc_health` handle that backs both the plaintext 8444 probe
+and the main-server health service. Services that call `run()` are unaffected —
+bootstrap still flips to SERVING automatically after health publish and TLS setup. The
+doc comment states the contract explicitly: do not call it until your own bootstrap is
+complete, or the readiness probe becomes a lie.
+
+**Wired up in gateway** (`8036781`, `src/main.rs:313`): `sm.set_serving(true).await` is
+called after identity, state clients, TLS material and the full router are built, and
+immediately before the TLS listener starts accepting — the earliest point at which
+SERVING is truthful.
+
+**Verified live, not assumed:** port-forwarded 8444 on the running `gateway0` pod and
+queried the probe directly:
+
+```
+$ grpcurl -plaintext -proto health.proto -d '{}' localhost:18444 grpc.health.v1.Health/Check
+{
+  "status": "SERVING"
+}
+```
+
+Fleet gates re-run alongside the verification and all green: tacplus `test` /
+`current-generation` / `determinism` / `soundness` all pass; `control/verify-live.sh`
+PASS 9 / FAIL 0; `testapp/verify-tasks.sh` PASS 11 / FAIL 0;
+`testapp/verify-tasks-web.sh` PASS 8 / FAIL 0.
