@@ -3,6 +3,14 @@ name = "gateway"
 version = "1.2.0"
 edition = "2021"
 
+[features]
+# Local-testing only: enables the GATEWAY_AUTH_PASSTHROUGH env var, which turns
+# off every C2S authentication and namespace check. Off by default, so the
+# shipped image (CI runs a plain `cargo build --release`) cannot honor the env
+# var at all. A release build with this feature on fails to compile — see the
+# compile_error! guard in src/main.rs.
+dev-bypass = []
+
 [dependencies]
 axum = { version = "0.8", features = ["ws"] }
 axum-server = { version = "0.7", features = ["tls-rustls-no-provider"] }

@@ -1,3 +1,12 @@
+// `dev-bypass` enables the GATEWAY_AUTH_PASSTHROUGH env var, a total C2S auth
+// bypass meant for local testing. It must never reach a shipped binary, and CI
+// packages `cargo build --release`, so make that combination a build failure
+// rather than something a stray `--features` flag can slip past review.
+#[cfg(all(feature = "dev-bypass", not(debug_assertions)))]
+compile_error!(
+    "the dev-bypass feature disables all C2S authentication and cannot be enabled in a release build"
+);
+
 mod auth;
 mod client_download;
 mod idp_proxy;
@@ -179,7 +188,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
     if auth_passthrough {
-        tracing::warn!("GATEWAY_AUTH_PASSTHROUGH is enabled — all C2S auth checks are bypassed");
+        if cfg!(feature = "dev-bypass") {
+            tracing::warn!("GATEWAY_AUTH_PASSTHROUGH is enabled — all C2S auth checks are bypassed");
+        } else {
+            tracing::error!(
+                "GATEWAY_AUTH_PASSTHROUGH is set but this binary was not built with the \
+                 dev-bypass feature — ignoring it, C2S auth stays enforced"
+            );
+        }
     }
     let gateway_auth = Arc::new(auth::GatewayAuth::new(
         authorizer.jwk_cache().clone(),

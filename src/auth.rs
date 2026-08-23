@@ -21,7 +21,8 @@ pub struct GatewayAuth {
     jwk_cache: Arc<JwkCache>,
     /// When true, all C2S auth checks are bypassed. Requests are forwarded
     /// to backend services without token validation or entitlement checks.
-    /// Set via GATEWAY_AUTH_PASSTHROUGH=1 env var (local testing only).
+    /// Requested via GATEWAY_AUTH_PASSTHROUGH=1 env var (local testing only),
+    /// and only ever true in a `dev-bypass` build — see `new()`.
     passthrough: bool,
 }
 
@@ -29,7 +30,11 @@ impl GatewayAuth {
     pub fn new(jwk_cache: Arc<JwkCache>, passthrough: bool) -> Self {
         Self {
             jwk_cache,
-            passthrough,
+            // The C2S bypass exists only in `dev-bypass` builds. The shipped
+            // image is a plain `cargo build --release` (.gitlab-ci.yml), where
+            // this is a compile-time `false`: no env var, config value or
+            // caller can turn auth off in a production binary.
+            passthrough: cfg!(feature = "dev-bypass") && passthrough,
         }
     }
 
@@ -484,6 +489,28 @@ fn dedupe_preserving_order(input: Vec<String>) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gateway_model::s2sm::rest_dispatch::AuthPolicy;
+
+    /// The passthrough switch must be honored only in a `dev-bypass` build.
+    /// Same assertion in both directions so the guarantee is checked by
+    /// `cargo test` and by `cargo test --features dev-bypass`.
+    #[tokio::test]
+    async fn passthrough_is_honored_only_in_dev_bypass_builds() {
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), true);
+        let result = auth
+            .validate_c2s(AuthPolicy::AnyUser, "echo", "echo", "/echo.Echo/Ping", None)
+            .await;
+
+        if cfg!(feature = "dev-bypass") {
+            assert!(
+                result.is_ok(),
+                "dev-bypass build must honor passthrough: {result:?}"
+            );
+        } else {
+            let (code, _) = result.expect_err("production build must ignore passthrough");
+            assert_eq!(code, StatusCode::UNAUTHORIZED);
+        }
+    }
 
     #[test]
     fn flat_grants_accept_legacy_service_wildcard() {
