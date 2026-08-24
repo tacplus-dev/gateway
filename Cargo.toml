@@ -46,3 +46,9 @@ gateway-logger = { package = "logger", path = "target/generated-sources/model/ch
 gateway-servicemanager = { package = "servicemanager", path = "target/generated-sources/model/chassis/servicemanager" }
 gateway-token = { package = "token", path = "target/generated-sources/model/chassis/token" }
 gateway-grpcserver = { package = "grpcserver", path = "target/generated-sources/model/chassis/grpcserver" }
+
+# Test-only: the entitlement end-to-end test signs its own throwaway JWTs with
+# the same generated key chassis the services already use through jwk/token.
+[dev-dependencies]
+gateway-key = { package = "key", path = "target/generated-sources/model/chassis/key" }
+gateway-x509 = { package = "x509", path = "target/generated-sources/model/chassis/x509" }

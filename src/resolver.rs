@@ -19,6 +19,13 @@ pub struct Resolver {
     health: HealthWatcher,
     tls_verifier: Arc<SpiffeServerCertVerifier>,
     counter: AtomicUsize,
+    /// Test-only: dial backends over plaintext h2c instead of TLS. Production
+    /// always speaks TLS to backends; the entitlement end-to-end test stands its
+    /// backend up on a bare socket because the decision it proves — does this
+    /// caller's grant admit this method — is made before any dial and does not
+    /// depend on the transport.
+    #[cfg(test)]
+    plaintext: bool,
 }
 
 impl Resolver {
@@ -27,7 +34,37 @@ impl Resolver {
             health,
             tls_verifier,
             counter: AtomicUsize::new(0),
+            #[cfg(test)]
+            plaintext: false,
         }
+    }
+
+    /// Test-only constructor: see the `plaintext` field.
+    #[cfg(test)]
+    pub fn plaintext_backends(
+        health: HealthWatcher,
+        tls_verifier: Arc<SpiffeServerCertVerifier>,
+    ) -> Self {
+        Self {
+            health,
+            tls_verifier,
+            counter: AtomicUsize::new(0),
+            plaintext: true,
+        }
+    }
+
+    #[cfg(test)]
+    fn scheme(&self) -> &'static str {
+        if self.plaintext {
+            "http"
+        } else {
+            "https"
+        }
+    }
+
+    #[cfg(not(test))]
+    fn scheme(&self) -> &'static str {
+        "https"
     }
 
     /// Returns a reference to the underlying HealthWatcher.
@@ -70,7 +107,7 @@ impl Resolver {
 
             if reachable {
                 let verifier = self.tls_verifier(service_id);
-                let uri = format!("https://{}", ep);
+                let uri = format!("{}://{}", self.scheme(), ep);
                 tracing::debug!(service = %service_id, endpoint = %ep, "dial_ready_any: found live endpoint");
                 match Self::connect_eager(&uri, verifier).await {
                     Ok(ch) => return ch,
@@ -104,7 +141,7 @@ impl Resolver {
             self.counter.fetch_add(1, Ordering::Relaxed) % endpoints.len()
         };
 
-        let uri = format!("https://{}", endpoints[idx]);
+        let uri = format!("{}://{}", self.scheme(), endpoints[idx]);
         let verifier = self.tls_verifier(label);
 
         match Self::connect_eager(&uri, verifier.clone()).await {
@@ -137,8 +174,14 @@ impl Resolver {
         uri: &str,
         verifier: Arc<dyn rustls::client::danger::ServerCertVerifier>,
     ) -> Result<Channel, Box<dyn std::error::Error>> {
-        let endpoint = Endpoint::from_shared(uri.to_string())?
-            .tls_config_with_verifier(ClientTlsConfig::new(), verifier)?
+        let endpoint = Endpoint::from_shared(uri.to_string())?;
+        // A plaintext target carries no server cert to verify (test-only path).
+        let endpoint = if uri.starts_with("http://") {
+            endpoint
+        } else {
+            endpoint.tls_config_with_verifier(ClientTlsConfig::new(), verifier)?
+        };
+        let endpoint = endpoint
             .http2_keep_alive_interval(std::time::Duration::from_secs(10))
             .keep_alive_while_idle(true)
             .keep_alive_timeout(std::time::Duration::from_secs(60));

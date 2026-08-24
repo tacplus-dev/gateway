@@ -62,6 +62,19 @@ impl HealthWatcher {
         self.ready.notified().await;
     }
 
+    /// Builds a HealthWatcher with a fixed endpoint table and no kernel watch.
+    /// Test-only: the real constructor needs a live kernel channel to stream
+    /// ServiceHealthState.instances from.
+    #[cfg(test)]
+    pub fn seeded(services: HashMap<String, Vec<ServiceEndpoint>>) -> Self {
+        Self {
+            services: Arc::new(RwLock::new(services)),
+            spiffe_services: Arc::new(RwLock::new(HashMap::new())),
+            ready: Arc::new(Notify::new()),
+            has_data: Arc::new(AtomicBool::new(true)),
+        }
+    }
+
     /// Returns gRPC endpoints (host:port) for healthy instances of a service.
     pub fn get_endpoints(&self, service_id: &str) -> Vec<String> {
         let map = self.services.read().unwrap();

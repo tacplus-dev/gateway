@@ -839,6 +839,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "jwk",
+ "key",
  "logger",
  "mime_guess",
  "prost",
@@ -860,6 +861,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "x509",
 ]
 
 [[package]]

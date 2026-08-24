@@ -19,6 +19,13 @@ mod rest_translation;
 mod spa;
 mod tls;
 
+/// End-to-end proof that a caller's entitlements decide whether a proxied gRPC
+/// call reaches the backend. Lives in the binary crate because that is the only
+/// place `proxy_grpc::handle` is reachable from — a `tests/` integration test
+/// cannot link a bin target.
+#[cfg(test)]
+mod e2e_entitlement;
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 
