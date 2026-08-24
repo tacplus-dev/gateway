@@ -382,27 +382,30 @@ fn ensure_not_expired(token: &Token) -> Result<(), (StatusCode, String)> {
     Ok(())
 }
 
+/// Authorizes a call against the flat `grants` list by the GENERATED grant
+/// catalog only.
+///
+/// Every decision goes through `grants::normalize`, which expands a wildcard to
+/// the exact member tokens the generator computed for it and drops anything the
+/// catalog does not know. Nothing is inferred from the SHAPE of a token: a
+/// hand-rolled "ends in _ANY" rule is a second, divergent copy of the wildcard
+/// vocabulary that tacplus already emits, and it grants by string spelling
+/// rather than by what the wildcard actually covers — e.g. a bare "ANY" or a
+/// `<SERVICE>_ANY` for a service with no catalog entry used to allow every
+/// method of that service, including methods no C2S grant exists for.
 fn flat_grants_allow(se_obj: &serde_json::Value, target_service: &str, grpc_path: &str) -> bool {
     let grant_tokens = collect_flat_grants(se_obj);
     if grant_tokens.is_empty() {
         return false;
     }
 
-    let service_part = grant_token_part(target_service);
-    let exact = method_grant_token(target_service, grpc_path);
-    let normalized = grants::normalize(grant_tokens.iter().map(String::as_str));
+    let Some(expected) = method_grant_token(target_service, grpc_path) else {
+        return false;
+    };
 
-    grant_tokens.iter().any(|token| {
-        let upper = token.to_ascii_uppercase();
-        upper == "ANY"
-            || upper == format!("{service_part}_ANY")
-            || upper == format!("{service_part}_RPCS_ANY")
-            || exact
-                .as_ref()
-                .is_some_and(|expected| upper == expected.as_str())
-    }) || exact
-        .as_ref()
-        .is_some_and(|expected| normalized.iter().any(|token| token == expected))
+    grants::normalize(grant_tokens.iter().map(String::as_str))
+        .iter()
+        .any(|token| *token == expected)
 }
 
 fn collect_flat_grants(value: &serde_json::Value) -> Vec<String> {
@@ -512,9 +515,24 @@ mod tests {
         }
     }
 
+    /// Tokens the generated catalog does not know grant NOTHING, however they
+    /// are spelled. `ECHO_RPCS_ANY` is the legacy per-service enum name; it is
+    /// absent from the catalog, and kernel/opa already drop it as unknown.
+    /// Gateway was the last consumer honoring it, by string shape alone.
     #[test]
-    fn flat_grants_accept_legacy_service_wildcard() {
-        let entitlements = serde_json::json!({"grants": ["ECHO_RPCS_ANY"]});
+    fn flat_grants_reject_tokens_outside_the_generated_catalog() {
+        for token in ["ANY", "ECHO_RPCS_ANY", "NOTASERVICE_ANY"] {
+            let entitlements = serde_json::json!({ "grants": [token] });
+            assert!(
+                !flat_grants_allow(&entitlements, "echo", "/echo.Echo/Ping"),
+                "uncatalogued token {token} must not authorize"
+            );
+        }
+    }
+
+    #[test]
+    fn flat_grants_accept_generated_package_wildcard() {
+        let entitlements = serde_json::json!({"grants": ["ECHO_ANY"]});
         assert!(flat_grants_allow(
             &entitlements,
             "echo",
@@ -528,8 +546,8 @@ mod tests {
     }
 
     #[test]
-    fn flat_grants_accept_generated_package_wildcard() {
-        let entitlements = serde_json::json!({"grants": ["ECHO_ANY"]});
+    fn flat_grants_accept_object_wrapper_shape() {
+        let entitlements = serde_json::json!({"grants": [{"token": "ECHO_ANY"}]});
         assert!(flat_grants_allow(
             &entitlements,
             "echo",
@@ -538,8 +556,8 @@ mod tests {
     }
 
     #[test]
-    fn flat_grants_accept_legacy_object_wrapper_during_rollout() {
-        let entitlements = serde_json::json!({"grants": [{"token": "ECHO_RPCS_ANY"}]});
+    fn flat_grants_accept_exact_catalog_token() {
+        let entitlements = serde_json::json!({"grants": ["ECHO_ECHO_PING"]});
         assert!(flat_grants_allow(
             &entitlements,
             "echo",

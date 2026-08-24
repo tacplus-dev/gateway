@@ -327,17 +327,27 @@ async fn handle_inner(
         return tonic_status_to_response(tonic::Status::not_found("gateway service not proxied"));
     }
 
-    // Look up route info from the generated ROUTES table.
-    // Default to Entitled (most restrictive) for routes not in the table.
-    let route_info = gateway_model::s2sm::rest_dispatch::ROUTES
+    // Look up route info from the generated ROUTES table. ROUTES is the complete
+    // set of C2S-reachable methods; a path that is not in it is not a method the
+    // gateway proxies, so it is REJECTED. Falling through to Entitled would be an
+    // allow-by-default: every S2S-only method (which carries no ROUTES entry, and
+    // whose own service authorizes by peer identity, not by user entitlement)
+    // would become reachable from outside by anything the entitlement check
+    // happens to admit. Deny, not "most restrictive policy".
+    let route_info = match gateway_model::s2sm::rest_dispatch::ROUTES
         .iter()
-        .find(|r| r.grpc_path == path);
-    let auth_policy = route_info
-        .map(|r| r.auth_policy)
-        .unwrap_or(gateway_model::s2sm::rest_dispatch::AuthPolicy::Entitled);
-    let entitlement_service = route_info
-        .and_then(|r| r.entitlement_service)
-        .unwrap_or(service_id);
+        .find(|r| r.grpc_path == path)
+    {
+        Some(r) => r,
+        None => {
+            tracing::warn!(path = %path, "gRPC path not in generated ROUTES table; rejected");
+            return tonic_status_to_response(tonic::Status::not_found(
+                "unknown gRPC method",
+            ));
+        }
+    };
+    let auth_policy = route_info.auth_policy;
+    let entitlement_service = route_info.entitlement_service.unwrap_or(service_id);
 
     // Extract auth header before consuming the request.
     let auth_header = req
@@ -349,9 +359,7 @@ async fn handle_inner(
     // Check if this is a streaming RPC. Either direction of streaming must be
     // treated as streaming so each incoming frame is validated and authorized
     // before forwarding.
-    let is_streaming = route_info
-        .map(|r| r.server_streaming || r.client_streaming)
-        .unwrap_or(false);
+    let is_streaming = route_info.server_streaming || route_info.client_streaming;
 
     let (parts, body) = req.into_parts();
 
