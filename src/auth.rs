@@ -199,7 +199,8 @@ impl GatewayAuth {
     /// Check entitlements against the **target** service (not gateway).
     ///
     /// Reads the `service_entitlements` JWT claim (set by opa at mint time).
-    /// Grants access if `any=true` or if the specific method is listed.
+    /// Apart from the admin `{"all": true}` bypass, the only way to authorize is
+    /// `flat_grants_allow` — the generated catalog. There is no second path.
     fn check_entitlements(
         &self,
         auth_header: &str,
@@ -237,40 +238,6 @@ impl GatewayAuth {
         }
 
         if flat_grants_allow(&se_obj, target_service, grpc_path) {
-            return Ok(());
-        }
-
-        let svc_ent = se_obj.get(target_service).ok_or_else(|| {
-            (
-                StatusCode::FORBIDDEN,
-                format!("no entitlements for service {target_service}"),
-            )
-        })?;
-
-        // Entitlements are a repeated enum array. 99 = _ANY wildcard (numeric proto value).
-        // Kernel serializes enum values as strings using tacplus json_return_value:
-        //   SENTINEL_RPCS_ANY → "sentinel_rpcs_any", GATEWAY_RPCS_ANY → "gateway_rpcs_any", etc.
-        // Check all representations of the ANY wildcard.
-        if let Some(rpcs) = svc_ent.as_array() {
-            for rpc in rpcs {
-                if rpc.as_u64() == Some(99) {
-                    return Ok(()); // numeric ANY
-                }
-                if let Some(s) = rpc.as_str() {
-                    let u = s.to_ascii_uppercase();
-                    if u == "ANY" || u.ends_with("_ANY") {
-                        return Ok(()); // string ANY ("SENTINEL_RPCS_ANY", "any", etc.)
-                    }
-                }
-            }
-        }
-
-        // Legacy format: {"any": true} → wildcard access.
-        if svc_ent
-            .get("any")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false)
-        {
             return Ok(());
         }
 
@@ -563,6 +530,60 @@ mod tests {
             "echo",
             "/echo.Echo/Ping"
         ));
+    }
+
+    /// Regression: the nested per-service claim shape must not authorize.
+    ///
+    /// Nothing mints `{"<service>": [...]}` any more — the generated
+    /// `TokenEntitlements` has only flat repeated-string fields, kernel writes
+    /// the claim solely through `flatServiceEntitlementsJson`, and opa's policy
+    /// returns `{"token_entitlements": {"grants": [...]}}`. Gateway used to
+    /// honor that shape anyway, by string spelling: a bare `"ANY"`, any
+    /// `*_ANY`, or a legacy `{"any": true}` opened every method of the named
+    /// service, catalog entry or not. Each token below took that path to `Ok`;
+    /// all of them must now be FORBIDDEN.
+    #[test]
+    fn nested_per_service_wildcards_no_longer_authorize() {
+        let key = gateway_key::keys::generate_ec_p256_key().expect("signing key");
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false);
+
+        for entitlements in [
+            serde_json::json!({ "echo": ["ANY"] }),
+            serde_json::json!({ "echo": ["ECHO_RPCS_ANY"] }),
+            serde_json::json!({ "echo": ["NOTASERVICE_ANY"] }),
+            serde_json::json!({ "echo": [99] }),
+            serde_json::json!({ "echo": { "any": true } }),
+        ] {
+            let mut token = Token::new();
+            token.set_kid(key.id()).expect("kid");
+            token.set_alg(key.alg()).expect("alg");
+            token.set_issuer("unit-test").expect("iss");
+            token.set_subject("alice@example.com").expect("sub");
+            token.set_audience("echo").expect("aud");
+            token
+                .set_expiration(
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .expect("clock")
+                        .as_secs() as i64
+                        + 3600,
+                )
+                .expect("exp");
+            token
+                .set_service_entitlements(entitlements.clone())
+                .expect("service_entitlements");
+            token.sign(&key).expect("sign");
+            let header = format!("Bearer {}", token.base64().expect("base64"));
+
+            let (code, _) = auth
+                .check_entitlements(&header, "echo", "/echo.Echo/Ping")
+                .expect_err(&format!("{entitlements} must not authorize"));
+            assert_eq!(
+                code,
+                StatusCode::FORBIDDEN,
+                "{entitlements} must be denied, not authorized by token shape"
+            );
+        }
     }
 
     #[test]
