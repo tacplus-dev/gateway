@@ -379,7 +379,7 @@ async fn stratum_c2s_query_is_allowed_with_entitlement_and_denied_without() {
         entitled.parse().expect("authorization metadata"),
     );
     let unrouted = map_client
-        .open_task_activity_query(request)
+        .create_task_activity_query(request)
         .await
         .expect_err("an unrouted gRPC path must not be proxied");
     assert_eq!(
