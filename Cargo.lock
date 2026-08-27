@@ -33,6 +33,7 @@ name = "am"
 version = "0.1.0"
 dependencies = [
  "gateway-model-types",
+ "tokio",
  "tonic",
  "tracing",
 ]

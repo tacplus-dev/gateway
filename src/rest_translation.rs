@@ -188,6 +188,7 @@ async fn rest_handler(
                         &path,
                         &body_bytes,
                         auth_header_value.as_deref(),
+                        &request_id,
                         false,
                     )
                     .await;
@@ -264,6 +265,7 @@ async fn rest_handler(
             route.grpc_path,
             &body_bytes,
             auth_header_value.as_deref(),
+            &request_id,
             false,
         )
         .await
@@ -397,6 +399,7 @@ async fn dispatch_via_proxy(
     grpc_path: &str,
     json_body: &[u8],
     auth_header: Option<&str>,
+    request_id: &str,
     _is_streaming: bool,
 ) -> axum::response::Response {
     // 1. Convert JSON to proto bytes.
@@ -424,6 +427,14 @@ async fn dispatch_via_proxy(
 
     if let Some(auth) = auth_header {
         builder = builder.header("authorization", auth);
+    }
+
+    // Forward the caller's x-request-id so downstream handlers (accounting,
+    // tracing) can join back to this call. Without this the backend never
+    // sees the header at all and every accounting/trace record is emitted
+    // with an empty request_id — see the accounting join design.
+    if let Ok(id) = http::HeaderValue::from_str(request_id) {
+        builder = builder.header("x-request-id", id);
     }
 
     let grpc_request = match builder.body(axum::body::Body::from(grpc_body)) {
