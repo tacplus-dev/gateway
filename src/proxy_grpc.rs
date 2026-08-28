@@ -53,6 +53,12 @@ fn extract_service_id(path: &str) -> Option<&str> {
         .filter(|s| !s.is_empty())
 }
 
+fn route_identity(route_info: &gateway_model::s2sm::rest_dispatch::RouteInfo) -> (&str, &str) {
+    let service_id = route_info.service_id;
+    let entitlement_service = route_info.entitlement_service.unwrap_or(service_id);
+    (service_id, entitlement_service)
+}
+
 /// Minimal prost message to extract trace_id (field 200) from any protobuf
 /// message without full deserialization. prost skips unknown fields,
 /// so this works on any message type that has trace_id at field 200.
@@ -315,7 +321,7 @@ async fn handle_inner(
 ) -> Response {
     let path = req.uri().path().to_string();
 
-    let service_id = match extract_service_id(&path) {
+    let package_service_id = match extract_service_id(&path) {
         Some(id) => id,
         None => {
             return tonic_status_to_response(tonic::Status::not_found("unknown gRPC service"));
@@ -323,7 +329,7 @@ async fn handle_inner(
     };
 
     // Gateway's own services (Mint) are handled by tonic routes, not the proxy.
-    if service_id == "gateway" {
+    if package_service_id == "gateway" {
         return tonic_status_to_response(tonic::Status::not_found("gateway service not proxied"));
     }
 
@@ -347,7 +353,7 @@ async fn handle_inner(
         }
     };
     let auth_policy = route_info.auth_policy;
-    let entitlement_service = route_info.entitlement_service.unwrap_or(service_id);
+    let (service_id, entitlement_service) = route_identity(route_info);
 
     // Extract auth header before consuming the request.
     let auth_header = req
@@ -590,4 +596,32 @@ pub fn is_grpc(req: &Request<Body>) -> bool {
         .and_then(|v| v.to_str().ok())
         .map(|ct| ct.starts_with("application/grpc"))
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gateway_model::s2sm::rest_dispatch::{AuthPolicy, RouteInfo};
+
+    #[test]
+    fn route_identity_separates_physical_service_from_entitlement_contract() {
+        let route = RouteInfo {
+            http_path: "/api/v1/tasks/DelegationProbeBusStateService/PublishToStream",
+            grpc_path: "/tasks.DelegationProbeBusStateService/PublishToStream",
+            service_id: "eventbus",
+            entitlement_service: Some("tasks"),
+            http_methods: &["POST"],
+            auth_policy: AuthPolicy::Entitled,
+            entitlement_scopes: &["WRITE"],
+            capability_scope: Some("WRITE"),
+            server_streaming: true,
+            client_streaming: true,
+            target_namespace_field: None,
+        };
+
+        let (physical_service, entitlement_service) = route_identity(&route);
+
+        assert_eq!(physical_service, "eventbus");
+        assert_eq!(entitlement_service, "tasks");
+    }
 }
