@@ -10,6 +10,7 @@ compile_error!(
 mod auth;
 mod client_download;
 mod idp_proxy;
+mod limits;
 mod proxy_grpc;
 mod health;
 mod mint;
@@ -311,10 +312,26 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         },
     );
 
+    // Edge limits. The body cap sits INSIDE the gRPC/IDP intercept so it only
+    // applies to the REST/SPA half — raw gRPC client streams are long-lived and
+    // already bounded per message in proxy_grpc. The concurrency/rate cap wraps
+    // the finished router, so it covers Mint, the gRPC proxy and REST alike.
+    let edge_limits = limits::EdgeLimits::from_env();
+    tracing::info!(
+        max_concurrent_requests = edge_limits.max_concurrent_requests,
+        max_requests_per_second = edge_limits.max_requests_per_second,
+        max_request_body_bytes = edge_limits.max_request_body_bytes,
+        "edge limits"
+    );
+    let spa_and_rest =
+        limits::with_request_body_limit(spa_and_rest, edge_limits.max_request_body_bytes);
+
     // Mint (tonic) handles /gateway.Mint/* methods.
     // Everything else hits the intercept layer: gRPC → IDP proxy → REST/SPA.
     let app = grpc_router
         .fallback_service(spa_and_rest.layer(grpc_and_idp_intercept));
+    let app: limits::EdgeService<hyper::body::Incoming> =
+        limits::with_edge_limits(app, &edge_limits);
 
     // 13. Start TLS listener — serves both HTTP and gRPC on the same port.
     tracing::info!(addr = %tcp_addr, "listening (TLS, HTTP+gRPC)");
@@ -336,7 +353,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     sm.set_serving(true).await;
 
     axum_server::bind_rustls(tcp_addr, tls_acceptor)
-        .serve(app.into_make_service())
+        .serve(tower::make::Shared::new(app))
         .await?;
 
     // Graceful shutdown.

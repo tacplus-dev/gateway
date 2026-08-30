@@ -53,7 +53,9 @@ fn extract_service_id(path: &str) -> Option<&str> {
         .filter(|s| !s.is_empty())
 }
 
-fn route_identity(route_info: &gateway_model::s2sm::rest_dispatch::RouteInfo) -> (&str, &str) {
+pub(crate) fn route_identity(
+    route_info: &gateway_model::s2sm::rest_dispatch::RouteInfo,
+) -> (&str, &str) {
     let service_id = route_info.service_id;
     let entitlement_service = route_info.entitlement_service.unwrap_or(service_id);
     (service_id, entitlement_service)
@@ -408,7 +410,28 @@ async fn handle_inner(
         let tonic_body = tonic::body::Body::new(streaming_body);
         Request::from_parts(parts, tonic_body)
     } else {
-        // Unary: buffer body, extract frame, validate, auth, trace, then forward.
+        // Token check FIRST, on headers alone — the same ordering the streaming
+        // branch above already uses. Buffering and decoding up to 10MB is work
+        // an unauthenticated caller must not be able to make the gateway do.
+        // The namespace-aware half of the check needs the decoded message and
+        // still runs below, once the body has been read and validated.
+        if let Err((code, msg)) = proxy
+            .auth
+            .validate_c2s(
+                auth_policy,
+                service_id,
+                entitlement_service,
+                &path,
+                auth_header.as_deref(),
+            )
+            .await
+        {
+            tracing::warn!(path = %path, error = %msg, "gRPC auth rejected before body read");
+            let grpc_code = status_code_to_tonic(code);
+            return tonic_status_to_response(tonic::Status::new(grpc_code, msg));
+        }
+
+        // Unary: buffer body, extract frame, validate, trace, then forward.
         let body_bytes = match axum::body::to_bytes(body, 5 + MAX_GRPC_MESSAGE_BYTES).await {
             Ok(b) => b,
             Err(e) => {
@@ -468,7 +491,8 @@ async fn handle_inner(
             }
         };
 
-        // Auth: validate after body extraction so we reject malformed messages first.
+        // The target-namespace half of the check: it needs the decoded message,
+        // so it can only run now. The token itself was already verified above.
         if let Err((code, msg)) = proxy
             .auth
             .validate_c2s_with_target_namespace(
@@ -601,7 +625,123 @@ pub fn is_grpc(req: &Request<Body>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use gateway_grpcserver::authorizer::JwkCache;
+    use gateway_key::keys;
     use gateway_model::s2sm::rest_dispatch::{AuthPolicy, RouteInfo};
+    use gateway_servicemanager::SpiffeServerCertVerifier;
+    use gateway_x509::x509::{ImmutableCertChain, X509KeyUsage};
+
+    use crate::health::HealthWatcher;
+
+    /// A request body that records every poll. Nothing may read it before the
+    /// token check has passed.
+    struct CountingBody {
+        polls: Arc<AtomicUsize>,
+        data: Option<bytes::Bytes>,
+    }
+
+    impl http_body::Body for CountingBody {
+        type Data = bytes::Bytes;
+        type Error = std::io::Error;
+
+        fn poll_frame(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+            let this = self.get_mut();
+            this.polls.fetch_add(1, Ordering::SeqCst);
+            Poll::Ready(this.data.take().map(|d| Ok(Frame::data(d))))
+        }
+    }
+
+    /// A verifier nothing in this test consults; `Resolver` just holds one, and
+    /// `WebPkiServerVerifier` refuses to build with no anchors at all.
+    fn unused_verifier() -> Arc<SpiffeServerCertVerifier> {
+        let key = keys::generate_ec_p256_key().expect("throwaway key");
+        let expiry = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_secs() as i64
+            + 3600;
+        let cert = ImmutableCertChain::for_self_signing(key)
+            .self_sign("unused", expiry, X509KeyUsage::CertSign, &[])
+            .expect("throwaway cert");
+        let mut roots = rustls::RootCertStore::empty();
+        for der in rustls_pemfile::certs(&mut cert.pem_bytes()) {
+            roots.add(der.expect("der")).expect("add root");
+        }
+        SpiffeServerCertVerifier::new("proxy.test", roots).expect("verifier")
+    }
+
+    /// The first unary, non-gateway route in the generated table that requires
+    /// a token. Picked from ROUTES so the test follows regeneration.
+    fn unary_authenticated_route() -> &'static RouteInfo {
+        gateway_model::s2sm::rest_dispatch::ROUTES
+            .iter()
+            .find(|r| {
+                !r.server_streaming
+                    && !r.client_streaming
+                    && r.auth_policy != AuthPolicy::NoAuth
+                    && !r.grpc_path.starts_with("/gateway.")
+            })
+            .expect("the generated ROUTES table must contain a unary authenticated route")
+    }
+
+    /// The finding: an unauthenticated caller could make the gateway buffer and
+    /// decode up to 10MB before the token was ever looked at. The body here is
+    /// garbage that cannot be unframed, so before the fix the caller got an
+    /// InvalidArgument frame error — proof the parse ran. It must now be
+    /// Unauthenticated, with the body never polled at all.
+    #[tokio::test]
+    async fn unary_rejects_unauthenticated_caller_before_reading_the_body() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+
+        let proxy = ProxyState {
+            resolver: Arc::new(Resolver::plaintext_backends(
+                HealthWatcher::seeded(HashMap::new()),
+                unused_verifier(),
+            )),
+            auth: Arc::new(GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false)),
+            trace_publisher: Arc::new(|_| {}),
+            trace_round: Box::new(Default::default),
+        };
+
+        let polls = Arc::new(AtomicUsize::new(0));
+        let body = Body::new(CountingBody {
+            polls: Arc::clone(&polls),
+            // A malformed gRPC frame: length prefix claims 4GB, payload is 3
+            // bytes. unframe_grpc rejects this the moment it is reached.
+            data: Some(bytes::Bytes::from_static(b"\x00\xff\xff\xff\xffnot")),
+        });
+
+        let route = unary_authenticated_route();
+        let request = Request::builder()
+            .method("POST")
+            .uri(route.grpc_path)
+            .header("content-type", "application/grpc+proto")
+            .body(body)
+            .expect("request");
+
+        let response = handle(&proxy, request).await;
+
+        assert_eq!(
+            response
+                .headers()
+                .get("grpc-status")
+                .and_then(|v| v.to_str().ok()),
+            Some("16"),
+            "no token must be Unauthenticated (16), not a body-parse error: {:?}",
+            response.headers().get("grpc-message")
+        );
+        assert_eq!(
+            polls.load(Ordering::SeqCst),
+            0,
+            "the request body must not be polled before the token check"
+        );
+    }
 
     #[test]
     fn route_identity_separates_physical_service_from_entitlement_contract() {

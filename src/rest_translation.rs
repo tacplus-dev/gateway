@@ -234,7 +234,15 @@ async fn rest_handler(
 
     // Read body after WebSocket upgrade handling; upgrade requests do not carry
     // a JSON request body.
-    let body_bytes = match read_body_for_method(&req_method, body).await {
+    let body_bytes = match authorize_then_read_body(
+        &state.auth,
+        route,
+        auth_header_value.as_deref(),
+        &req_method,
+        body,
+    )
+    .await
+    {
         Ok(bytes) => bytes,
         Err(response) => return response,
     };
@@ -270,6 +278,39 @@ async fn rest_handler(
         )
         .await
     }
+}
+
+/// Verify the caller's token on headers alone, then read the request body.
+///
+/// The token check has to come first: reading the body buffers up to
+/// `MAX_JSON_BODY_BYTES` and the JSON→proto conversion that follows decodes all
+/// of it, and neither is work an unauthenticated caller may make the gateway
+/// do. This mirrors the ordering `proxy_grpc` uses on both of its paths; the
+/// namespace-aware half of the check still runs there, once the message is
+/// decoded.
+async fn authorize_then_read_body(
+    auth: &GatewayAuth,
+    route: &RouteInfo,
+    auth_header: Option<&str>,
+    method: &axum::http::Method,
+    body: axum::body::Body,
+) -> Result<Vec<u8>, axum::response::Response> {
+    let (service_id, entitlement_service) = proxy_grpc::route_identity(route);
+    if let Err((code, msg)) = auth
+        .validate_c2s(
+            route.auth_policy,
+            service_id,
+            entitlement_service,
+            route.grpc_path,
+            auth_header,
+        )
+        .await
+    {
+        tracing::warn!(path = %route.http_path, error = %msg, "REST auth rejected before body read");
+        return Err(json_error_response(code, msg));
+    }
+
+    read_body_for_method(method, body).await
 }
 
 async fn read_body_for_method(
@@ -1240,6 +1281,85 @@ fn grpc_status_to_http(grpc_status: i32) -> StatusCode {
 
 #[cfg(test)]
 mod tests {
+    use std::pin::Pin;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::task::{Context, Poll};
+
+    use gateway_grpcserver::authorizer::JwkCache;
+    use http_body::Frame;
+
+    /// A request body that records every poll. Nothing may read it before the
+    /// token check has passed.
+    struct CountingBody {
+        polls: Arc<AtomicUsize>,
+        data: Option<bytes::Bytes>,
+    }
+
+    impl http_body::Body for CountingBody {
+        type Data = bytes::Bytes;
+        type Error = std::io::Error;
+
+        fn poll_frame(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+            let this = self.get_mut();
+            this.polls.fetch_add(1, Ordering::SeqCst);
+            Poll::Ready(this.data.take().map(|d| Ok(Frame::data(d))))
+        }
+    }
+
+    /// The first unary, non-gateway route in the generated table that requires
+    /// a token. Picked from ROUTES so the test follows regeneration.
+    fn unary_authenticated_route() -> &'static RouteInfo {
+        ROUTES
+            .iter()
+            .find(|r| {
+                !r.server_streaming
+                    && !r.client_streaming
+                    && r.auth_policy != AuthPolicy::NoAuth
+                    && !r.grpc_path.starts_with("/gateway.")
+            })
+            .expect("the generated ROUTES table must contain a unary authenticated route")
+    }
+
+    /// The finding on the REST path: the handler buffered up to
+    /// MAX_JSON_BODY_BYTES and handed it to the JSON→proto decoder before any
+    /// token was checked. An unauthenticated caller must now be turned away
+    /// with the body untouched.
+    #[tokio::test]
+    async fn rest_rejects_unauthenticated_caller_before_reading_the_body() {
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false);
+        let polls = Arc::new(AtomicUsize::new(0));
+        let body = axum::body::Body::new(CountingBody {
+            polls: Arc::clone(&polls),
+            // Not JSON — before the fix this reached request_json_to_proto and
+            // came back as a 400 parse error, proving the parse ran.
+            data: Some(bytes::Bytes::from_static(b"not json at all")),
+        });
+
+        let response = super::authorize_then_read_body(
+            &auth,
+            unary_authenticated_route(),
+            None,
+            &axum::http::Method::POST,
+            body,
+        )
+        .await
+        .expect_err("a caller with no token must be rejected");
+
+        assert_eq!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "no token must be 401, not a body-parse error"
+        );
+        assert_eq!(
+            polls.load(Ordering::SeqCst),
+            0,
+            "the request body must not be polled before the token check"
+        );
+    }
+
     use super::*;
 
     fn route(auth_policy: AuthPolicy) -> RouteInfo {

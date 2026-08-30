@@ -34,8 +34,8 @@ tokio-rustls = { version = "0.26", features = ["ring"], default-features = false
 tokio-stream = "0.1"
 tonic = { version = "0.14", features = ["transport", "tls-ring"] }
 tonic-health = "0.14"
-tower = "0.5"
-tower-http = { version = "0.6", features = ["cors"] }
+tower = { version = "0.5", features = ["buffer", "limit", "load-shed", "make", "util"] }
+tower-http = { version = "0.6", features = ["cors", "limit", "map-request-body"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
