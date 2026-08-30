@@ -9,6 +9,8 @@ use gateway_model::types::sys::jwk::jwk::Jwk as ProtoJwk;
 // Generated libs for JWT parsing (no crypto needed — authorizer handles verification)
 use gateway_token::token::Token;
 
+use verified::VerifiedClaims;
+
 /// Gateway C2S authenticator/authorizer.
 ///
 /// Uses JwkCache for signature verification. Entitlements are read directly
@@ -57,22 +59,43 @@ impl GatewayAuth {
         grpc_path: &str,
         auth_header: Option<&str>,
     ) -> Result<(), (StatusCode, String)> {
+        self.verify_c2s(
+            auth_policy,
+            service_id,
+            entitlement_service,
+            grpc_path,
+            auth_header,
+        )
+        .map(|_| ())
+    }
+
+    /// The shared body of the two `validate_c2s*` entry points.
+    ///
+    /// Returns the caller's `VerifiedClaims` when the policy required a token,
+    /// and `None` when no token was verified (passthrough, or `NoAuth`). Every
+    /// downstream check takes that value, so a check can only ever run on
+    /// claims this function verified.
+    fn verify_c2s(
+        &self,
+        auth_policy: gateway_model::s2sm::rest_dispatch::AuthPolicy,
+        service_id: &str,
+        entitlement_service: &str,
+        grpc_path: &str,
+        auth_header: Option<&str>,
+    ) -> Result<Option<VerifiedClaims>, (StatusCode, String)> {
         use gateway_model::s2sm::rest_dispatch::AuthPolicy;
 
         if self.passthrough {
-            return Ok(());
+            return Ok(None);
         }
 
         match auth_policy {
-            AuthPolicy::NoAuth => Ok(()),
-            AuthPolicy::AnyUser => {
-                self.authenticate(service_id, auth_header)?;
-                Ok(())
-            }
+            AuthPolicy::NoAuth => Ok(None),
+            AuthPolicy::AnyUser => Ok(Some(self.authenticate(service_id, auth_header)?)),
             AuthPolicy::Entitled => {
-                self.authenticate(service_id, auth_header)?;
-                self.check_entitlements(auth_header.unwrap_or(""), entitlement_service, grpc_path)?;
-                Ok(())
+                let claims = self.authenticate(service_id, auth_header)?;
+                self.check_entitlements(&claims, entitlement_service, grpc_path)?;
+                Ok(Some(claims))
             }
         }
     }
@@ -88,112 +111,33 @@ impl GatewayAuth {
         auth_header: Option<&str>,
         target_namespace: Option<&str>,
     ) -> Result<(), (StatusCode, String)> {
-        use gateway_model::s2sm::rest_dispatch::AuthPolicy;
-
-        self.validate_c2s(
+        // `None` covers exactly the cases that skipped the namespace check
+        // before: passthrough, and `NoAuth`.
+        let claims = self.verify_c2s(
             auth_policy,
             service_id,
             entitlement_service,
             grpc_path,
             auth_header,
-        )
-        .await?;
+        )?;
 
-        if self.passthrough || matches!(auth_policy, AuthPolicy::NoAuth) {
-            return Ok(());
-        }
-
-        if let Some(target_namespace) = target_namespace {
-            self.check_target_namespace(auth_header, target_namespace)?;
+        if let (Some(claims), Some(target_namespace)) = (claims.as_ref(), target_namespace) {
+            self.check_target_namespace(claims, target_namespace)?;
         }
 
         Ok(())
     }
 
     /// Verify token signature + aud == target_service, then reject S2S tokens.
+    ///
+    /// The returned `VerifiedClaims` is the only handle on this token's claims
+    /// the downstream checks accept, so verification cannot be skipped.
     fn authenticate(
         &self,
         target_service: &str,
         auth_header: Option<&str>,
-    ) -> Result<(), (StatusCode, String)> {
-        let token_str = extract_bearer(auth_header.ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                "missing authorization header".into(),
-            )
-        })?)
-        .ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                "invalid authorization header".into(),
-            )
-        })?;
-
-        // Parse token
-        let tw = Token::parse(token_str)
-            .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
-
-        // Verify signature using JWK cache
-        let kid = tw.kid().ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                "token missing key ID (kid)".into(),
-            )
-        })?;
-
-        let jwk = self.jwk_cache.get(kid).ok_or_else(|| {
-            if self.jwk_cache.has_keys() {
-                (
-                    StatusCode::UNAUTHORIZED,
-                    format!("unknown signing key: {kid}"),
-                )
-            } else {
-                // No keys loaded yet — fail open for gradual rollout
-                (StatusCode::UNAUTHORIZED, "no JWK keys loaded yet".into())
-            }
-        })?;
-
-        tw.verify(&jwk).map_err(|e| {
-            (
-                StatusCode::UNAUTHORIZED,
-                format!("token verification failed: {e}"),
-            )
-        })?;
-
-        ensure_not_expired(&tw)?;
-
-        // Reject refresh tokens — they should only be exchanged at the Mint endpoint.
-        // Check token_use first, fall back to legacy typ for backwards compat.
-        let is_refresh = tw
-            .custom_field("token_use")
-            .and_then(|v| v.as_str())
-            .map(|v| v == "refresh")
-            .unwrap_or_else(|| {
-                tw.custom_field("typ")
-                    .and_then(|v| v.as_str())
-                    .map(|v| v == "refresh")
-                    .unwrap_or(false)
-            });
-        if is_refresh {
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                "refresh tokens cannot be used for API access".into(),
-            ));
-        }
-
-        // Check aud matches TARGET service (not gateway)
-        let aud = tw.audience().unwrap_or("");
-        if aud != target_service {
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                format!(
-                    "token audience \"{}\" does not match target service \"{}\"",
-                    aud, target_service
-                ),
-            ));
-        }
-
-        Ok(())
+    ) -> Result<VerifiedClaims, (StatusCode, String)> {
+        VerifiedClaims::authenticate(&self.jwk_cache, target_service, auth_header)
     }
 
     /// Check entitlements against the **target** service (not gateway).
@@ -201,24 +145,21 @@ impl GatewayAuth {
     /// Reads the `service_entitlements` JWT claim (set by opa at mint time).
     /// Apart from the admin `{"all": true}` bypass, the only way to authorize is
     /// `flat_grants_allow` — the generated catalog. There is no second path.
+    ///
+    /// Takes `VerifiedClaims` rather than the raw header: the claims read here
+    /// are the ones `authenticate` already verified, and there is no way to
+    /// call this on a token whose signature, expiry and audience were not
+    /// checked first.
     fn check_entitlements(
         &self,
-        auth_header: &str,
+        claims: &VerifiedClaims,
         target_service: &str,
         grpc_path: &str,
     ) -> Result<(), (StatusCode, String)> {
         let method = grpc_path.rsplit('/').next().unwrap_or(grpc_path);
-        let token_str = extract_bearer(auth_header).ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                "invalid authorization header".into(),
-            )
-        })?;
-        let tw = Token::parse(token_str)
-            .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
 
         // Extract service_entitlements claim (embedded by opa/kernel at mint time).
-        let se_val = tw.custom_field("service_entitlements").ok_or_else(|| {
+        let se_val = claims.custom_field("service_entitlements").ok_or_else(|| {
             (
                 StatusCode::FORBIDDEN,
                 "token missing service_entitlements claim".into(),
@@ -247,9 +188,10 @@ impl GatewayAuth {
         ))
     }
 
+    /// Enforce the level-or-below rule on the caller's verified namespace claim.
     fn check_target_namespace(
         &self,
-        auth_header: Option<&str>,
+        claims: &VerifiedClaims,
         target_namespace: &str,
     ) -> Result<(), (StatusCode, String)> {
         if target_namespace.is_empty() {
@@ -259,21 +201,7 @@ impl GatewayAuth {
             ));
         }
 
-        let token_str = extract_bearer(auth_header.ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                "missing authorization header".into(),
-            )
-        })?)
-        .ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                "invalid authorization header".into(),
-            )
-        })?;
-        let tw = Token::parse(token_str)
-            .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
-        let caller_namespace = tw.namespace().unwrap_or("");
+        let caller_namespace = claims.namespace();
         if caller_namespace.is_empty() {
             return Err((
                 StatusCode::FORBIDDEN,
@@ -320,6 +248,120 @@ impl GatewayAuth {
     /// Returns raw JWK protos for the JWKS endpoint.
     pub fn get_raw_jwks(&self) -> Vec<ProtoJwk> {
         self.jwk_cache.jwk_protos()
+    }
+}
+
+/// `VerifiedClaims` and its only constructor.
+///
+/// The inner `Token` is private to this module and `authenticate` is the only
+/// way to build a `VerifiedClaims`, so no code outside can produce one from a
+/// token whose signature, expiry and audience were not checked. Handing that
+/// value to the entitlement and namespace checks turns "authenticate() ran
+/// first" from a call-ordering convention into a compile-time requirement: a
+/// refactor that drops or reorders authentication no longer builds.
+mod verified {
+    use super::{ensure_not_expired, extract_bearer, JwkCache, StatusCode, Token};
+
+    pub struct VerifiedClaims {
+        token: Token,
+    }
+
+    impl VerifiedClaims {
+        /// Verify token signature + aud == target_service, then reject S2S tokens.
+        pub fn authenticate(
+            jwk_cache: &JwkCache,
+            target_service: &str,
+            auth_header: Option<&str>,
+        ) -> Result<Self, (StatusCode, String)> {
+            let token_str = extract_bearer(auth_header.ok_or_else(|| {
+                (
+                    StatusCode::UNAUTHORIZED,
+                    "missing authorization header".into(),
+                )
+            })?)
+            .ok_or_else(|| {
+                (
+                    StatusCode::UNAUTHORIZED,
+                    "invalid authorization header".into(),
+                )
+            })?;
+
+            // Parse token
+            let tw = Token::parse(token_str)
+                .map_err(|e| (StatusCode::UNAUTHORIZED, format!("invalid token: {e}")))?;
+
+            // Verify signature using JWK cache
+            let kid = tw.kid().ok_or_else(|| {
+                (
+                    StatusCode::UNAUTHORIZED,
+                    "token missing key ID (kid)".into(),
+                )
+            })?;
+
+            let jwk = jwk_cache.get(kid).ok_or_else(|| {
+                if jwk_cache.has_keys() {
+                    (
+                        StatusCode::UNAUTHORIZED,
+                        format!("unknown signing key: {kid}"),
+                    )
+                } else {
+                    // No keys loaded yet — fail CLOSED. Until the JWK cache has
+                    // a key to verify against, no token can be trusted, so every
+                    // request is rejected rather than waved through.
+                    (StatusCode::UNAUTHORIZED, "no JWK keys loaded yet".into())
+                }
+            })?;
+
+            tw.verify(&jwk).map_err(|e| {
+                (
+                    StatusCode::UNAUTHORIZED,
+                    format!("token verification failed: {e}"),
+                )
+            })?;
+
+            ensure_not_expired(&tw)?;
+
+            // Reject refresh tokens — they should only be exchanged at the Mint endpoint.
+            // Check token_use first, fall back to legacy typ for backwards compat.
+            let is_refresh = tw
+                .custom_field("token_use")
+                .and_then(|v| v.as_str())
+                .map(|v| v == "refresh")
+                .unwrap_or_else(|| {
+                    tw.custom_field("typ")
+                        .and_then(|v| v.as_str())
+                        .map(|v| v == "refresh")
+                        .unwrap_or(false)
+                });
+            if is_refresh {
+                return Err((
+                    StatusCode::UNAUTHORIZED,
+                    "refresh tokens cannot be used for API access".into(),
+                ));
+            }
+
+            // Check aud matches TARGET service (not gateway)
+            let aud = tw.audience().unwrap_or("");
+            if aud != target_service {
+                return Err((
+                    StatusCode::UNAUTHORIZED,
+                    format!(
+                        "token audience \"{}\" does not match target service \"{}\"",
+                        aud, target_service
+                    ),
+                ));
+            }
+
+            Ok(Self { token: tw })
+        }
+
+        pub fn custom_field(&self, key: &str) -> Option<&serde_json::Value> {
+            self.token.custom_field(key)
+        }
+
+        pub fn namespace(&self) -> &str {
+            self.token.namespace().unwrap_or("")
+        }
     }
 }
 
@@ -459,7 +501,56 @@ fn dedupe_preserving_order(input: Vec<String>) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gateway_jwk::jwk::{ImmutableJwk, Jwk};
+    use gateway_key::{base64_utils, keys};
     use gateway_model::s2sm::rest_dispatch::AuthPolicy;
+
+    /// Publish a throwaway signing key as the JWK the cache verifies against.
+    fn jwk_for(key: &keys::ImmutableKey) -> ImmutableJwk {
+        let keys::PublicKey::EcP256(ec) = key.public_key() else {
+            panic!("these tests sign with P-256");
+        };
+        let point = ec.to_encoded_point(false);
+        ImmutableJwk::new(Jwk {
+            kty: "EC".to_string(),
+            alg: Some(key.alg().to_string()),
+            kid: key.id().to_string(),
+            key_use: Some("sig".to_string()),
+            n: None,
+            e: None,
+            crv: Some("P-256".to_string()),
+            x: Some(base64_utils::encode_base64_url(point.x().expect("x"))),
+            y: Some(base64_utils::encode_base64_url(point.y().expect("y"))),
+            exp: None,
+            created: None,
+        })
+        .expect("jwk")
+    }
+
+    /// Mint a signed user token carrying `entitlements` as its
+    /// `service_entitlements` claim, audienced at `echo`.
+    fn signed_header(key: &keys::ImmutableKey, entitlements: &serde_json::Value) -> String {
+        let mut token = Token::new();
+        token.set_kid(key.id()).expect("kid");
+        token.set_alg(key.alg()).expect("alg");
+        token.set_issuer("unit-test").expect("iss");
+        token.set_subject("alice@example.com").expect("sub");
+        token.set_audience("echo").expect("aud");
+        token
+            .set_expiration(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("clock")
+                    .as_secs() as i64
+                    + 3600,
+            )
+            .expect("exp");
+        token
+            .set_service_entitlements(entitlements.clone())
+            .expect("service_entitlements");
+        token.sign(key).expect("sign");
+        format!("Bearer {}", token.base64().expect("base64"))
+    }
 
     /// The passthrough switch must be honored only in a `dev-bypass` build.
     /// Same assertion in both directions so the guarantee is checked by
@@ -542,10 +633,14 @@ mod tests {
     /// `*_ANY`, or a legacy `{"any": true}` opened every method of the named
     /// service, catalog entry or not. Each token below took that path to `Ok`;
     /// all of them must now be FORBIDDEN.
+    ///
+    /// Also the before/after control for the `VerifiedClaims` refactor: the
+    /// legitimate call path — verify, then check — still reaches
+    /// `check_entitlements` and still denies exactly these tokens.
     #[test]
     fn nested_per_service_wildcards_no_longer_authorize() {
-        let key = gateway_key::keys::generate_ec_p256_key().expect("signing key");
-        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false);
+        let key = keys::generate_ec_p256_key().expect("signing key");
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![jwk_for(&key)])), false);
 
         for entitlements in [
             serde_json::json!({ "echo": ["ANY"] }),
@@ -554,29 +649,16 @@ mod tests {
             serde_json::json!({ "echo": [99] }),
             serde_json::json!({ "echo": { "any": true } }),
         ] {
-            let mut token = Token::new();
-            token.set_kid(key.id()).expect("kid");
-            token.set_alg(key.alg()).expect("alg");
-            token.set_issuer("unit-test").expect("iss");
-            token.set_subject("alice@example.com").expect("sub");
-            token.set_audience("echo").expect("aud");
-            token
-                .set_expiration(
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .expect("clock")
-                        .as_secs() as i64
-                        + 3600,
-                )
-                .expect("exp");
-            token
-                .set_service_entitlements(entitlements.clone())
-                .expect("service_entitlements");
-            token.sign(&key).expect("sign");
-            let header = format!("Bearer {}", token.base64().expect("base64"));
+            let header = signed_header(&key, &entitlements);
+
+            // `check_entitlements` takes nothing but `VerifiedClaims`, so this
+            // is the only way to reach it.
+            let claims = auth
+                .authenticate("echo", Some(&header))
+                .expect("token must authenticate");
 
             let (code, _) = auth
-                .check_entitlements(&header, "echo", "/echo.Echo/Ping")
+                .check_entitlements(&claims, "echo", "/echo.Echo/Ping")
                 .expect_err(&format!("{entitlements} must not authorize"));
             assert_eq!(
                 code,
@@ -584,6 +666,66 @@ mod tests {
                 "{entitlements} must be denied, not authorized by token shape"
             );
         }
+    }
+
+    /// The entitlement check is gated on verification by the type system.
+    ///
+    /// `check_entitlements`/`check_target_namespace` accept only
+    /// `VerifiedClaims`, and `VerifiedClaims`'s single constructor is
+    /// `authenticate` — its inner token is private to `mod verified`. So there
+    /// is no expression that reaches either check for a token the JWK cache
+    /// cannot verify; the attempt below stops at `authenticate` with a 401,
+    /// and skipping that step does not compile.
+    #[test]
+    fn entitlement_check_is_unreachable_without_verification() {
+        let key = keys::generate_ec_p256_key().expect("signing key");
+        // A token signed by a key the cache does not know — well-formed, with
+        // an entitlement claim that would otherwise authorize.
+        let header = signed_header(&key, &serde_json::json!({ "grants": ["ECHO_ECHO_PING"] }));
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false);
+
+        let (code, _) = auth
+            .authenticate("echo", Some(&header))
+            .err()
+            .expect("unverifiable token must not yield VerifiedClaims");
+        assert_eq!(code, StatusCode::UNAUTHORIZED);
+    }
+
+    /// The namespace check reads the caller namespace off the same verified
+    /// claims, and enforces level-or-below unchanged.
+    #[test]
+    fn target_namespace_check_uses_verified_claims() {
+        let key = keys::generate_ec_p256_key().expect("signing key");
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![jwk_for(&key)])), false);
+
+        let mut token = Token::new();
+        token.set_kid(key.id()).expect("kid");
+        token.set_alg(key.alg()).expect("alg");
+        token.set_issuer("unit-test").expect("iss");
+        token.set_subject("alice@example.com").expect("sub");
+        token.set_audience("echo").expect("aud");
+        token.set_namespace("acme").expect("ns");
+        token
+            .set_expiration(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("clock")
+                    .as_secs() as i64
+                    + 3600,
+            )
+            .expect("exp");
+        token.sign(&key).expect("sign");
+        let header = format!("Bearer {}", token.base64().expect("base64"));
+
+        let claims = auth
+            .authenticate("echo", Some(&header))
+            .expect("token must authenticate");
+
+        assert!(auth.check_target_namespace(&claims, "acme/eu").is_ok());
+        let (code, _) = auth
+            .check_target_namespace(&claims, "other")
+            .expect_err("a sibling namespace must be denied");
+        assert_eq!(code, StatusCode::FORBIDDEN);
     }
 
     #[test]
