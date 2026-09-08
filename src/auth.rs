@@ -5,6 +5,7 @@ use http::StatusCode;
 use gateway_grpcserver::{authorizer::JwkCache, spiffe::is_at_or_below};
 use gateway_model::grants;
 use gateway_model::types::sys::jwk::jwk::Jwk as ProtoJwk;
+use gateway_spiffe as spiffe;
 
 // Generated libs for JWT parsing (no crypto needed — authorizer handles verification)
 use gateway_token::token::Token;
@@ -218,6 +219,68 @@ impl GatewayAuth {
             ));
         }
         Ok(())
+    }
+
+    /// The tenant a caller's verified namespace claim names, for routing a
+    /// tenant-owned service to `<svc>-<tenant>`.
+    ///
+    /// Runs the same `verify_c2s` every other check runs, so the namespace read
+    /// here comes off a token whose signature, expiry and audience were checked
+    /// — a claim is never parsed and trusted. The namespace itself is normalized
+    /// by the generated `spiffe` chassis, which is also what rejects anything
+    /// that is not rooted at `/system` or `/tenants`.
+    ///
+    /// A `/system/...` caller is REJECTED: a tenant-owned service has no shared
+    /// instance to fall back to, so there is no tenant to route to. So is a
+    /// caller with no verified claims at all (`NoAuth`, or a `dev-bypass`
+    /// passthrough build) — same reason. See the decision doc's Open question 2.
+    pub fn caller_tenant(
+        &self,
+        auth_policy: gateway_model::s2sm::rest_dispatch::AuthPolicy,
+        service_id: &str,
+        entitlement_service: &str,
+        grpc_path: &str,
+        auth_header: Option<&str>,
+    ) -> Result<String, (StatusCode, String)> {
+        let claims = self
+            .verify_c2s(
+                auth_policy,
+                service_id,
+                entitlement_service,
+                grpc_path,
+                auth_header,
+            )?
+            .ok_or_else(|| {
+                (
+                    StatusCode::FORBIDDEN,
+                    format!(
+                        "tenant-owned service \"{}\" cannot be routed for an unauthenticated caller",
+                        service_id
+                    ),
+                )
+            })?;
+
+        let namespace = spiffe::normalize_namespace(claims.namespace()).map_err(|e| {
+            (
+                StatusCode::FORBIDDEN,
+                format!("token namespace claim is malformed: {}", e),
+            )
+        })?;
+
+        // normalize_namespace guarantees the path is rooted at /system or
+        // /tenants and that a /tenants root is followed by a tenant name, so the
+        // only case left to reject is the /system one.
+        let mut segments = namespace.trim_start_matches('/').split('/');
+        match (segments.next(), segments.next()) {
+            (Some(spiffe::TENANTS_SEGMENT), Some(tenant)) => Ok(tenant.to_string()),
+            _ => Err((
+                StatusCode::FORBIDDEN,
+                format!(
+                    "caller namespace \"{}\" is not tenant-scoped; tenant-owned service \"{}\" has no instance to route to",
+                    namespace, service_id
+                ),
+            )),
+        }
     }
 
     /// Check whether a bearer token has expired.
@@ -726,6 +789,30 @@ mod tests {
             .check_target_namespace(&claims, "other")
             .expect_err("a sibling namespace must be denied");
         assert_eq!(code, StatusCode::FORBIDDEN);
+    }
+
+    /// A route that requires no token verifies no claims, so there is no tenant
+    /// to route to. A tenant-owned service must refuse rather than invent one.
+    #[test]
+    fn a_tenant_owned_service_refuses_a_caller_with_no_verified_claims() {
+        use gateway_model::s2sm::rest_dispatch::AuthPolicy;
+
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false);
+        let (code, msg) = auth
+            .caller_tenant(
+                AuthPolicy::NoAuth,
+                "docmanager",
+                "docmanager",
+                "/x.Y/Z",
+                None,
+            )
+            .expect_err("an unauthenticated caller has no tenant");
+
+        assert_eq!(code, StatusCode::FORBIDDEN);
+        assert!(
+            msg.contains("unauthenticated"),
+            "the rejection must name the reason, got {msg:?}"
+        );
     }
 
     #[test]

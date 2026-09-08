@@ -44,6 +44,7 @@ gateway-model = { path = "target/generated-sources/model" }
 gateway-jwk = { package = "jwk", path = "target/generated-sources/model/chassis/jwk" }
 gateway-logger = { package = "logger", path = "target/generated-sources/model/chassis/logger" }
 gateway-servicemanager = { package = "servicemanager", path = "target/generated-sources/model/chassis/servicemanager" }
+gateway-spiffe = { package = "spiffe", path = "target/generated-sources/model/chassis/spiffe" }
 gateway-token = { package = "token", path = "target/generated-sources/model/chassis/token" }
 gateway-grpcserver = { package = "grpcserver", path = "target/generated-sources/model/chassis/grpcserver" }
 

@@ -74,17 +74,26 @@ impl Resolver {
 
     /// Create a tonic Channel to the given service_id.
     /// Connects eagerly to a healthy backend endpoint via TLS.
-    pub async fn dial(&self, service_id: &str) -> Channel {
-        let endpoints = self.health.get_endpoints(service_id);
-        self.dial_endpoints(service_id, &endpoints).await
+    ///
+    /// `route_key` selects the health entry and `service_label` is the
+    /// location-agnostic SPIFFE service the backend's certificate must present.
+    /// They are the same string for a shared service. For a tenant-owned one
+    /// they differ: the instance is registered as `<svc>-<tenant>` (the name the
+    /// operator deploys, item 4 §2.3) while its certificate carries
+    /// `spiffe://<td>/tenants/<tenant>/services/<svc>`, whose location-agnostic
+    /// service label is the bare `<svc>`.
+    pub async fn dial(&self, route_key: &str, service_label: &str) -> Channel {
+        let endpoints = self.health.get_endpoints(route_key);
+        self.dial_endpoints(route_key, service_label, &endpoints)
+            .await
     }
 
     /// Try each unique endpoint with a raw TCP probe and return a channel to the
     /// first reachable one. Falls back to round-robin if no endpoint responds.
-    pub async fn dial_ready_any(&self, service_id: &str) -> Channel {
-        let all_endpoints = self.health.get_endpoints(service_id);
+    pub async fn dial_ready_any(&self, route_key: &str, service_label: &str) -> Channel {
+        let all_endpoints = self.health.get_endpoints(route_key);
         if all_endpoints.is_empty() {
-            return self.dial_spiffe(service_id).await;
+            return self.dial_spiffe(route_key, service_label).await;
         }
 
         // Deduplicate: try each unique endpoint address exactly once.
@@ -106,29 +115,35 @@ impl Resolver {
             .unwrap_or(false);
 
             if reachable {
-                let verifier = self.tls_verifier(service_id);
+                let verifier = self.tls_verifier(service_label);
                 let uri = format!("{}://{}", self.scheme(), ep);
-                tracing::debug!(service = %service_id, endpoint = %ep, "dial_ready_any: found live endpoint");
+                tracing::debug!(service = %route_key, endpoint = %ep, "dial_ready_any: found live endpoint");
                 match Self::connect_eager(&uri, verifier).await {
                     Ok(ch) => return ch,
                     Err(e) => {
-                        tracing::warn!(service = %service_id, endpoint = %ep, error = %e, "eager connect failed after TCP probe");
+                        tracing::warn!(service = %route_key, endpoint = %ep, error = %e, "eager connect failed after TCP probe");
                     }
                 }
             }
-            tracing::debug!(service = %service_id, endpoint = %ep, "dial_ready_any: TCP probe failed, trying next");
+            tracing::debug!(service = %route_key, endpoint = %ep, "dial_ready_any: TCP probe failed, trying next");
         }
-        tracing::warn!(service = %service_id, endpoints = unique.len(), "dial_ready_any: no live endpoint found");
-        self.dial(service_id).await
+        tracing::warn!(service = %route_key, endpoints = unique.len(), "dial_ready_any: no live endpoint found");
+        self.dial(route_key, service_label).await
     }
 
     /// Create a tonic Channel to a service identified by its SPIFFE path.
-    pub async fn dial_spiffe(&self, spiffe_path: &str) -> Channel {
+    pub async fn dial_spiffe(&self, spiffe_path: &str, service_label: &str) -> Channel {
         let endpoints = self.health.get_endpoints_by_spiffe_path(spiffe_path);
-        self.dial_endpoints(spiffe_path, &endpoints).await
+        self.dial_endpoints(spiffe_path, service_label, &endpoints)
+            .await
     }
 
-    async fn dial_endpoints(&self, label: &str, endpoints: &[String]) -> Channel {
+    async fn dial_endpoints(
+        &self,
+        label: &str,
+        service_label: &str,
+        endpoints: &[String],
+    ) -> Channel {
         if endpoints.is_empty() {
             tracing::warn!(service = %label, "no healthy endpoints, creating placeholder channel");
             return Endpoint::from_static("http://[::1]:1")
@@ -142,7 +157,7 @@ impl Resolver {
         };
 
         let uri = format!("{}://{}", self.scheme(), endpoints[idx]);
-        let verifier = self.tls_verifier(label);
+        let verifier = self.tls_verifier(service_label);
 
         match Self::connect_eager(&uri, verifier.clone()).await {
             Ok(ch) => {
@@ -189,7 +204,48 @@ impl Resolver {
         Ok(channel)
     }
 
-    fn tls_verifier(&self, service_id: &str) -> Arc<dyn rustls::client::danger::ServerCertVerifier> {
-        self.tls_verifier.clone().expect_service(service_id)
+    /// Narrows the trust-domain verifier to one service identity. The generated
+    /// `SpiffeServerCertVerifier` compares this against the certificate's
+    /// location-agnostic service label, so it matches both
+    /// `spiffe://<td>/system/<loc...>/services/<svc>` and the tenant-owned
+    /// `spiffe://<td>/tenants/<tenant>/services/<svc>` — see the decision doc's
+    /// Open question 4 for what it does NOT pin.
+    fn tls_verifier(
+        &self,
+        service_label: &str,
+    ) -> Arc<dyn rustls::client::danger::ServerCertVerifier> {
+        self.tls_verifier.clone().expect_service(service_label)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// The property `tls_verifier()` relies on, asserted against the generated
+    /// parser rather than assumed: a tenant-owned backend's certificate names
+    /// `spiffe://<td>/tenants/<tenant>/services/<svc>`, and that ID must
+    /// classify as a SERVICE whose location-agnostic label is the bare `<svc>` —
+    /// which is what `SpiffeServerCertVerifier::expect_service` compares
+    /// against. Before the model was regenerated (decision doc §1.2) this shape
+    /// parsed as `Unknown` and every tenant-owned backend's cert was rejected.
+    #[test]
+    fn a_tenant_owned_backend_identity_is_a_service_named_by_its_bare_label() {
+        let tenant = gateway_spiffe::parse_spiffe_id(
+            "spiffe://local.dev/tenants/acme/services/docmanager",
+        )
+        .expect("the canonical tenant-owned service identity must parse");
+
+        assert_eq!(tenant.subject_kind, gateway_spiffe::SubjectKind::Service);
+        assert_eq!(tenant.subject_path, "docmanager");
+        assert_eq!(tenant.namespace, "/tenants/acme");
+
+        // The shared shape is unchanged, and reduces to the same label — which
+        // is why one `expect_service(service_id)` serves both.
+        let system = gateway_spiffe::parse_spiffe_id(
+            "spiffe://local.dev/system/us-east/services/docmanager",
+        )
+        .expect("the shared service identity must parse");
+        assert_eq!(system.subject_kind, gateway_spiffe::SubjectKind::Service);
+        assert_eq!(system.subject_path, "docmanager");
+        assert_eq!(system.namespace, "/system/us-east");
     }
 }

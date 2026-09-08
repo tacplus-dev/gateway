@@ -37,3 +37,141 @@ impl Registry {
         AGENT_MD
     }
 }
+
+/// The set of proto packages `registry.json` marks `(spec.service).tenant_owned`.
+///
+/// This is the ONLY answer to "is this service tenant-owned" — there is no
+/// gateway-side allowlist, matching the operator (item 4 §2.2), which reads the
+/// same tacplus-emitted flag off the same file.
+///
+/// Keyed by `ServiceInfo.package`, not by the registry node name: the node name
+/// is what the operator deploys under, while `RouteInfo.service_id` — the value
+/// the whole routing path uses — is the proto package, and the two differ today
+/// for `saml` (package `samlsvc`).
+pub fn tenant_owned_services() -> std::collections::HashSet<String> {
+    parse_tenant_owned(REGISTRY_JSON)
+}
+
+/// The registry walk behind `tenant_owned_services`, split out so it can be run
+/// against a fixture registry: no service in the live registry declares the
+/// annotation yet (item 4 §1.2), so a test against the embedded one proves only
+/// that nothing is falsely marked.
+fn parse_tenant_owned(registry_json: &str) -> std::collections::HashSet<String> {
+    let root: serde_json::Value = match serde_json::from_str(registry_json) {
+        Ok(v) => v,
+        Err(e) => {
+            // The embedded registry is generated and validated at build time, so
+            // this cannot happen for the real input; a fixture typo must not be
+            // silently read as "no service is tenant-owned".
+            tracing::error!(error = %e, "registry.json did not parse; no service treated as tenant-owned");
+            return Default::default();
+        }
+    };
+
+    let mut out = std::collections::HashSet::new();
+    collect_tenant_owned(&root, &mut out);
+    out
+}
+
+/// Walks the registry's `children` tree, collecting the package of every
+/// `services[]` entry carrying `tenant_owned: true`. "Any entry" is deliberate:
+/// the annotation is file-level in the proto, so tacplus stamps it onto every
+/// `ServiceInfo` the package produces (item 4 §2.2).
+fn collect_tenant_owned(node: &serde_json::Value, out: &mut std::collections::HashSet<String>) {
+    if let Some(services) = node.get("services").and_then(|s| s.as_array()) {
+        for svc in services {
+            if svc.get("tenant_owned").and_then(|t| t.as_bool()) == Some(true) {
+                if let Some(pkg) = svc.get("package").and_then(|p| p.as_str()) {
+                    out.insert(pkg.to_string());
+                }
+            }
+        }
+    }
+    if let Some(children) = node.get("children").and_then(|c| c.as_array()) {
+        for child in children {
+            collect_tenant_owned(child, out);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The shape tacplus emits: a `children` tree whose `services[]` entries are
+    /// `ServiceInfo`s. `docmanager` declares the annotation, `tasks` does not,
+    /// and `saml` shows why the key is the PACKAGE and not the node name.
+    const FIXTURE: &str = r#"{
+      "name": "root",
+      "children": [
+        {
+          "name": "types",
+          "children": [
+            {
+              "name": "services",
+              "children": [
+                {
+                  "name": "docmanager",
+                  "services": [
+                    {"name": "DocManager", "package": "docmanager", "tenant_owned": true},
+                    {"name": "DocManagerStateService", "package": "docmanager", "tenant_owned": true}
+                  ]
+                },
+                {
+                  "name": "tasks",
+                  "services": [{"name": "Tasks", "package": "tasks"}]
+                },
+                {
+                  "name": "saml",
+                  "services": [{"name": "Saml", "package": "samlsvc", "tenant_owned": true}]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }"#;
+
+    #[test]
+    fn tenant_owned_is_read_off_the_annotation_and_keyed_by_package() {
+        let owned = parse_tenant_owned(FIXTURE);
+
+        assert!(
+            owned.contains("docmanager"),
+            "a service declaring tenant_owned must be found: {owned:?}"
+        );
+        assert!(
+            !owned.contains("tasks"),
+            "proto3 omits a false bool entirely; absence must read as not tenant-owned"
+        );
+        assert!(
+            owned.contains("samlsvc"),
+            "the key must be ServiceInfo.package, which is what RouteInfo.service_id holds"
+        );
+        assert!(
+            !owned.contains("saml"),
+            "the registry NODE name is the operator's key, not the gateway's"
+        );
+        assert_eq!(owned.len(), 2, "no other service may be marked: {owned:?}");
+    }
+
+    /// Guards the claim in the decision doc §1.5: no service in the real
+    /// registry declares the annotation yet, so every tenant-owned code path is
+    /// dead in today's fleet and cannot regress a live route.
+    #[test]
+    fn the_embedded_registry_marks_no_service_tenant_owned_today() {
+        assert!(
+            tenant_owned_services().is_empty(),
+            "a service now declares (spec.service).tenant_owned — the gateway path is live, \
+             and decision-goalA-item5 Open question 1 must be revisited: {:?}",
+            tenant_owned_services()
+        );
+    }
+
+    /// A registry that does not parse must fail closed: treating it as "nothing
+    /// is tenant-owned" keeps shared routing working, which is the safe half.
+    #[test]
+    fn an_unparseable_registry_marks_nothing() {
+        assert!(parse_tenant_owned("{not json").is_empty());
+    }
+}

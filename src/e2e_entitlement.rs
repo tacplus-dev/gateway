@@ -36,7 +36,7 @@ use gateway_servicemanager::SpiffeServerCertVerifier;
 use gateway_token::token::Token;
 use gateway_x509::x509::{ImmutableCertChain, X509KeyUsage};
 
-use gateway_model::types::services::stratum::stratum as stratum_pb;
+use gateway_model::types::vservices::query::query as stratum_pb;
 use stratum_pb::record_map_client::RecordMapClient;
 use stratum_pb::record_query_client::RecordQueryClient;
 use stratum_pb::record_query_server::{RecordQuery, RecordQueryServer};
@@ -181,6 +181,301 @@ impl RecordQuery for RecordQueryBackend {
         _request: tonic::Request<stratum_pb::QueryHandle>,
     ) -> Result<tonic::Response<Self::SubscribeTaskActivityCountStream>, tonic::Status> {
         Err(tonic::Status::unimplemented("subscribe_task_activity_count"))
+    }
+
+    async fn create_accounting_record_query(
+        &self,
+        _request: tonic::Request<stratum_pb::OpenAccountingRecordQueryRequest>,
+    ) -> Result<tonic::Response<stratum_pb::QueryHandle>, tonic::Status> {
+        Err(tonic::Status::unimplemented("create_accounting_record_query"))
+    }
+
+    async fn get_accounting_record_count(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<stratum_pb::RecordCount>, tonic::Status> {
+        Err(tonic::Status::unimplemented("get_accounting_record_count"))
+    }
+
+    async fn get_accounting_record_sample(
+        &self,
+        _request: tonic::Request<stratum_pb::SampleAccountingRecordRequest>,
+    ) -> Result<tonic::Response<stratum_pb::SampleAccountingRecordResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("get_accounting_record_sample"))
+    }
+
+    async fn list_accounting_record(
+        &self,
+        _request: tonic::Request<stratum_pb::PullAccountingRecordRequest>,
+    ) -> Result<tonic::Response<stratum_pb::PullAccountingRecordResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("list_accounting_record"))
+    }
+
+    async fn delete_accounting_record_query(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<stratum_pb::QueryStats>, tonic::Status> {
+        Err(tonic::Status::unimplemented("delete_accounting_record_query"))
+    }
+
+    async fn update_accounting_record_query(
+        &self,
+        _request: tonic::Request<stratum_pb::RefineAccountingRecordRequest>,
+    ) -> Result<tonic::Response<stratum_pb::QueryStats>, tonic::Status> {
+        Err(tonic::Status::unimplemented("update_accounting_record_query"))
+    }
+
+    type WatchAccountingRecordStream =
+        ReceiverStream<Result<stratum_pb::AccountingRecordWatchEvent, tonic::Status>>;
+    async fn watch_accounting_record(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<Self::WatchAccountingRecordStream>, tonic::Status> {
+        Err(tonic::Status::unimplemented("watch_accounting_record"))
+    }
+
+    type SubscribeAccountingRecordCountStream = CountStream;
+    async fn subscribe_accounting_record_count(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<Self::SubscribeAccountingRecordCountStream>, tonic::Status> {
+        Err(tonic::Status::unimplemented("subscribe_accounting_record_count"))
+    }
+
+    async fn create_agent_session_state_query(
+        &self,
+        _request: tonic::Request<stratum_pb::OpenAgentSessionStateQueryRequest>,
+    ) -> Result<tonic::Response<stratum_pb::QueryHandle>, tonic::Status> {
+        Err(tonic::Status::unimplemented("create_agent_session_state_query"))
+    }
+
+    async fn get_agent_session_state_count(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<stratum_pb::RecordCount>, tonic::Status> {
+        Err(tonic::Status::unimplemented("get_agent_session_state_count"))
+    }
+
+    async fn get_agent_session_state_sample(
+        &self,
+        _request: tonic::Request<stratum_pb::SampleAgentSessionStateRequest>,
+    ) -> Result<tonic::Response<stratum_pb::SampleAgentSessionStateResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("get_agent_session_state_sample"))
+    }
+
+    async fn list_agent_session_state(
+        &self,
+        _request: tonic::Request<stratum_pb::PullAgentSessionStateRequest>,
+    ) -> Result<tonic::Response<stratum_pb::PullAgentSessionStateResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("list_agent_session_state"))
+    }
+
+    async fn delete_agent_session_state_query(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<stratum_pb::QueryStats>, tonic::Status> {
+        Err(tonic::Status::unimplemented("delete_agent_session_state_query"))
+    }
+
+    async fn update_agent_session_state_query(
+        &self,
+        _request: tonic::Request<stratum_pb::RefineAgentSessionStateRequest>,
+    ) -> Result<tonic::Response<stratum_pb::QueryStats>, tonic::Status> {
+        Err(tonic::Status::unimplemented("update_agent_session_state_query"))
+    }
+
+    type WatchAgentSessionStateStream =
+        ReceiverStream<Result<stratum_pb::AgentSessionStateWatchEvent, tonic::Status>>;
+    async fn watch_agent_session_state(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<Self::WatchAgentSessionStateStream>, tonic::Status> {
+        Err(tonic::Status::unimplemented("watch_agent_session_state"))
+    }
+
+    type SubscribeAgentSessionStateCountStream = CountStream;
+    async fn subscribe_agent_session_state_count(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<Self::SubscribeAgentSessionStateCountStream>, tonic::Status> {
+        Err(tonic::Status::unimplemented("subscribe_agent_session_state_count"))
+    }
+
+    async fn create_mailbox_entry_query(
+        &self,
+        _request: tonic::Request<stratum_pb::OpenMailboxEntryQueryRequest>,
+    ) -> Result<tonic::Response<stratum_pb::QueryHandle>, tonic::Status> {
+        Err(tonic::Status::unimplemented("create_mailbox_entry_query"))
+    }
+
+    async fn get_mailbox_entry_count(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<stratum_pb::RecordCount>, tonic::Status> {
+        Err(tonic::Status::unimplemented("get_mailbox_entry_count"))
+    }
+
+    async fn get_mailbox_entry_sample(
+        &self,
+        _request: tonic::Request<stratum_pb::SampleMailboxEntryRequest>,
+    ) -> Result<tonic::Response<stratum_pb::SampleMailboxEntryResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("get_mailbox_entry_sample"))
+    }
+
+    async fn list_mailbox_entry(
+        &self,
+        _request: tonic::Request<stratum_pb::PullMailboxEntryRequest>,
+    ) -> Result<tonic::Response<stratum_pb::PullMailboxEntryResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("list_mailbox_entry"))
+    }
+
+    async fn delete_mailbox_entry_query(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<stratum_pb::QueryStats>, tonic::Status> {
+        Err(tonic::Status::unimplemented("delete_mailbox_entry_query"))
+    }
+
+    async fn update_mailbox_entry_query(
+        &self,
+        _request: tonic::Request<stratum_pb::RefineMailboxEntryRequest>,
+    ) -> Result<tonic::Response<stratum_pb::QueryStats>, tonic::Status> {
+        Err(tonic::Status::unimplemented("update_mailbox_entry_query"))
+    }
+
+    type WatchMailboxEntryStream =
+        ReceiverStream<Result<stratum_pb::MailboxEntryWatchEvent, tonic::Status>>;
+    async fn watch_mailbox_entry(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<Self::WatchMailboxEntryStream>, tonic::Status> {
+        Err(tonic::Status::unimplemented("watch_mailbox_entry"))
+    }
+
+    type SubscribeMailboxEntryCountStream = CountStream;
+    async fn subscribe_mailbox_entry_count(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<Self::SubscribeMailboxEntryCountStream>, tonic::Status> {
+        Err(tonic::Status::unimplemented("subscribe_mailbox_entry_count"))
+    }
+
+    async fn create_message_query(
+        &self,
+        _request: tonic::Request<stratum_pb::OpenMessageQueryRequest>,
+    ) -> Result<tonic::Response<stratum_pb::QueryHandle>, tonic::Status> {
+        Err(tonic::Status::unimplemented("create_message_query"))
+    }
+
+    async fn get_message_count(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<stratum_pb::RecordCount>, tonic::Status> {
+        Err(tonic::Status::unimplemented("get_message_count"))
+    }
+
+    async fn get_message_sample(
+        &self,
+        _request: tonic::Request<stratum_pb::SampleMessageRequest>,
+    ) -> Result<tonic::Response<stratum_pb::SampleMessageResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("get_message_sample"))
+    }
+
+    async fn list_message(
+        &self,
+        _request: tonic::Request<stratum_pb::PullMessageRequest>,
+    ) -> Result<tonic::Response<stratum_pb::PullMessageResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("list_message"))
+    }
+
+    async fn delete_message_query(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<stratum_pb::QueryStats>, tonic::Status> {
+        Err(tonic::Status::unimplemented("delete_message_query"))
+    }
+
+    async fn update_message_query(
+        &self,
+        _request: tonic::Request<stratum_pb::RefineMessageRequest>,
+    ) -> Result<tonic::Response<stratum_pb::QueryStats>, tonic::Status> {
+        Err(tonic::Status::unimplemented("update_message_query"))
+    }
+
+    type WatchMessageStream =
+        ReceiverStream<Result<stratum_pb::MessageWatchEvent, tonic::Status>>;
+    async fn watch_message(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<Self::WatchMessageStream>, tonic::Status> {
+        Err(tonic::Status::unimplemented("watch_message"))
+    }
+
+    type SubscribeMessageCountStream = CountStream;
+    async fn subscribe_message_count(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<Self::SubscribeMessageCountStream>, tonic::Status> {
+        Err(tonic::Status::unimplemented("subscribe_message_count"))
+    }
+
+    async fn create_delegation_probe_query(
+        &self,
+        _request: tonic::Request<stratum_pb::OpenDelegationProbeQueryRequest>,
+    ) -> Result<tonic::Response<stratum_pb::QueryHandle>, tonic::Status> {
+        Err(tonic::Status::unimplemented("create_delegation_probe_query"))
+    }
+
+    async fn get_delegation_probe_count(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<stratum_pb::RecordCount>, tonic::Status> {
+        Err(tonic::Status::unimplemented("get_delegation_probe_count"))
+    }
+
+    async fn get_delegation_probe_sample(
+        &self,
+        _request: tonic::Request<stratum_pb::SampleDelegationProbeRequest>,
+    ) -> Result<tonic::Response<stratum_pb::SampleDelegationProbeResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("get_delegation_probe_sample"))
+    }
+
+    async fn list_delegation_probe(
+        &self,
+        _request: tonic::Request<stratum_pb::PullDelegationProbeRequest>,
+    ) -> Result<tonic::Response<stratum_pb::PullDelegationProbeResponse>, tonic::Status> {
+        Err(tonic::Status::unimplemented("list_delegation_probe"))
+    }
+
+    async fn delete_delegation_probe_query(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<stratum_pb::QueryStats>, tonic::Status> {
+        Err(tonic::Status::unimplemented("delete_delegation_probe_query"))
+    }
+
+    async fn update_delegation_probe_query(
+        &self,
+        _request: tonic::Request<stratum_pb::RefineDelegationProbeRequest>,
+    ) -> Result<tonic::Response<stratum_pb::QueryStats>, tonic::Status> {
+        Err(tonic::Status::unimplemented("update_delegation_probe_query"))
+    }
+
+    type WatchDelegationProbeStream =
+        ReceiverStream<Result<stratum_pb::DelegationProbeWatchEvent, tonic::Status>>;
+    async fn watch_delegation_probe(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<Self::WatchDelegationProbeStream>, tonic::Status> {
+        Err(tonic::Status::unimplemented("watch_delegation_probe"))
+    }
+
+    type SubscribeDelegationProbeCountStream = CountStream;
+    async fn subscribe_delegation_probe_count(
+        &self,
+        _request: tonic::Request<stratum_pb::QueryHandle>,
+    ) -> Result<tonic::Response<Self::SubscribeDelegationProbeCountStream>, tonic::Status> {
+        Err(tonic::Status::unimplemented("subscribe_delegation_probe_count"))
     }
 }
 
@@ -335,6 +630,8 @@ async fn stratum_c2s_query_is_allowed_with_entitlement_and_denied_without() {
     let proxy = Arc::new(ProxyState {
         resolver,
         auth,
+        // stratum is not tenant-owned; this test routes by name, as before.
+        tenant_owned: Arc::new(Default::default()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
     });

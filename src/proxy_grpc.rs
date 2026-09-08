@@ -74,6 +74,11 @@ struct TraceProbe {
 pub struct ProxyState {
     pub resolver: Arc<Resolver>,
     pub auth: Arc<GatewayAuth>,
+    /// Proto packages `registry.json` marks `(spec.service).tenant_owned`, read
+    /// once at startup by `registry::tenant_owned_services()`. A service in this
+    /// set is deployed once per tenant and routed per caller; every other
+    /// service routes by name and never consults the caller's namespace.
+    pub tenant_owned: Arc<std::collections::HashSet<String>>,
     pub trace_publisher: Arc<dyn Fn(TraceEvent) + Send + Sync>,
     pub trace_round: Box<dyn Fn() -> TraceRound + Send + Sync>,
 }
@@ -527,17 +532,43 @@ async fn handle_inner(
         Request::from_parts(parts, tonic_body)
     };
 
+    // A tenant-owned service is deployed once per tenant, as `<svc>-<tenant>`
+    // (the operator's `ServiceInstance.InstanceName()`, item 4 §2.3), so the
+    // health entry to dial depends on WHOSE token this is. Every other service —
+    // the majority — keeps routing by name and never looks at the namespace
+    // claim, so `route_key` is `service_id` and nothing below changes.
+    let route_key = if proxy.tenant_owned.contains(service_id) {
+        match proxy.auth.caller_tenant(
+            auth_policy,
+            service_id,
+            entitlement_service,
+            &path,
+            auth_header.as_deref(),
+        ) {
+            Ok(tenant) => std::borrow::Cow::Owned(format!("{}-{}", service_id, tenant)),
+            Err((code, msg)) => {
+                tracing::warn!(path = %path, service = service_id, error = %msg, "tenant-owned routing rejected");
+                let grpc_code = status_code_to_tonic(code);
+                return tonic_status_to_response(tonic::Status::new(grpc_code, msg));
+            }
+        }
+    } else {
+        std::borrow::Cow::Borrowed(service_id)
+    };
+
     // Forward to backend service.
     // Probe endpoints to find a live one — stale health entries (pods that were
     // removed from the cluster but not yet expired from Hazelcast) cause transport
     // errors without probing. dial_ready_any() skips unreachable endpoints.
-    // Try service_id first, fall back to SPIFFE path routing.
+    // Try route_key first, fall back to SPIFFE path routing. The TLS identity is
+    // always `service_id`: a tenant instance's certificate names the bare
+    // service, under a `/tenants/<tenant>` namespace.
     let mut channel = {
-        let endpoints = proxy.resolver.health().get_endpoints(service_id);
+        let endpoints = proxy.resolver.health().get_endpoints(&route_key);
         if endpoints.is_empty() {
-            proxy.resolver.dial_spiffe(service_id).await
+            proxy.resolver.dial_spiffe(&route_key, service_id).await
         } else {
-            proxy.resolver.dial_ready_any(service_id).await
+            proxy.resolver.dial_ready_any(&route_key, service_id).await
         }
     };
 
@@ -705,6 +736,7 @@ mod tests {
                 unused_verifier(),
             )),
             auth: Arc::new(GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false)),
+            tenant_owned: Arc::new(Default::default()),
             trace_publisher: Arc::new(|_| {}),
             trace_round: Box::new(Default::default),
         };

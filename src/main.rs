@@ -27,6 +27,11 @@ mod tls;
 #[cfg(test)]
 mod e2e_entitlement;
 
+/// End-to-end proof that a tenant-owned service is routed to the caller's own
+/// tenant instance, and that every other service is routed exactly as before.
+#[cfg(test)]
+mod e2e_tenant_routing;
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -242,9 +247,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // 10. Build gRPC router: Mint (native tonic) + raw proxy for all other services.
     let sm_for_grpc_trace = Arc::clone(&sm);
+    // Read once: the set of tenant-owned services is a property of the compiled
+    // registry, so it cannot change while the process runs.
+    let tenant_owned = Arc::new(registry::tenant_owned_services());
+    if !tenant_owned.is_empty() {
+        tracing::info!(services = ?tenant_owned, "tenant-owned services route per caller tenant");
+    }
     let proxy_state = Arc::new(proxy_grpc::ProxyState {
         resolver: Arc::clone(&resolver),
         auth: Arc::clone(&gateway_auth),
+        tenant_owned: Arc::clone(&tenant_owned),
         trace_publisher: Arc::clone(&trace_publisher),
         trace_round: Box::new(move || sm_for_grpc_trace.trace_round()),
     });
