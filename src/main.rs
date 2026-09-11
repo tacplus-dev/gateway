@@ -32,6 +32,12 @@ mod e2e_entitlement;
 #[cfg(test)]
 mod e2e_tenant_routing;
 
+/// End-to-end proof that a fresh device key registers and logs in through the
+/// gateway's NoAuth `personalauth.Device` routes, and that the kernel
+/// registration RPC those routes replaced is no longer reachable at all.
+#[cfg(test)]
+mod e2e_personalauth_registration;
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 
