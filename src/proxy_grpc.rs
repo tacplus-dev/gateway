@@ -796,4 +796,55 @@ mod tests {
         assert_eq!(physical_service, "eventbus");
         assert_eq!(entitlement_service, "tasks");
     }
+
+    fn route_for(grpc_path: &str) -> Option<&'static RouteInfo> {
+        gateway_model::s2sm::rest_dispatch::ROUTES
+            .iter()
+            .find(|r| r.grpc_path == grpc_path)
+    }
+
+    /// The device-login broker's two RPCs must be reachable unauthenticated:
+    /// the caller has no token yet, which is the whole point of the path.
+    /// Nothing in this repo produces these entries — they exist only because
+    /// `personalauth.proto` declares the RPCs `RPC_FLAG_SELF_AUTHENTICATES` on
+    /// a `service_c2s`, and tacplus turns that into a NoAuth route. The test is
+    /// here so a regeneration that drops them fails loudly instead of taking
+    /// device login offline.
+    #[test]
+    fn the_personalauth_device_login_rpcs_are_noauth_routes() {
+        for path in [
+            "/personalauth.Device/CreateDevicePrincipal",
+            "/personalauth.Device/MintDeviceTokens",
+        ] {
+            let route = route_for(path)
+                .unwrap_or_else(|| panic!("{path} must be in the generated ROUTES table"));
+            assert_eq!(
+                route.auth_policy,
+                AuthPolicy::NoAuth,
+                "{path} must be reachable without a token: {:?}",
+                route.auth_policy
+            );
+            assert_eq!(route.service_id, "personalauth");
+        }
+    }
+
+    /// The tripwire for decision-goalB-q1 §6. `CreatePersonalPrincipal` used to
+    /// carry `RPC_FLAG_SELF_AUTHENTICATES`, which made tacplus emit a NoAuth
+    /// proxy route for it — kernel itself, gateway-fronted, unauthenticated, in
+    /// the user-facing path, which is exactly what the ruling forbids. Unit 5
+    /// swapped the flag for `auth_services: ["*"]` so the route is no longer
+    /// generated and `resolve`'s deny-by-default answers `NOT_FOUND`.
+    ///
+    /// Re-adding the flag would silently restore the route, so the assertion is
+    /// on the generated table rather than on the proto: this fails on the next
+    /// regeneration after such a change, not on a review nobody runs.
+    #[test]
+    fn kernel_create_personal_principal_has_no_proxy_route() {
+        assert!(
+            route_for("/kernel.Mint/CreatePersonalPrincipal").is_none(),
+            "kernel.Mint.CreatePersonalPrincipal is externally routable again — a no-auth flag \
+             was re-added to it in kernel.proto. Registration must only be reachable through \
+             the personalauth broker (decision-goalB-q1-broker-service-design.md §6)."
+        );
+    }
 }

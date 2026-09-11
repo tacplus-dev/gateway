@@ -524,6 +524,7 @@ fn user_token(key: &keys::ImmutableKey, grants: &[&str]) -> String {
     token.set_issuer("e2e-test").expect("iss");
     token.set_subject("alice@example.com").expect("sub");
     token.set_audience(BACKEND_SERVICE).expect("aud");
+    token.set_namespace("acme").expect("ns");
     token.set_expiration(unix_now() + 3600).expect("exp");
     token.set_sub_type("user").expect("sub_type");
     token
@@ -637,9 +638,11 @@ async fn stratum_c2s_query_is_allowed_with_entitlement_and_denied_without() {
     });
     let gateway_uri = spawn_gateway(proxy).await;
 
-    // Half 1 — entitled caller. STRATUM_ANY is the wildcard opa mints today; it
-    // is a real grant only because the c2s sibling put stratum in the catalog.
-    let entitled = user_token(&signing_key, &["STRATUM_ANY"]);
+    // Half 1 — entitled caller. QUERY_ANY is the wildcard opa mints today; it
+    // is a real grant only because the c2s sibling put query in the catalog.
+    // The token names the route's entitlement_service ("query"), not its
+    // service_id ("stratum") — those are separate identities.
+    let entitled = user_token(&signing_key, &["QUERY_ANY"]);
     let handle = call_through_gateway(&gateway_uri, &entitled)
         .await
         .unwrap_or_else(|e| panic!("entitled caller must reach the backend, got {e:?}"));

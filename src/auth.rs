@@ -599,6 +599,7 @@ mod tests {
         token.set_issuer("unit-test").expect("iss");
         token.set_subject("alice@example.com").expect("sub");
         token.set_audience("echo").expect("aud");
+        token.set_namespace("acme").expect("ns");
         token
             .set_expiration(
                 std::time::SystemTime::now()
