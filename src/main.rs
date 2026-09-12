@@ -195,7 +195,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         build_backend_tls_verifier_from_pem(&ca_pem_bundle, &sm.config().spiffe_trust_domain)?;
     let resolver = Arc::new(resolver::Resolver::new(health_watcher.clone(), backend_tls));
 
-    // Store CA certs in a shared RwLock so the Mint service can serve them via ListPublicCa.
+    // Keep kernel's CaState CAs in a shared RwLock, refreshed by the watcher below.
+    // These are the INTERNAL cluster signing CAs. They are not what ListPublicCa
+    // answers with — that is `cfg.root_ca`, the CA behind gateway's external TLS
+    // cert — and nothing else reads this store today; see the 2026-09-12 audit-fix
+    // decision doc.
     let ca_certs_store = Arc::new(tokio::sync::RwLock::new(initial_cas));
     spawn_ca_cert_watcher(kernel_channel.clone(), token_provider.clone(), Arc::clone(&ca_certs_store));
 
@@ -283,7 +287,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         proxy: Arc::clone(&proxy_state),
         sm: Arc::clone(&sm),
         auth: Arc::clone(&gateway_auth),
-        ca_certs: Arc::clone(&ca_certs_store),
+        root_ca: cfg.root_ca.clone(),
         issuer_url: issuer_url.clone(),
     });
 

@@ -8,7 +8,7 @@ use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::Router;
 use futures::{SinkExt, StreamExt};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::mpsc;
 use tokio::time::{timeout, Duration};
 use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
@@ -42,7 +42,13 @@ pub struct RestState {
     pub proxy: Arc<ProxyState>,
     pub sm: Arc<ServiceManager>,
     pub auth: Arc<GatewayAuth>,
-    pub ca_certs: Arc<RwLock<Vec<X509Cert>>>,
+    /// The CA that signed gateway's external TLS cert, from gateway config —
+    /// exactly what `mint::GatewayMintService` serves on the native gRPC
+    /// `ListPublicCa`. The REST path used to serve kernel's `CaState` signing
+    /// CAs here instead: internal cluster trust material, on a `NoAuth` route,
+    /// and the wrong answer to the question `ListPublicCa` asks. Both paths
+    /// now answer from the same config value.
+    pub root_ca: Vec<X509Cert>,
     /// Public OIDC issuer URL used as the JWT `iss` claim and discovery
     /// issuer. Sourced from gateway config's external_hostnames at startup.
     pub issuer_url: String,
@@ -714,12 +720,10 @@ async fn handle_websocket_stream(
         },
     }
 
-    if !matches!(route.auth_policy, AuthPolicy::NoAuth) && backend_auth_header.is_none() {
-        let _ = ws_sender
-            .send(ws_error(
-                "authenticated WebSocket streams require an authorization token before backend stream open; every data message must include authorization",
-            ))
-            .await;
+    if let Err(message) =
+        authorize_ws_stream(&state.auth, route, backend_auth_header.as_deref()).await
+    {
+        let _ = ws_sender.send(ws_error(message)).await;
         let _ = ws_sender.close().await;
         return;
     }
@@ -885,6 +889,46 @@ async fn handle_websocket_stream(
 struct WsDataFrame {
     json_bytes: Vec<u8>,
     auth_header: Option<String>,
+}
+
+/// Verify the token a WebSocket stream is about to carry into the backend,
+/// before the backend stream is opened.
+///
+/// This is the header-only half of the check `authorize_then_read_body` runs on
+/// the unary path; the namespace-aware half still runs per data frame in
+/// `ws_frame_to_proto`. It cannot move up into `rest_handler` ahead of the
+/// upgrade: W2S streams are message-tokened, so the token legitimately first
+/// appears in the `start` frame. This is the earliest point at which the token
+/// that will actually be forwarded is known, and it is still before the dial.
+///
+/// Before this existed the caller only had to supply *some* non-empty string:
+/// presence was checked, validity was not, and the gateway opened a real
+/// backend gRPC stream with that unverified value as `authorization`.
+async fn authorize_ws_stream(
+    auth: &GatewayAuth,
+    route: &RouteInfo,
+    auth_header: Option<&str>,
+) -> Result<(), String> {
+    if !matches!(route.auth_policy, AuthPolicy::NoAuth) && auth_header.is_none() {
+        return Err(
+            "authenticated WebSocket streams require an authorization token before backend stream open; every data message must include authorization"
+                .to_string(),
+        );
+    }
+
+    let (service_id, entitlement_service) = proxy_grpc::route_identity(route);
+    auth.validate_c2s(
+        route.auth_policy,
+        service_id,
+        entitlement_service,
+        route.grpc_path,
+        auth_header,
+    )
+    .await
+    .map_err(|(_, message)| {
+        tracing::warn!(path = %route.http_path, error = %message, "WebSocket auth rejected before backend stream open");
+        message
+    })
 }
 
 fn parse_ws_data_frame(route: &RouteInfo, text: &str) -> Result<WsDataFrame, String> {
@@ -1219,29 +1263,33 @@ async fn handle_mint(
                 }
             }
         }
-        "/gateway.Mint/ListPublicCa" => {
-            let certs = state.ca_certs.read().await;
-            let items: Vec<serde_json::Value> = certs
-                .iter()
-                .map(|c| serde_json::json!({"id": c.id, "base64": c.base64}))
-                .collect();
-            let resp = serde_json::json!({"certs": items});
-            (
-                StatusCode::OK,
-                [(
-                    axum::http::header::CONTENT_TYPE,
-                    "application/json".to_string(),
-                )],
-                resp.to_string(),
-            )
-                .into_response()
-        }
+        "/gateway.Mint/ListPublicCa" => list_public_ca_response(&state.root_ca),
         _ => (
             StatusCode::NOT_FOUND,
             format!("{{\"error\":\"unknown mint route: {}\"}}", route.grpc_path),
         )
             .into_response(),
     }
+}
+
+/// REST translation of `ListPublicCa`, over the same `PublicCaResponse` the
+/// native gRPC handler returns — see `mint::public_ca_response` for why the two
+/// share one source. The JSON shape is unchanged.
+fn list_public_ca_response(root_ca: &[X509Cert]) -> axum::response::Response {
+    let items: Vec<serde_json::Value> = crate::mint::public_ca_response(root_ca)
+        .certs
+        .iter()
+        .map(|c| serde_json::json!({"id": c.id, "base64": c.base64}))
+        .collect();
+    (
+        StatusCode::OK,
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "application/json".to_string(),
+        )],
+        serde_json::json!({"certs": items}).to_string(),
+    )
+        .into_response()
 }
 
 /// Serialize a value to a JSON HTTP response.
@@ -1435,5 +1483,208 @@ mod tests {
             .expect_err("complete is a control frame");
 
         assert!(err.contains("complete"));
+    }
+
+    // ── WebSocket streams must not reach the backend on an unverified token ──
+    //
+    // The finding: `handle_websocket_stream` checked only that SOME non-empty
+    // authorization string had been supplied, then opened a real backend gRPC
+    // stream and forwarded that string verbatim as `authorization`. Presence is
+    // not validity. `authorize_ws_stream` now runs the same header-only check
+    // the unary path runs, at the last point before the dial — the first point
+    // at which the token that will actually be forwarded is known — and
+    // `handle_websocket_stream` returns on its error without ever building the
+    // backend request.
+
+    use gateway_jwk::jwk::{ImmutableJwk, Jwk};
+    use gateway_key::{base64_utils, keys};
+    use gateway_token::token::Token;
+
+    /// Publish a throwaway signing key as the JWK the cache verifies against.
+    fn jwk_for(key: &keys::ImmutableKey) -> ImmutableJwk {
+        let keys::PublicKey::EcP256(ec) = key.public_key() else {
+            panic!("these tests sign with P-256");
+        };
+        let point = ec.to_encoded_point(false);
+        ImmutableJwk::new(Jwk {
+            kty: "EC".to_string(),
+            alg: Some(key.alg().to_string()),
+            kid: key.id().to_string(),
+            key_use: Some("sig".to_string()),
+            n: None,
+            e: None,
+            crv: Some("P-256".to_string()),
+            x: Some(base64_utils::encode_base64_url(point.x().expect("x"))),
+            y: Some(base64_utils::encode_base64_url(point.y().expect("y"))),
+            exp: None,
+            created: None,
+        })
+        .expect("jwk")
+    }
+
+    /// A live user token audienced at `service`, entitled to everything.
+    /// `{"all": true}` is the admin bypass, used so an entitlement failure can
+    /// never be mistaken for the authentication failure under test.
+    fn ws_token(key: &keys::ImmutableKey, service: &str) -> String {
+        let mut token = Token::new();
+        token.set_kid(key.id()).expect("kid");
+        token.set_alg(key.alg()).expect("alg");
+        token.set_issuer("ws-stream-auth-test").expect("iss");
+        token.set_subject("alice@example.com").expect("sub");
+        token.set_audience(service).expect("aud");
+        token.set_namespace("/tenants/acme").expect("namespace");
+        token.set_sub_type("user").expect("sub_type");
+        token
+            .set_expiration(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("clock")
+                    .as_secs() as i64
+                    + 3600,
+            )
+            .expect("exp");
+        token
+            .set_service_entitlements(serde_json::json!({ "all": true }))
+            .expect("service_entitlements");
+        token.sign(key).expect("sign");
+        format!("Bearer {}", token.base64().expect("base64"))
+    }
+
+    /// The first `client_streaming` route in the generated table that requires
+    /// a token and entitles against itself. Picked from ROUTES so the test
+    /// follows regeneration rather than pinning a path a proto change can move.
+    fn ws_authenticated_route() -> &'static RouteInfo {
+        ROUTES
+            .iter()
+            .find(|r| {
+                r.client_streaming
+                    && r.auth_policy != AuthPolicy::NoAuth
+                    && r.entitlement_service.is_none()
+                    && !r.grpc_path.starts_with("/gateway.")
+            })
+            .expect("the generated ROUTES table must contain an authenticated W2S route")
+    }
+
+    fn ws_noauth_route() -> &'static RouteInfo {
+        ROUTES
+            .iter()
+            .find(|r| r.client_streaming && r.auth_policy == AuthPolicy::NoAuth)
+            .expect("the generated ROUTES table must contain a NoAuth W2S route")
+    }
+
+    /// The bypass as reported: any non-empty string satisfied the old presence
+    /// check, so a caller with no credential at all got a backend stream.
+    #[tokio::test]
+    async fn websocket_stream_rejects_a_token_that_is_not_a_token() {
+        let key = keys::generate_ec_p256_key().expect("signing key");
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![jwk_for(&key)])), false);
+
+        authorize_ws_stream(&auth, ws_authenticated_route(), Some("Bearer not-a-token"))
+            .await
+            .expect_err("an unverifiable string must not open a backend stream");
+    }
+
+    /// The same bypass with more effort behind it: a well-formed, unexpired,
+    /// correctly-audienced token that gateway simply cannot verify, because it
+    /// was signed by a key the JWK cache does not trust.
+    #[tokio::test]
+    async fn websocket_stream_rejects_a_token_signed_by_an_untrusted_key() {
+        let route = ws_authenticated_route();
+        let trusted = keys::generate_ec_p256_key().expect("trusted key");
+        let forged = keys::generate_ec_p256_key().expect("attacker key");
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![jwk_for(&trusted)])), false);
+
+        authorize_ws_stream(&auth, route, Some(&ws_token(&forged, route.service_id)))
+            .await
+            .expect_err("a token signed by an untrusted key must not open a backend stream");
+    }
+
+    #[tokio::test]
+    async fn websocket_stream_rejects_a_missing_token() {
+        let key = keys::generate_ec_p256_key().expect("signing key");
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![jwk_for(&key)])), false);
+
+        let message = authorize_ws_stream(&auth, ws_authenticated_route(), None)
+            .await
+            .expect_err("no token must not open a backend stream");
+
+        assert!(
+            message.contains("authorization"),
+            "the rejection must say what is missing, got {message:?}"
+        );
+    }
+
+    /// The other half: the gate is defense in depth, not a new wall. A caller
+    /// who really is authenticated and entitled still gets their stream.
+    #[tokio::test]
+    async fn websocket_stream_accepts_a_valid_token() {
+        let route = ws_authenticated_route();
+        let key = keys::generate_ec_p256_key().expect("signing key");
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![jwk_for(&key)])), false);
+
+        authorize_ws_stream(&auth, route, Some(&ws_token(&key, route.service_id)))
+            .await
+            .expect("a valid, entitled token must still open the backend stream");
+    }
+
+    /// And a `NoAuth` W2S route still opens with no token at all, exactly as
+    /// `parse_ws_data_frame` already allows for its data frames.
+    #[tokio::test]
+    async fn a_noauth_websocket_stream_still_opens_without_a_token() {
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false);
+
+        authorize_ws_stream(&auth, ws_noauth_route(), None)
+            .await
+            .expect("a NoAuth W2S route must not start requiring a token");
+    }
+
+    // ── ListPublicCa answers the same on REST and on gRPC ───────────────────
+
+    fn ca(id: &str) -> X509Cert {
+        X509Cert {
+            id: id.to_string(),
+            base64: format!("base64-of-{id}"),
+            ..Default::default()
+        }
+    }
+
+    /// The REST path used to serve kernel's `CaState` internal cluster signing
+    /// CAs while the native gRPC path served the external root CA from config.
+    /// Both now answer from one function over one input, so the same root_ca
+    /// yields the same cert set on either path.
+    #[test]
+    fn rest_and_grpc_list_public_ca_return_the_same_cert_set() {
+        let root_ca = vec![ca("external-root"), ca("external-root-next")];
+
+        let grpc: Vec<(String, String)> = crate::mint::public_ca_response(&root_ca)
+            .certs
+            .into_iter()
+            .map(|c| (c.id, c.base64))
+            .collect();
+
+        let response = list_public_ca_response(&root_ca);
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = futures::executor::block_on(axum::body::to_bytes(
+            response.into_body(),
+            MAX_JSON_BODY_BYTES,
+        ))
+        .expect("body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json");
+        let rest: Vec<(String, String)> = json["certs"]
+            .as_array()
+            .expect("certs array")
+            .iter()
+            .map(|c| {
+                (
+                    c["id"].as_str().expect("id").to_string(),
+                    c["base64"].as_str().expect("base64").to_string(),
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            rest, grpc,
+            "REST ListPublicCa must return exactly what the gRPC handler returns"
+        );
     }
 }
