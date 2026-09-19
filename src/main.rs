@@ -96,7 +96,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("ServiceManager connected to kernel");
 
     // 2. Fetch gateway config from kernel state (delivered by operator via bootstrap).
-    let cfg = sm
+    let mut cfg = sm
         .state_clients()
         .services()
         .gateway_config_state()
@@ -104,6 +104,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .fetch()
         .await
         .map_err(|e| format!("failed to fetch gateway config from kernel: {e}"))?;
+    // A raw fetch returns exactly what kernel holds; the proto's declared
+    // defaults (tcp_listener = 0.0.0.0:8443 among them) are only applied by the
+    // generated delivery path in s2sm/mod.rs, which this startup read bypasses.
+    // On 2026-09-19 kernel served a config without tcp_listener while its
+    // members were churning, and every fresh gateway start died on the check
+    // below. Apply the same defaults the chassis applies.
+    gateway_model::types::services::gateway::helpers::config_defaults(&mut cfg);
 
     let tcp_addr = host_to_socket_addr(
         cfg.tcp_listener.as_ref().ok_or("tcp_listener must be set in gateway config")?,
