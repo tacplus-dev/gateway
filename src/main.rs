@@ -38,6 +38,13 @@ mod e2e_tenant_routing;
 #[cfg(test)]
 mod e2e_personalauth_registration;
 
+/// End-to-end proof that kernel's C2S `UserMint` surface — the user half of the
+/// delegate-bound Offline Token mint — is reachable through the gateway's
+/// generic routing with no hand-written front, and that the S2S delegate half
+/// is not reachable from a client at all.
+#[cfg(test)]
+mod e2e_user_mint;
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 

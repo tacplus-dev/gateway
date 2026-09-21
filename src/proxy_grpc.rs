@@ -828,6 +828,57 @@ mod tests {
         }
     }
 
+    /// Token-management item 7: the user half of the delegate-bound Offline
+    /// Token mint must be reachable through gateway's ORDINARY client-facing
+    /// path — no hand-written `Mint` front entry, no proxy special case. The
+    /// entry exists only because `kernel.proto` declares
+    /// `kernel.UserMint` `(spec.service_c2s)`; `kernel.Mint` is
+    /// `(spec.service_s2s)` and a service carries exactly one caller surface,
+    /// so moving the RPC to its own C2S service is what generates the route.
+    ///
+    /// AnyUser, not Entitled: any authenticated person may connect an agent of
+    /// their own, and the handler mints against that caller's own OPA
+    /// entitlements. Asserted on the generated table so a regeneration that
+    /// drops or re-gates the route fails here.
+    #[test]
+    fn kernel_user_mint_delegate_offline_token_is_a_generic_c2s_route() {
+        let path = "/kernel.UserMint/MintDelegateOfflineToken";
+        let route = route_for(path)
+            .unwrap_or_else(|| panic!("{path} must be in the generated ROUTES table"));
+
+        assert_eq!(
+            route.service_id, "kernel",
+            "the gateway must dial kernel directly for this RPC"
+        );
+        assert_eq!(
+            route.auth_policy,
+            AuthPolicy::AnyUser,
+            "{path} must admit any authenticated user: {:?}",
+            route.auth_policy
+        );
+        assert_eq!(
+            route.http_path, "/api/v1/kernel/UserMint/MintDelegateOfflineToken",
+            "the convention REST path is the client-facing way in"
+        );
+        assert!(
+            !route.client_streaming && !route.server_streaming,
+            "a unary mint must dispatch through the unary arm"
+        );
+
+        // The delegate half stays S2S: it is redeemed by the delegate's own
+        // service identity, never from a browser, so it must NOT be routable.
+        assert!(
+            route_for("/kernel.Mint/BrokerDelegateOfflineToken").is_none(),
+            "BrokerDelegateOfflineToken is S2S-only and must have no gateway route"
+        );
+
+        // And nothing re-declared the RPC on gateway's own hand-written front.
+        assert!(
+            route_for("/gateway.Mint/MintDelegateOfflineToken").is_none(),
+            "this RPC must flow through generic C2S routing, not a gateway front"
+        );
+    }
+
     /// The tripwire for decision-goalB-q1 §6. `CreatePersonalPrincipal` used to
     /// carry `RPC_FLAG_SELF_AUTHENTICATES`, which made tacplus emit a NoAuth
     /// proxy route for it — kernel itself, gateway-fronted, unauthenticated, in
