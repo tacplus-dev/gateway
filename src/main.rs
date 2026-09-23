@@ -17,6 +17,7 @@ mod mint;
 mod registry;
 mod resolver;
 mod rest_translation;
+mod plain_http;
 mod spa;
 mod tls;
 
@@ -365,11 +366,40 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Mint (tonic) handles /gateway.Mint/* methods.
     // Everything else hits the intercept layer: gRPC → IDP proxy → REST/SPA.
     let app = grpc_router
-        .fallback_service(spa_and_rest.layer(grpc_and_idp_intercept));
+        .fallback_service(spa_and_rest.layer(grpc_and_idp_intercept))
+        // HSTS on everything served over TLS. Outermost on purpose: the header
+        // is a statement about the origin, so it has to be on the response the
+        // browser actually gets, whichever half of the router produced it.
+        .layer(axum::middleware::from_fn(plain_http::hsts));
     let app: limits::EdgeService<hyper::body::Incoming> =
         limits::with_edge_limits(app, &edge_limits);
 
-    // 13. Start TLS listener — serves both HTTP and gRPC on the same port.
+    // 13. Start the plaintext listener, when configured. The gateway owns the
+    // edge's port 80 as well as 443 — one LoadBalancer carries both — so this
+    // is what proxies ACME HTTP-01 challenges to the letsencrypt service and
+    // redirects everything else to https. Bound before the TLS listener so a
+    // bind failure kills startup instead of being lost in a background task.
+    if let Some(http_listener) = cfg.http_listener.as_ref() {
+        let http_addr = host_to_socket_addr(http_listener);
+        let acme_backend = cfg
+            .acme_backend
+            .as_ref()
+            .map(|host| format!("{}:{}", host.host, host.port));
+        if acme_backend.is_none() {
+            tracing::warn!(
+                "http_listener is set but acme_backend is not — ACME HTTP-01 challenges \
+                 will be answered 503 and no certificate can be issued or renewed"
+            );
+        }
+        plain_http::serve(http_addr, acme_backend.clone()).await?;
+        tracing::info!(
+            addr = %http_addr,
+            acme_backend = acme_backend.as_deref().unwrap_or(""),
+            "listening (plaintext, ACME challenge + https redirect)"
+        );
+    }
+
+    // 14. Start TLS listener — serves both HTTP and gRPC on the same port.
     tracing::info!(addr = %tcp_addr, "listening (TLS, HTTP+gRPC)");
 
     // Gateway builds the ServiceManager with new() but never calls run(), because
