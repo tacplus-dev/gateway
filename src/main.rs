@@ -429,7 +429,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Wait for a TLS certificate from LetsEncryptState.cert_data.
-/// Logs every 5 seconds while waiting. Returns error after 60 seconds.
+/// Logs every 5 seconds while waiting. Waits indefinitely: startup is bounded by
+/// the k8s startupProbe, not by a second, shorter timeout here. Errors only on a
+/// stream error or the stream ending, which mean something is actually broken.
 async fn wait_for_tls_cert(
     channel: tonic::transport::Channel,
     token_provider: &TokenProvider,
@@ -450,35 +452,28 @@ async fn wait_for_tls_cert(
     let mut log_interval = tokio::time::interval(Duration::from_secs(5));
     log_interval.tick().await; // consume immediate first tick
 
-    let result = timeout(Duration::from_secs(60), async {
-        loop {
-            tokio::select! {
-                msg = stream.next() => {
-                    match msg {
-                        Some(Ok(cert_data)) if cert_data.tls_cert.is_some() => {
-                            tracing::info!(
-                                hostnames = ?cert_data.hostnames,
-                                "TLS certificate received from LetsEncryptState"
-                            );
-                            return Ok(cert_data);
-                        }
-                        Some(Ok(_)) => {
-                            // Empty cert_data — keep waiting.
-                        }
-                        Some(Err(e)) => return Err(Box::new(e) as Box<dyn std::error::Error>),
-                        None => return Err("WatchCertData stream ended without data".into()),
+    loop {
+        tokio::select! {
+            msg = stream.next() => {
+                match msg {
+                    Some(Ok(cert_data)) if cert_data.tls_cert.is_some() => {
+                        tracing::info!(
+                            hostnames = ?cert_data.hostnames,
+                            "TLS certificate received from LetsEncryptState"
+                        );
+                        return Ok(cert_data);
                     }
-                }
-                _ = log_interval.tick() => {
-                    tracing::info!("waiting for TLS certificate from LetsEncryptState...");
+                    Some(Ok(_)) => {
+                        // Empty cert_data — keep waiting.
+                    }
+                    Some(Err(e)) => return Err(Box::new(e) as Box<dyn std::error::Error>),
+                    None => return Err("WatchCertData stream ended without data".into()),
                 }
             }
+            _ = log_interval.tick() => {
+                tracing::info!("waiting for TLS certificate from LetsEncryptState...");
+            }
         }
-    }).await;
-
-    match result {
-        Ok(inner) => inner,
-        Err(_) => Err("no TLS certificate received within 60 seconds — shutting down".into()),
     }
 }
 
