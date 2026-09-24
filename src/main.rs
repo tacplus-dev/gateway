@@ -60,7 +60,6 @@ use gateway_model::types::sys::host::host::Host;
 use gateway_model::types::services::gateway::gateway::Config as GatewayConfig;
 use gateway_model::types::services::gateway::gateway::ExternalTlsMode;
 use gateway_model::types::services::letsencrypt::letsencrypt::lets_encrypt_state_service_client::LetsEncryptStateServiceClient;
-use gateway_model::types::services::letsencrypt::letsencrypt::LetsEncryptCertData;
 use crate::health::TokenProvider;
 
 #[tokio::main]
@@ -158,11 +157,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         ExternalTlsMode::Letsencrypt => {
             tracing::info!("external TLS mode: letsencrypt");
-            let cert_data = wait_for_tls_cert(kernel_channel.clone(), &token_provider).await?;
-            let chain = cert_data.tls_cert
-                .as_ref()
-                .ok_or("LetsEncryptState cert_data has no tls_cert")?;
-            tls::build_server_config(chain)?
+            // Start on the cluster-CA edge chain -- the same material cert_chain
+            // mode serves -- and never block startup on a public certificate.
+            // Gateway owns port 80, which is what answers letsencrypt's HTTP-01
+            // challenge, so waiting here for a cert deadlocked its own issuance:
+            // no listener -> no challenge -> no cert -> no listener. The watcher
+            // spawned below hot-swaps the real certificate in the moment
+            // LetsEncryptState delivers one.
+            tls::build_server_config_from_pem(&cfg.external_cert_pem, &cfg.external_key_pem)?
         }
         ExternalTlsMode::Unspecified => {
             return Err("external_tls_mode must be set in gateway config (cert_chain or letsencrypt)".into());
@@ -426,55 +428,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     sm.close();
 
     Ok(())
-}
-
-/// Wait for a TLS certificate from LetsEncryptState.cert_data.
-/// Logs every 5 seconds while waiting. Waits indefinitely: startup is bounded by
-/// the k8s startupProbe, not by a second, shorter timeout here. Errors only on a
-/// stream error or the stream ending, which mean something is actually broken.
-async fn wait_for_tls_cert(
-    channel: tonic::transport::Channel,
-    token_provider: &TokenProvider,
-) -> Result<LetsEncryptCertData, Box<dyn std::error::Error>> {
-    let mut client = LetsEncryptStateServiceClient::new(channel);
-
-    let mut request = tonic::Request::new(Default::default());
-    if let Ok(token) = (token_provider)().await {
-        let val: tonic::metadata::MetadataValue<tonic::metadata::Ascii> =
-            format!("Bearer {}", token).parse()
-                .map_err(|_| "invalid token metadata")?;
-        request.metadata_mut().insert("authorization", val);
-    }
-
-    let response = client.watch_cert_data(request).await?;
-    let mut stream = response.into_inner();
-
-    let mut log_interval = tokio::time::interval(Duration::from_secs(5));
-    log_interval.tick().await; // consume immediate first tick
-
-    loop {
-        tokio::select! {
-            msg = stream.next() => {
-                match msg {
-                    Some(Ok(cert_data)) if cert_data.tls_cert.is_some() => {
-                        tracing::info!(
-                            hostnames = ?cert_data.hostnames,
-                            "TLS certificate received from LetsEncryptState"
-                        );
-                        return Ok(cert_data);
-                    }
-                    Some(Ok(_)) => {
-                        // Empty cert_data — keep waiting.
-                    }
-                    Some(Err(e)) => return Err(Box::new(e) as Box<dyn std::error::Error>),
-                    None => return Err("WatchCertData stream ended without data".into()),
-                }
-            }
-            _ = log_interval.tick() => {
-                tracing::info!("waiting for TLS certificate from LetsEncryptState...");
-            }
-        }
-    }
 }
 
 /// Hot-reload the external TLS certificate in cert_chain mode when a renewed

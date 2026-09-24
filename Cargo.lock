@@ -54,6 +54,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
+name = "approval"
+version = "1.0.0"
+dependencies = [
+ "sha2",
+ "tonic",
+]
+
+[[package]]
 name = "arc-swap"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -871,6 +879,7 @@ name = "gateway-model"
 version = "1.0.0"
 dependencies = [
  "am",
+ "approval",
  "async-trait",
  "axum",
  "base64 0.21.7",
