@@ -149,17 +149,18 @@ async fn proxy_plaintext(
     // request to the responder, not a request through a forward proxy.
     let backend_uri: http::Uri = path_and_query.parse()?;
 
+    // Preserve the client's original Host header rather than rewriting it to
+    // the backend address: certmagic's HTTP-01 solver keys its challenge
+    // lookup by the identifier in the request's Host header, so a rewritten
+    // Host (e.g. the in-cluster service DNS name) makes it 404 a challenge it
+    // is actually holding for the real hostname.
     let mut backend_req = Request::builder()
         .method(parts.method.clone())
         .uri(backend_uri)
         .version(http::Version::HTTP_11);
     for (name, value) in &parts.headers {
-        if name == header::HOST {
-            continue;
-        }
         backend_req = backend_req.header(name, value);
     }
-    backend_req = backend_req.header(header::HOST, backend);
 
     let backend_req = backend_req.body(http_body_util::Full::new(body_bytes).boxed())?;
     let backend_resp = sender.send_request(backend_req).await?;
@@ -276,6 +277,18 @@ mod tests {
         assert!(
             request_line.starts_with("GET /.well-known/acme-challenge/abc123 HTTP/1.1"),
             "the backend must see the original path:\n{request_line}"
+        );
+        // certmagic's HTTP-01 solver keys its challenge lookup by the Host
+        // header, not the connection it arrived on — rewriting Host to the
+        // backend's own address makes it 404 a challenge it is actually
+        // holding for the real hostname (observed live: console.seabeam.net
+        // proxied to letsencrypt0.schematic.svc.cluster.local:8080 came back
+        // "no information found to solve challenge for identifier:
+        // letsencrypt0.schematic.svc.cluster.local").
+        assert!(
+            request_line.contains("host: console.seabeam.net")
+                || request_line.contains("Host: console.seabeam.net"),
+            "the backend must see the client's original Host header, not the backend address:\n{request_line}"
         );
     }
 
