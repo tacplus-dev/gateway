@@ -8,6 +8,7 @@ compile_error!(
 );
 
 mod auth;
+mod blob_proxy;
 mod client_download;
 mod idp_proxy;
 mod limits;
@@ -335,15 +336,26 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // to the IDP proxy check, then REST routes and SPA handler.
     let proxy_state_clone = Arc::clone(&proxy_state);
     let idp_proxy_clone = Arc::clone(&idp_proxy);
+    // The blob store's byte paths. Intercepted HERE, alongside the gRPC proxy and
+    // the IDP proxy, for two reasons the decision doc's R3 asks for: this layer
+    // sits BEFORE the SPA fallback, so `/b/<token>` is never answered with the
+    // web app's index.html; and it sits OUTSIDE the REST body cap applied below,
+    // so an upload is bounded by its volume group's max_blob_bytes rather than by
+    // the 10 MB REST ceiling.
+    let blob_proxy = Arc::new(blob_proxy::BlobProxy::new(health_watcher.clone()));
+    let blob_proxy_clone = Arc::clone(&blob_proxy);
     let grpc_and_idp_intercept = axum::middleware::from_fn(
         move |req: axum::extract::Request, next: axum::middleware::Next| {
             let proxy = Arc::clone(&proxy_state_clone);
             let idp = Arc::clone(&idp_proxy_clone);
+            let blob = Arc::clone(&blob_proxy_clone);
             async move {
                 if proxy_grpc::is_grpc(&req) {
                     proxy_grpc::handle(&proxy, req).await
                 } else if idp_proxy::IdpProxy::is_idp_request(req.uri().path()) {
                     idp.handle(req).await
+                } else if blob_proxy::BlobProxy::is_blob_request(req.uri().path()) {
+                    blob.handle(req).await
                 } else {
                     next.run(req).await
                 }
@@ -420,8 +432,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // accept. Reporting SERVING any earlier would be a lie.
     sm.set_serving(true).await;
 
+    // `with_peer_addr` rather than `tower::make::Shared`: Shared discards the
+    // connection's peer address, and the blob paths' per-source-IP rate limit has
+    // to key on something the client cannot choose (see blob_proxy::PeerAddr).
+    // Everything else about this wiring is unchanged — it is the same finished
+    // service, served per connection with its address attached.
     axum_server::bind_rustls(tcp_addr, tls_acceptor)
-        .serve(tower::make::Shared::new(app))
+        .serve(blob_proxy::with_peer_addr(app))
         .await?;
 
     // Graceful shutdown.

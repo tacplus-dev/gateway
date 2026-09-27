@@ -8,8 +8,14 @@
 //!      and in plaintext, to the letsencrypt service's HTTP-01 responder. That
 //!      responder (certmagic's `AltHTTPPort` solver) is no longer reachable from
 //!      outside the cluster at all; this hop is its only path from the internet.
-//!   2. Any other `GET`/`HEAD` is redirected `301` to the same path on `https://`.
-//!   3. Anything else is `405`. A redirect would turn a POST into a GET, and
+//!   2. The blob store's byte paths — `/b/*` and `/upload/*` — are `404`, NOT
+//!      redirected. The decision doc requires it (R3: "port-80 answers `/b/*`
+//!      with 404"), because the path IS the credential: a `301` puts the token in
+//!      a `Location` header, which is logged by every intermediary between here
+//!      and the client, and it invites a client to keep presenting credentials
+//!      over plaintext. A 404 tells it nothing and costs it one request.
+//!   3. Any other `GET`/`HEAD` is redirected `301` to the same path on `https://`.
+//!   4. Anything else is `405`. A redirect would turn a POST into a GET, and
 //!      there is nothing here to serve a body to.
 //!
 //! Nothing else is routed on 80: no SPA, no REST, no gRPC. Everything the
@@ -59,6 +65,12 @@ impl PlainHttp {
             return self.proxy_challenge(req).await;
         }
 
+        // The blob paths are answered here rather than redirected. See rule 2 in
+        // this module's comment.
+        if is_blob_path(req.uri().path()) {
+            return status_only(StatusCode::NOT_FOUND);
+        }
+
         redirect_to_https(&req)
     }
 
@@ -81,6 +93,13 @@ impl PlainHttp {
             }
         }
     }
+}
+
+/// True for the blob store's two byte paths. The prefixes are
+/// `blob_proxy`'s, so the plaintext rule and the TLS route cannot come to
+/// disagree about which paths carry a token.
+fn is_blob_path(path: &str) -> bool {
+    path.starts_with(crate::blob_proxy::PATH_BLOB) || path.starts_with(crate::blob_proxy::PATH_UPLOAD)
 }
 
 /// `301` to the same path and query on `https://`, on the host the client
@@ -366,6 +385,28 @@ mod tests {
             );
             assert_eq!(response.headers().get(header::ALLOW).unwrap(), "GET, HEAD");
         }
+    }
+
+    /// The blob paths are 404 on port 80, not 301: a redirect would put the
+    /// token in a Location header, which every intermediary logs.
+    #[tokio::test]
+    async fn blob_paths_are_404_on_port_80() {
+        let plain = PlainHttp::new(None);
+        for path in ["/b/sometoken", "/upload/sometoken", "/b/", "/upload/"] {
+            let response = plain.handle(request("GET", path)).await;
+            assert_eq!(
+                response.status(),
+                StatusCode::NOT_FOUND,
+                "{path} on port 80 must be 404"
+            );
+            assert!(
+                response.headers().get(header::LOCATION).is_none(),
+                "{path} must not be redirected — the Location header would carry the token"
+            );
+        }
+        // HEAD too: a client checking a blob URL over plaintext learns nothing.
+        let head = plain.handle(request("HEAD", "/b/sometoken")).await;
+        assert_eq!(head.status(), StatusCode::NOT_FOUND);
     }
 
     /// A POST to the challenge path is still 405: the method check runs first,
