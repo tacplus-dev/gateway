@@ -1,4 +1,4 @@
 language: rust
-pkg: com.gitlab.secondstarcavalier.controlplane.schematic.services.gateway
+pkg: com.gitlab.seabeam.controlplane.schematic.services.gateway
 output-dir: target/generated-sources/model
-src: https://gitlab.com/secondstarcavalier/schematic/platform/proto.git
+src: https://gitlab.com/seabeam/schematic/platform/proto.git

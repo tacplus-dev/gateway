@@ -8,7 +8,7 @@ stages:
 build-webapp:
   stage: .pre
   trigger:
-    project: secondstarcavalier/schematic/platform/clients/webapp
+    project: seabeam/schematic/platform/clients/webapp
     branch: main
     strategy: depend
   variables:
@@ -32,7 +32,7 @@ compute-image:
       fi
       MAJOR="$(echo "$TACPLUS_VER" | cut -d. -f1)"
       MINOR="$(echo "$TACPLUS_VER" | cut -d. -f2)"
-      REPO="secondstarcavalier/schematic/tacplus/tacplus-${MAJOR}-${MINOR}"
+      REPO="seabeam/schematic/tacplus/tacplus-${MAJOR}-${MINOR}"
       IMAGE="${CI_REGISTRY}/${REPO}:latest"
       echo "TACPLUS_IMAGE=${IMAGE}" > tacplus.env
       echo "Using tacplus image: ${IMAGE}"
@@ -186,7 +186,7 @@ compute-validate-image:
       fi
       MAJOR="$(echo "$TACPLUS_VER" | cut -d. -f1)"
       MINOR="$(echo "$TACPLUS_VER" | cut -d. -f2)"
-      REPO="secondstarcavalier/schematic/tacplus/tacplus-${MAJOR}-${MINOR}"
+      REPO="seabeam/schematic/tacplus/tacplus-${MAJOR}-${MINOR}"
       echo "TACPLUS_IMAGE=${CI_REGISTRY}/${REPO}:latest" > tacplus.env
       echo "Using tacplus image: ${CI_REGISTRY}/${REPO}:latest"
   artifacts:
