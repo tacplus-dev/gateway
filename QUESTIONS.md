@@ -1,6 +1,40 @@
 # Gateway Questions
 
-_No open questions._
+## 2. `cargo test` does not compile: stale generated model (2026-09-29)
+
+The test build fails before any test runs. `src/e2e_entitlement.rs`
+(`#[cfg(test)]`, `main.rs:30`) uses `stratum_pb::record_query_client`,
+`record_query_server`, `OpenTaskActivityQueryRequest`, `*DelegationProbe*` and
+more, and none of them exist in `target/generated-sources/model` (generated
+2026-09-28). There are 32 errors, all in that file. `dist/` is also missing, so
+`#[derive(rust_embed::Embed)] #[folder = "dist/"]` in `spa.rs` does not derive
+`get`.
+
+With that module switched off and an empty `dist/`, in a scratch copy and not in
+this repo, the suite runs: 58 passed and 8 failed. The same 8 fail without the
+blob_proxy change: `auth::tests::flat_grants_accept_{exact_catalog_token,
+object_wrapper_shape,generated_package_wildcard}`, all four
+`e2e_tenant_routing::*`, and
+`registry::tests::the_embedded_registry_marks_no_service_tenant_owned_today`.
+`blob_proxy::tests::a_bucket_refills_over_time` also fails now and then
+(1 run in 3). It expects two back-to-back `allow` calls less than 1ms apart at
+1000/s.
+
+**Default taken:** did not regenerate (`just generate` / `tacplus build`) or
+touch those tests. They are outside the blob-proxy task. A regen against current
+tacplus and protos is the likely fix.
+
+## 3. Upload 503 covers every failed hop, not only "pod dead" (2026-09-29)
+
+`blob_proxy::forward` now answers **503** for any `proxy_streaming` error on
+`PUT /upload/*`: connect refused, reset mid-body, closed before a response.
+Reads (`/b/*`) keep **502**. This follows the decision's R1 ("if a pod is down,
+uploads fail (503)").
+
+A client that drops its own connection mid-upload also takes this path. It
+gets the 503 on a connection it has already abandoned, so nothing sees it.
+
+**Default taken:** did not add a `Retry-After` header. Is one wanted?
 
 ---
 

@@ -197,15 +197,7 @@ impl BlobProxy {
             return status_only(StatusCode::SERVICE_UNAVAILABLE);
         };
 
-        match proxy_streaming(req, &backend).await {
-            Ok(resp) => resp,
-            Err(e) => {
-                // The error is logged; the PATH is not, because the path is the
-                // credential.
-                tracing::warn!(error = %e, backend = %backend, prefix = %prefix, "blob_proxy: request failed");
-                status_only(StatusCode::BAD_GATEWAY)
-            }
-        }
+        forward(req, prefix, &backend).await
     }
 
     /// Round-robin over the healthy blobstore pods, on the byte port.
@@ -242,6 +234,30 @@ fn token_of(path: &str) -> Option<(&'static str, &str)> {
         }
     }
     None
+}
+
+/// Proxies one request to `backend` and answers the backend's response, or the
+/// status a failed hop maps to.
+///
+/// A failed hop is a pod that is dead or unreachable — refused, reset mid-body,
+/// gone before it answered. For an upload that is 503: the decision (R1) says
+/// uploads fail with 503 while a pod is down, and blobstore promotes nothing it
+/// did not fully receive, so the upload was refused rather than half-accepted.
+/// A read keeps 502.
+async fn forward(req: Request<Body>, prefix: &str, backend: &str) -> Response<Body> {
+    match proxy_streaming(req, backend).await {
+        Ok(resp) => resp,
+        Err(e) => {
+            // The error is logged; the PATH is not, because the path is the
+            // credential.
+            tracing::warn!(error = %e, backend = %backend, prefix = %prefix, "blob_proxy: request failed");
+            if prefix == PATH_UPLOAD {
+                status_only(StatusCode::SERVICE_UNAVAILABLE)
+            } else {
+                status_only(StatusCode::BAD_GATEWAY)
+            }
+        }
+    }
 }
 
 /// Forwards one request to the backend WITHOUT buffering either body.
@@ -578,6 +594,65 @@ mod tests {
             expected_len,
             "the whole body must reach the backend"
         );
+    }
+
+    /// A blobstore pod killed while an upload is streaming to it: the backend
+    /// reads the headers and part of the body, then drops the connection. The
+    /// decision (R1: "if a pod is down, uploads fail (503)") makes that a 503.
+    #[tokio::test]
+    async fn an_upload_whose_backend_dies_mid_body_is_503() {
+        use tokio::io::AsyncReadExt;
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let backend = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 64 * 1024];
+            let mut received = 0;
+            while received < 128 * 1024 {
+                let n = stream.read(&mut buf).await.unwrap();
+                assert!(n > 0, "the proxy closed before sending the body");
+                received += n;
+            }
+            // The pod dies: the connection goes away with the body unfinished.
+        });
+
+        // Bigger than the backend reads before dying, so the body is mid-flight.
+        let upload = vec![b'x'; 8 * 1024 * 1024];
+        let req = Request::builder()
+            .method(Method::PUT)
+            .uri("/upload/sometoken")
+            .header(header::CONTENT_LENGTH, upload.len().to_string())
+            .body(Body::from(upload))
+            .unwrap();
+
+        let resp = forward(req, PATH_UPLOAD, &addr.to_string()).await;
+        backend.await.unwrap();
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    /// A backend that is not there at all: an upload is refused with 503, and a
+    /// read keeps its 502.
+    #[tokio::test]
+    async fn an_unreachable_backend_is_503_for_an_upload_and_502_for_a_read() {
+        // A port that was just bound and released has nothing listening on it.
+        let addr = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .to_string();
+
+        let upload = Request::builder()
+            .method(Method::PUT)
+            .uri("/upload/sometoken")
+            .header(header::CONTENT_LENGTH, "2")
+            .body(Body::from("{}"))
+            .unwrap();
+        assert_eq!(forward(upload, PATH_UPLOAD, &addr).await.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+        let read = Request::builder().method(Method::GET).uri("/b/sometoken").body(Body::empty()).unwrap();
+        assert_eq!(forward(read, PATH_BLOB, &addr).await.status(), StatusCode::BAD_GATEWAY);
     }
 
     fn find_headers_end(buf: &[u8]) -> Option<usize> {
