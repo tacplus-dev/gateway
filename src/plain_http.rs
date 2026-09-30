@@ -35,9 +35,9 @@ use tokio::net::TcpStream;
 /// The ACME HTTP-01 challenge path prefix, fixed by RFC 8555 §8.3.
 const ACME_CHALLENGE_PREFIX: &str = "/.well-known/acme-challenge/";
 
-/// Two years, subdomains included, and the `preload` token. The token only
-/// makes the domain ELIGIBLE for the browser preload list — it is not a
-/// submission, and submitting is a separate, deliberate step.
+/// Two years, subdomains included. No `preload` token: it was never submitted, and
+/// `includeSubDomains` + `preload` would lock every subdomain (mail.seabeam.net, the
+/// dev host) into HTTPS-only in every browser forever (decided 2026-09-30).
 const HSTS_VALUE: &str = "max-age=63072000; includeSubDomains";
 
 /// Serves the port-80 listener. `acme_backend` is the in-cluster `host:port` of
