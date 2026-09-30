@@ -38,7 +38,7 @@ const ACME_CHALLENGE_PREFIX: &str = "/.well-known/acme-challenge/";
 /// Two years, subdomains included, and the `preload` token. The token only
 /// makes the domain ELIGIBLE for the browser preload list — it is not a
 /// submission, and submitting is a separate, deliberate step.
-const HSTS_VALUE: &str = "max-age=63072000; includeSubDomains; preload";
+const HSTS_VALUE: &str = "max-age=63072000; includeSubDomains";
 
 /// Serves the port-80 listener. `acme_backend` is the in-cluster `host:port` of
 /// the letsencrypt service's HTTP-01 responder; `None` means no backend was
@@ -436,7 +436,7 @@ mod tests {
                 .headers()
                 .get(header::STRICT_TRANSPORT_SECURITY)
                 .unwrap(),
-            "max-age=63072000; includeSubDomains; preload"
+            "max-age=63072000; includeSubDomains"
         );
     }
 }
