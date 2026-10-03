@@ -18,7 +18,7 @@ const VALID_TARGETS: &[(&str, &str)] = &[
 ];
 
 /// Serve schematic client binary downloads.
-/// Route: GET /api/v1/client/:os/:arch
+/// Route: GET /client/:os/:arch
 /// Auth: AnyUser (valid token required, no entitlement check).
 pub async fn handler(
     Path((os, arch)): Path<(String, String)>,

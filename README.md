@@ -12,7 +12,7 @@ minting delegation to kernel, and provides SPIFFE-based workload routing.
                           │               gateway                    │
                           │                                          │
   clients ──► HTTPS ──►   │  axum server (HTTP/1.1 + HTTP/2 + H3)   │
-                          │    ├── REST handler (/api/v1/...)        │
+                          │    ├── REST handler (/{pkg}/{Svc}/{Rpc}) │
                           │    │     ├── ROUTES table dispatch       │
                           │    │     ├── SPIFFE path routing         │
                           │    │     └── Mint (OIDC, JWKS, tokens)   │
@@ -36,8 +36,9 @@ Requests not in the table fall back to SPIFFE path routing.
 
 ## Routing
 
-**REST**: Requests to `/api/v1/{service}/{Method}` are matched against the
-proto-generated `ROUTES` table. The handler deserializes JSON, dispatches via
+**REST**: Requests to `/{package}/{Service}/{Method}` are matched against the
+proto-generated `ROUTES` table; each generated path is registered as an exact
+route at the origin root. The handler deserializes JSON, dispatches via
 gRPC to the backend service, and returns JSON. Server-streaming RPCs are
 supported via `dispatch_stream`.
 
@@ -46,8 +47,9 @@ as raw HTTP/2 frames without deserializing the protobuf body. The target
 service is extracted from the gRPC method path (`/package.Service/Method`).
 
 **SPIFFE path routing**: For paths not in the ROUTES table, gateway strips the
-REST prefix and uses the remaining path as a SPIFFE service path for endpoint
-resolution. Exact match only — no hierarchical fallback.
+leading `/` and uses the remaining path as a SPIFFE service path for endpoint
+resolution. Exact match only — no hierarchical fallback. Paths that match no
+SPIFFE service either serve the SPA (`GET`/`HEAD`) or return a JSON 404.
 
 ## RPCs
 

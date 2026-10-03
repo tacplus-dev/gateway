@@ -778,7 +778,7 @@ mod tests {
     #[test]
     fn route_identity_separates_physical_service_from_entitlement_contract() {
         let route = RouteInfo {
-            http_path: "/api/v1/tasks/DelegationProbeBusStateService/PublishToStream",
+            http_path: "/tasks/DelegationProbeBusStateService/PublishToStream",
             grpc_path: "/tasks.DelegationProbeBusStateService/PublishToStream",
             service_id: "eventbus",
             entitlement_service: Some("tasks"),
@@ -857,7 +857,7 @@ mod tests {
             route.auth_policy
         );
         assert_eq!(
-            route.http_path, "/api/v1/kernel/UserMint/MintDelegateOfflineToken",
+            route.http_path, "/kernel/UserMint/MintDelegateOfflineToken",
             "the convention REST path is the client-facing way in"
         );
         assert!(

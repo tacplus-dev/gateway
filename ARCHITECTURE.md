@@ -22,8 +22,8 @@ This document defines the target architecture for the Schematic gateway. It supe
          │                                                            │
          │   content-type: application/grpc ────────────► proxy_grpc  │
          │   /gateway.Mint/* ───────────────► tonic (native Mint)     │
-         │   /api/v1/* ─────────────────────► rest_translation        │
-         │   /* ────────────────────────────► SPA                     │
+         │   /{pkg}/{Svc}/{Rpc}, /.well-known/* ► rest_translation    │
+         │   /* (GET/HEAD) ─────────────────► SPA                     │
          │                                                            │
          └──────────────┬───────────────────────────┬─────────────────┘
                         │                           │
@@ -88,6 +88,8 @@ The target service is identified from the gRPC method path (e.g., `/sentinel.Das
 Converts REST HTTP requests into gRPC messages, then delegates to `proxy_grpc`.
 
 **Processing:**
+
+**Routes at the origin root.** Every generated `http_path` (`/{package}/{Service}/{Rpc}`) and `rest_path` alias (`/.well-known/openid-configuration`, `/.well-known/jwks.json`) is registered as an exact axum route; there is no prefix and no catch-all. A request no route claims reaches the fallback: SPIFFE path routing first, then the SPA for `GET`/`HEAD`, and a JSON 404 for any other method. These first path segments are taken by the gateway itself, so no proto package may use them: `b`, `upload`, `realms`, `admin`, `registry`, `client`, `healthz`, `readyz`, `login`, `.well-known`.
 
 **Request path:**
 
@@ -184,7 +186,7 @@ This works for both unary and streaming RPCs because `proxy_grpc` inspects every
 ### REST Client -> Backend Service
 
 ```
-1. Client sends HTTP/1.1 or HTTP/2 request to /api/v1/{service}/{Method}
+1. Client sends HTTP/1.1 or HTTP/2 request to /{package}/{Service}/{Method}
 2. rest_translation: match route -> read JSON body -> *_from_json() -> frame as gRPC
 3. Delegate to proxy_grpc (same path as native gRPC)
 4. proxy_grpc: extract frame -> deserialize -> validate -> auth -> trace -> forward bytes

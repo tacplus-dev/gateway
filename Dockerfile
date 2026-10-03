@@ -25,7 +25,7 @@ RUN chmod +x /usr/local/bin/gateway
 COPY webapp-dist/ /opt/schematic/webapp/
 ENV WEB_ROOT=/opt/schematic/webapp
 
-# Schematic client binaries for authenticated download via /api/v1/client/:os/:arch
+# Schematic client binaries for authenticated download via /client/:os/:arch
 COPY clients/ /opt/schematic/clients/
 
 ENTRYPOINT ["gateway"]

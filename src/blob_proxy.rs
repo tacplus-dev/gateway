@@ -457,7 +457,7 @@ mod tests {
             assert!(BlobProxy::is_blob_request(path), "{path} must be a blob request");
         }
         for path in [
-            "/b/", "/upload/", "/b", "/upload", "/", "/app/b/abc", "/api/v1/x",
+            "/b/", "/upload/", "/b", "/upload", "/", "/app/b/abc", "/scotty/Scotty/GetTicket",
             // A token is one segment, so nothing that looks like a path is one.
             "/b/../etc/passwd", "/b/a/b", "/upload/a/b",
         ] {

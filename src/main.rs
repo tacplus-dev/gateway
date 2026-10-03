@@ -56,7 +56,7 @@ use tokio::time::{timeout, Duration};
 use tokio_stream::StreamExt;
 use tracing_subscriber::EnvFilter;
 
-use gateway_model::s2sm::{rest_dispatch::REST_ROOT_PATH, ServiceManager};
+use gateway_model::s2sm::ServiceManager;
 use gateway_model::types::sys::host::host::Host;
 use gateway_model::types::services::gateway::gateway::Config as GatewayConfig;
 use gateway_model::types::services::gateway::gateway::ExternalTlsMode;
@@ -244,12 +244,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     // Derive the public OIDC issuer URL from configured external_hostnames.
-    // Kernel signs JWTs with `https://<host>/api/v1` as `iss`; discovery must
+    // Kernel signs JWTs with `https://<host>` as `iss`; discovery must
     // advertise that exact value for external verifiers such as Anthropic WIF.
     let issuer_url = cfg
         .external_hostnames
         .first()
-        .map(|h| format!("https://{}{}", h, REST_ROOT_PATH))
+        .map(|h| rest_translation::issuer_url(h))
         .ok_or("gateway config has no external_hostnames; cannot build issuer URL")?;
     tracing::info!(issuer_url = %issuer_url, "OIDC issuer URL derived from external_hostnames");
 
@@ -320,15 +320,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // 13. Layer the routers: Mint (tonic) → gRPC proxy → IDP proxy → REST/SPA.
     // Mint is a native tonic service; all other gRPC requests are proxied
     // as raw HTTP/2 through the resolver to backend services.
-    let registry_route = format!("{}/registry/{{file}}", gateway_model::s2sm::rest_dispatch::REST_ROOT_PATH);
-    let client_route = format!("{}/client/{{os}}/{{arch}}", gateway_model::s2sm::rest_dispatch::REST_ROOT_PATH);
+    // The REST router carries the fallback: unclaimed GET/HEAD serve the SPA.
     let client_auth = Arc::clone(&gateway_auth);
     let spa_and_rest = rest_translation::router(rest_state)
         .route("/healthz", get(healthz))
         .route("/readyz", get(healthz))
-        .route(&registry_route, get(spa::registry_handler))
-        .route(&client_route, get(move |path, req| client_download::handler(path, req, client_auth.clone())))
-        .fallback(spa::spa_handler);
+        .route("/registry/{file}", get(spa::registry_handler))
+        .route("/client/{os}/{arch}", get(move |path, req| client_download::handler(path, req, client_auth.clone())));
 
     // Intercept gRPC requests before they reach REST/SPA routing.
     // Native gRPC clients (operator, service-to-service) send content-type: application/grpc.

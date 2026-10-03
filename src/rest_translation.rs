@@ -5,7 +5,7 @@ use axum::extract::{FromRequestParts, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event, Sse};
 use axum::response::IntoResponse;
-use axum::routing::any;
+use axum::routing::{any, MethodRouter};
 use axum::Router;
 use futures::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
@@ -13,7 +13,7 @@ use tokio::time::{timeout, Duration};
 use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
 
-use gateway_model::s2sm::rest_dispatch::{self, AuthPolicy, RouteInfo, REST_ROOT_PATH, ROUTES};
+use gateway_model::s2sm::rest_dispatch::{self, AuthPolicy, RouteInfo, ROUTES};
 use gateway_model::s2sm::ServiceManager;
 use gateway_model::types::sys::jwk::jwk::Jwk as ProtoJwk;
 use gateway_model::types::sys::jwk::jwk::JwkUseType;
@@ -135,11 +135,92 @@ fn proto_jwk_to_public(j: &ProtoJwk) -> Option<PublicJwk> {
 
 /// Build the REST router.
 /// No auth middleware — all auth is handled by proxy_grpc.
+///
+/// REST paths sit at the origin root, beside the SPA, so there is no prefix to
+/// mount a catch-all under: every generated path is registered exactly, and
+/// anything unclaimed reaches `fallback`.
 pub fn router(state: Arc<RestState>) -> Router {
-    let rest_route = format!("{}/{{*rest}}", REST_ROOT_PATH);
-    Router::new()
-        .route(&rest_route, any(rest_handler))
+    rest_routes(Router::new(), any(rest_handler))
+        .fallback(fallback)
         .with_state(state)
+}
+
+/// One exact route per generated `http_path`. A `rest_path` alias is its own
+/// ROUTES entry, so it is registered here too. Empty paths are RPCs with no
+/// REST surface.
+fn rest_routes<S: Clone + Send + Sync + 'static>(
+    router: Router<S>,
+    handler: MethodRouter<S>,
+) -> Router<S> {
+    ROUTES
+        .iter()
+        .map(|r| r.http_path)
+        .filter(|p| !p.is_empty())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .fold(router, |router, path| router.route(path, handler.clone()))
+}
+
+/// Requests no REST route claimed: SPIFFE-path routing first, then the SPA.
+async fn fallback(
+    State(state): State<Arc<RestState>>,
+    request: axum::http::Request<axum::body::Body>,
+) -> axum::response::Response {
+    let (parts, body) = request.into_parts();
+    let path = parts.uri.path();
+    let spiffe_path = path.trim_start_matches('/');
+    if !spiffe_path.is_empty() {
+        let endpoints = state
+            .proxy
+            .resolver
+            .health()
+            .get_endpoints_by_spiffe_path(spiffe_path);
+        if !endpoints.is_empty() {
+            let auth_header_value = parts
+                .headers
+                .get("authorization")
+                .and_then(|v| v.to_str().ok());
+            let request_id = parts
+                .headers
+                .get("x-request-id")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| Uuid::new_v4().to_string());
+            tracing::info!(path = %path, spiffe_path = %spiffe_path, request_id = %request_id, "SPIFFE path routing");
+            let body_bytes = match read_body_for_method(&parts.method, body).await {
+                Ok(bytes) => bytes,
+                Err(response) => return response,
+            };
+            return dispatch_via_proxy(
+                &state,
+                path,
+                &body_bytes,
+                auth_header_value,
+                &request_id,
+                false,
+            )
+            .await;
+        }
+    }
+    spa_or_not_found(&parts.method, parts.uri).await
+}
+
+/// The SPA answers browser navigation (`GET`/`HEAD`). Any other method on an
+/// unknown path is an API call that missed, and gets a JSON 404 rather than
+/// `index.html`.
+async fn spa_or_not_found(
+    method: &axum::http::Method,
+    uri: axum::http::Uri,
+) -> axum::response::Response {
+    if method == axum::http::Method::GET || method == axum::http::Method::HEAD {
+        return crate::spa::spa_handler(uri).await;
+    }
+    tracing::warn!(path = %uri.path(), "no route found");
+    (
+        StatusCode::NOT_FOUND,
+        format!("{{\"error\":\"unknown route: {}\"}}", uri.path()),
+    )
+        .into_response()
 }
 
 /// REST→gRPC handler. Converts JSON to proto, delegates to proxy_grpc,
@@ -167,46 +248,14 @@ async fn rest_handler(
         .map(|s| s.to_string())
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-    // Look up route.
-    let route = ROUTES.iter().find(|r| r.http_path == path);
-    let route = match route {
-        Some(r) => r,
-        None => {
-            // Try SPIFFE path routing.
-            let spiffe_path = path
-                .strip_prefix(REST_ROOT_PATH)
-                .and_then(|p| p.strip_prefix('/'))
-                .unwrap_or("");
-            if !spiffe_path.is_empty() {
-                let endpoints = state
-                    .proxy
-                    .resolver
-                    .health()
-                    .get_endpoints_by_spiffe_path(spiffe_path);
-                if !endpoints.is_empty() {
-                    tracing::info!(path = %path, spiffe_path = %spiffe_path, request_id = %request_id, "SPIFFE path routing");
-                    let body_bytes = match read_body_for_method(&req_method, body).await {
-                        Ok(bytes) => bytes,
-                        Err(response) => return response,
-                    };
-                    return dispatch_via_proxy(
-                        &state,
-                        &path,
-                        &body_bytes,
-                        auth_header_value.as_deref(),
-                        &request_id,
-                        false,
-                    )
-                    .await;
-                }
-            }
-            tracing::warn!(path = %path, "no route found");
-            return (
-                StatusCode::NOT_FOUND,
-                format!("{{\"error\":\"unknown route: {}\"}}", path),
-            )
-                .into_response();
-        }
+    // Look up route. Only registered paths reach this handler (`rest_routes`).
+    let Some(route) = ROUTES.iter().find(|r| r.http_path == path) else {
+        tracing::warn!(path = %path, "no route found");
+        return (
+            StatusCode::NOT_FOUND,
+            format!("{{\"error\":\"unknown route: {}\"}}", path),
+        )
+            .into_response();
     };
 
     if route.client_streaming {
@@ -1167,6 +1216,24 @@ impl futures::Stream for GrpcFrameStream {
     }
 }
 
+/// The public OIDC issuer for an external hostname: the bare origin, which is
+/// also what kernel signs as `iss`.
+pub fn issuer_url(host: &str) -> String {
+    format!("https://{}", host)
+}
+
+fn openid_config(issuer: &str) -> OidcDiscoveryDoc<'_> {
+    OidcDiscoveryDoc {
+        issuer,
+        jwks_uri: format!("{}/.well-known/jwks.json", issuer),
+        token_endpoint: format!("{}/gateway/TokenMint", issuer),
+        response_types_supported: &["token"],
+        grant_types_supported: &["urn:ietf:params:oauth:grant-type:token-exchange"],
+        subject_types_supported: &["public"],
+        id_token_signing_alg_values_supported: ID_TOKEN_SIGNING_ALGS_SUPPORTED,
+    }
+}
+
 /// Handle Mint RPCs: GetOpenIdConfig/ListJwks/ListPublicCa locally, MintToken/MintX509Cert via kernel.
 async fn handle_mint(
     route: &RouteInfo,
@@ -1179,17 +1246,7 @@ async fn handle_mint(
         "/gateway.Mint/GetOpenIdConfig" => {
             // issuer is the configured public OIDC issuer URL, not the Host
             // header, which can be lost across HTTP/2 / TLS termination.
-            let issuer = &state.issuer_url;
-            let config = OidcDiscoveryDoc {
-                issuer,
-                jwks_uri: format!("{}/.well-known/jwks.json", issuer),
-                token_endpoint: format!("{}/gateway/TokenMint", issuer),
-                response_types_supported: &["token"],
-                grant_types_supported: &["urn:ietf:params:oauth:grant-type:token-exchange"],
-                subject_types_supported: &["public"],
-                id_token_signing_alg_values_supported: ID_TOKEN_SIGNING_ALGS_SUPPORTED,
-            };
-            json_response(&config)
+            json_response(&openid_config(&state.issuer_url))
         }
         "/gateway.Mint/ListJwks" => {
             let keys: Vec<PublicJwk> = state
@@ -1424,6 +1481,83 @@ mod tests {
             client_streaming: true,
             target_namespace_field: None,
         }
+    }
+
+    /// The REST route table and the SPA/404 fallback, with a stub in place of
+    /// `rest_handler` so no backend state is needed.
+    fn root_router() -> Router {
+        rest_routes(Router::new(), any(|| async { "rest" })).fallback(
+            |method: axum::http::Method, uri: axum::http::Uri| async move {
+                spa_or_not_found(&method, uri).await
+            },
+        )
+    }
+
+    async fn send(method: &str, path: &str) -> axum::response::Response {
+        use tower::ServiceExt;
+        let request = axum::http::Request::builder()
+            .method(method)
+            .uri(path)
+            .body(axum::body::Body::empty())
+            .expect("request");
+        root_router().oneshot(request).await.expect("response")
+    }
+
+    async fn body_text(response: axum::response::Response) -> String {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body");
+        String::from_utf8(bytes.to_vec()).expect("utf-8 body")
+    }
+
+    #[test]
+    fn generated_rest_paths_sit_at_the_origin_root() {
+        for r in ROUTES.iter().filter(|r| !r.http_path.is_empty()) {
+            assert!(
+                !r.http_path.starts_with("/api/"),
+                "{} still carries the removed REST root prefix",
+                r.http_path
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn well_known_paths_reach_rest_not_the_spa() {
+        for path in ["/.well-known/openid-configuration", "/.well-known/jwks.json"] {
+            let response = send("GET", path).await;
+            assert_eq!(response.status(), StatusCode::OK, "{path}");
+            assert_eq!(body_text(response).await, "rest", "{path} must be a REST route");
+        }
+    }
+
+    #[tokio::test]
+    async fn spa_routes_still_serve_the_spa() {
+        for path in ["/", "/scotty", "/sentinel", "/login", "/scotty/tickets/42"] {
+            let response = send("GET", path).await;
+            assert_eq!(response.status(), StatusCode::OK, "{path}");
+            let content_type = response
+                .headers()
+                .get(axum::http::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or_default()
+                .to_string();
+            assert!(content_type.starts_with("text/html"), "{path} served {content_type}");
+        }
+    }
+
+    #[tokio::test]
+    async fn non_get_on_an_unknown_path_is_a_json_404() {
+        let response = send("POST", "/nope").await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(body_text(response).await, r#"{"error":"unknown route: /nope"}"#);
+    }
+
+    #[test]
+    fn discovery_advertises_the_bare_origin_as_issuer() {
+        let issuer = issuer_url("dev.seabeam.net");
+        let doc = serde_json::to_value(openid_config(&issuer)).expect("json");
+        assert_eq!(doc["issuer"], "https://dev.seabeam.net");
+        assert_eq!(doc["jwks_uri"], "https://dev.seabeam.net/.well-known/jwks.json");
     }
 
     #[test]

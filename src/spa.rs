@@ -324,4 +324,15 @@ mod tests {
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         assert_ne!(body_of(response).await, b"SECRET");
     }
+
+    /// The registry is mounted at `/registry/{file}`, which is the prefix
+    /// `registry_handler` strips. Under the old prefixed mount it never
+    /// matched and every file 404'd.
+    #[tokio::test]
+    async fn registry_files_resolve_under_the_root_mount() {
+        let ok = registry_handler("/registry/registry.json".parse().unwrap()).await;
+        assert_eq!(ok.status(), StatusCode::OK);
+        let missing = registry_handler("/registry/nope.json".parse().unwrap()).await;
+        assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+    }
 }
