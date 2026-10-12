@@ -192,7 +192,7 @@ async fn fallback(
                 Err(response) => return response,
             };
             return dispatch_via_proxy(
-                &state,
+                &state.proxy,
                 path,
                 &body_bytes,
                 auth_header_value,
@@ -323,16 +323,69 @@ async fn rest_handler(
         )
         .await
     } else {
-        dispatch_via_proxy(
-            &state,
-            route.grpc_path,
-            &body_bytes,
+        dispatch_unary(
+            &state.proxy,
+            route,
+            parts.headers.get(axum::http::header::CONTENT_TYPE),
+            body_bytes,
             auth_header_value.as_deref(),
             &request_id,
-            false,
         )
         .await
     }
+}
+
+/// One unary REST call. A `form_body` route's form-encoded body is decoded to
+/// JSON first, and a `redirect_field` route's answer becomes its 303; both by
+/// the generated `rest_dispatch` seams, so every other route is served exactly
+/// as the JSON path always served it.
+pub(crate) async fn dispatch_unary(
+    proxy: &ProxyState,
+    route: &RouteInfo,
+    content_type: Option<&axum::http::HeaderValue>,
+    body: Vec<u8>,
+    auth_header: Option<&str>,
+    request_id: &str,
+) -> axum::response::Response {
+    let json_body = match rest_dispatch::form_body_to_json(route, content_type, body).await {
+        Ok(json) => json,
+        Err((status, error_body)) => {
+            return (
+                status,
+                [(
+                    axum::http::header::CONTENT_TYPE,
+                    "application/json".to_string(),
+                )],
+                error_body,
+            )
+                .into_response();
+        }
+    };
+    let response = dispatch_via_proxy(
+        proxy,
+        route.grpc_path,
+        &json_body,
+        auth_header,
+        request_id,
+        false,
+    )
+    .await;
+    // An error stays the JSON error it already is: there is no URL to send the
+    // browser to.
+    if route.redirect_field.is_none() || response.status() != StatusCode::OK {
+        return response;
+    }
+    let response_json = match axum::body::to_bytes(response.into_body(), MAX_JSON_BODY_BYTES).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            return json_error_response(
+                StatusCode::BAD_GATEWAY,
+                format!("failed to read response body: {e}"),
+            );
+        }
+    };
+    rest_dispatch::redirect_response(route, &String::from_utf8_lossy(&response_json))
+        .expect("redirect_response answers every route with a redirect_field")
 }
 
 /// Verify the caller's token on headers alone, then read the request body.
@@ -491,7 +544,7 @@ async fn read_grpc_response_body(mut body: axum::body::Body) -> Result<Vec<u8>, 
 
 /// Convert JSON to proto, frame as gRPC, delegate to proxy_grpc, convert response to JSON.
 async fn dispatch_via_proxy(
-    state: &RestState,
+    proxy: &ProxyState,
     grpc_path: &str,
     json_body: &[u8],
     auth_header: Option<&str>,
@@ -545,7 +598,7 @@ async fn dispatch_via_proxy(
     };
 
     // 4. Delegate to proxy_grpc.
-    let response = proxy_grpc::handle(&state.proxy, grpc_request).await;
+    let response = proxy_grpc::handle(proxy, grpc_request).await;
 
     // 5. Check for headers-only gRPC errors before reading the body.
     if let Some(error_response) = grpc_error_response_from_headers(response.headers()) {
@@ -1480,6 +1533,8 @@ mod tests {
             server_streaming: true,
             client_streaming: true,
             target_namespace_field: None,
+            form_body: false,
+            redirect_field: None,
         }
     }
 

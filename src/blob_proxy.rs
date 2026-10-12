@@ -343,7 +343,7 @@ fn forwardable(headers: &HeaderMap) -> impl Iterator<Item = (&http::HeaderName, 
 /// ip_key is the per-IP bucket key. The whole address, v4 or v6: a /64's worth of
 /// v6 addresses is one host's, but narrowing that is a policy decision the edge
 /// limiter does not make either.
-fn ip_key(ip: IpAddr) -> String {
+pub(crate) fn ip_key(ip: IpAddr) -> String {
     ip.to_string()
 }
 
@@ -376,7 +376,7 @@ fn status_only(status: StatusCode) -> Response<Body> {
 /// A bucket rather than a fixed window because a fixed window lets twice the rate
 /// through across a boundary, and because a PDF viewer's Range requests arrive in
 /// a clump that a burst allowance should absorb rather than refuse.
-struct RateLimiter {
+pub(crate) struct RateLimiter {
     rate_per_sec: f64,
     burst: f64,
     buckets: Mutex<HashMap<String, Bucket>>,
@@ -388,7 +388,7 @@ struct Bucket {
 }
 
 impl RateLimiter {
-    fn new(rate_per_sec: f64, burst: f64) -> Self {
+    pub(crate) fn new(rate_per_sec: f64, burst: f64) -> Self {
         Self {
             rate_per_sec,
             burst,
@@ -399,12 +399,12 @@ impl RateLimiter {
     /// Defaults, overridable by env var, like `limits::EdgeLimits`: an operator
     /// raising or lowering a limit during an incident must not need a rebuild. The
     /// burst scales with the rate so one knob moves both.
-    fn from_env(var: &str, default_rate: f64, default_burst: f64) -> Self {
+    pub(crate) fn from_env(var: &str, default_rate: f64, default_burst: f64) -> Self {
         let rate = match std::env::var(var) {
             Ok(v) => match v.parse::<f64>() {
                 Ok(n) if n > 0.0 => n,
                 _ => {
-                    tracing::warn!(var, value = %v, default_rate, "ignoring unparsable blob rate limit");
+                    tracing::warn!(var, value = %v, default_rate, "ignoring unparsable rate limit");
                     default_rate
                 }
             },
@@ -414,7 +414,7 @@ impl RateLimiter {
     }
 
     /// Takes one token, or refuses.
-    fn allow(&self, key: &str) -> bool {
+    pub(crate) fn allow(&self, key: &str) -> bool {
         let now = Instant::now();
         let mut buckets = self.buckets.lock().expect("blob rate limiter mutex poisoned");
         if buckets.len() >= MAX_TRACKED_KEYS && !buckets.contains_key(key) {

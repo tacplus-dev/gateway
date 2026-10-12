@@ -47,6 +47,12 @@ mod e2e_personalauth_registration;
 #[cfg(test)]
 mod e2e_user_mint;
 
+/// End-to-end proof that an identity provider's form_post callback (Sign in
+/// with Apple) is decoded from its form body and answered with a 303 through
+/// the gateway's REST leg.
+#[cfg(test)]
+mod e2e_form_post;
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -342,13 +348,20 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // the 10 MB REST ceiling.
     let blob_proxy = Arc::new(blob_proxy::BlobProxy::new(health_watcher.clone()));
     let blob_proxy_clone = Arc::clone(&blob_proxy);
+    // The per-IP limit on oauth's public sign-in routes. Checked HERE, first, so
+    // it covers the REST and the native gRPC spelling of a route alike, and
+    // refuses before any body is read.
+    let sign_in_limit = Arc::new(limits::SignInLimit::from_env());
     let grpc_and_idp_intercept = axum::middleware::from_fn(
         move |req: axum::extract::Request, next: axum::middleware::Next| {
             let proxy = Arc::clone(&proxy_state_clone);
             let idp = Arc::clone(&idp_proxy_clone);
             let blob = Arc::clone(&blob_proxy_clone);
+            let sign_in_limit = Arc::clone(&sign_in_limit);
             async move {
-                if proxy_grpc::is_grpc(&req) {
+                if let Some(refusal) = sign_in_limit.refusal(&req) {
+                    refusal
+                } else if proxy_grpc::is_grpc(&req) {
                     proxy_grpc::handle(&proxy, req).await
                 } else if idp_proxy::IdpProxy::is_idp_request(req.uri().path()) {
                     idp.handle(req).await

@@ -789,6 +789,8 @@ mod tests {
             server_streaming: true,
             client_streaming: true,
             target_namespace_field: None,
+            form_body: false,
+            redirect_field: None,
         };
 
         let (physical_service, entitlement_service) = route_identity(&route);

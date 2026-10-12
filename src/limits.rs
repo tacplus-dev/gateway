@@ -5,17 +5,23 @@
 //! are reachable by an unauthenticated caller, so all three are capped here,
 //! at the outermost layer of the stack.
 
+use std::collections::HashSet;
 use std::time::Duration;
 
+use axum::body::Body;
 use axum::error_handling::HandleErrorLayer;
 use axum::http::{Request, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Router;
+use gateway_model::s2sm::rest_dispatch::{AuthPolicy, ROUTES};
 use tower::util::BoxCloneService;
 use tower::{BoxError, ServiceBuilder};
 use tower_http::body::Limited;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::map_request_body::MapRequestBodyLayer;
+
+use crate::blob_proxy::{ip_key, PeerAddr, RateLimiter};
+use crate::proxy_grpc;
 
 /// Concurrent in-flight requests admitted by the router. Beyond this, requests
 /// are shed with 503 rather than queued, so an overload sheds load instead of
@@ -140,6 +146,74 @@ pub fn with_request_body_limit(router: Router, max_bytes: usize) -> Router {
     )
 }
 
+/// Per-source-IP request rate for the public sign-in routes, and the burst it
+/// allows. One person signing in makes a handful of these calls (providers,
+/// session, classify, authorize, callback, mint); a caller spraying addresses
+/// at ClassifySignInEmail, or at a sign-in mail send, makes many.
+const DEFAULT_SIGN_IN_MAX_RPS_PER_IP: f64 = 0.5;
+const DEFAULT_SIGN_IN_BURST_PER_IP: f64 = 30.0;
+
+/// SignInLimit is a per-source-IP limit on oauth's public (NoAuth) routes, on
+/// top of the global edge limiter: those routes are the ones an anonymous
+/// caller can drive, and ClassifySignInEmail and any sign-in mail send cost
+/// work (a DNS lookup, an outbound mail) per call. oauth's own per-address
+/// limit bounds one address; this bounds one caller.
+///
+/// It keys on [`PeerAddr`], for the reason given there, and matches a route by
+/// its REST path and by its gRPC path, so a native gRPC caller is limited the
+/// same as a browser.
+pub struct SignInLimit {
+    paths: HashSet<&'static str>,
+    per_ip: RateLimiter,
+}
+
+impl SignInLimit {
+    pub fn from_env() -> Self {
+        Self::with_limiter(RateLimiter::from_env(
+            "GATEWAY_SIGNIN_MAX_RPS_PER_IP",
+            DEFAULT_SIGN_IN_MAX_RPS_PER_IP,
+            DEFAULT_SIGN_IN_BURST_PER_IP,
+        ))
+    }
+
+    fn with_limiter(per_ip: RateLimiter) -> Self {
+        let paths = ROUTES
+            .iter()
+            .filter(|r| r.service_id == "oauth" && r.auth_policy == AuthPolicy::NoAuth)
+            .flat_map(|r| [r.http_path, r.grpc_path])
+            .filter(|p| !p.is_empty())
+            .collect();
+        Self { paths, per_ip }
+    }
+
+    /// The refusal for a public sign-in call over its source IP's limit, or
+    /// None to let the request through. A request with no [`PeerAddr`] is let
+    /// through, as on the blob paths.
+    pub fn refusal(&self, req: &Request<Body>) -> Option<Response> {
+        if !self.paths.contains(req.uri().path()) {
+            return None;
+        }
+        let PeerAddr(peer) = req.extensions().get::<PeerAddr>().copied()?;
+        if self.per_ip.allow(&ip_key(peer.ip())) {
+            return None;
+        }
+        const MESSAGE: &str = "too many sign-in requests from this address";
+        if proxy_grpc::is_grpc(req) {
+            return Some(proxy_grpc::tonic_status_to_response(
+                tonic::Status::resource_exhausted(MESSAGE),
+            ));
+        }
+        Some(
+            (
+                StatusCode::TOO_MANY_REQUESTS,
+                [(axum::http::header::CONTENT_TYPE, "application/json")],
+                serde_json::json!({ "error": MESSAGE }).to_string(),
+            )
+                .into_response(),
+        )
+    }
+}
+
 fn handle_edge_error(err: BoxError) -> std::future::Ready<Response> {
     let response = if err.is::<tower::load_shed::error::Overloaded>() {
         (
@@ -242,6 +316,72 @@ mod tests {
             elapsed >= Duration::from_millis(1500),
             "6 requests at 2/s must take at least two window resets, took {elapsed:?}"
         );
+    }
+
+    fn sign_in_request(path: &str, ip: [u8; 4], grpc: bool) -> Request<Body> {
+        let mut builder = Request::builder().method("POST").uri(path);
+        if grpc {
+            builder = builder.header("content-type", "application/grpc");
+        }
+        let mut req = builder.body(Body::empty()).unwrap();
+        req.extensions_mut()
+            .insert(PeerAddr(std::net::SocketAddr::from((ip, 443))));
+        req
+    }
+
+    /// Every public oauth route is limited per source IP, by its REST path and
+    /// by its gRPC path alike; past the burst a browser gets 429 and a gRPC
+    /// caller RESOURCE_EXHAUSTED, and another address is unaffected.
+    #[test]
+    fn sign_in_routes_are_limited_per_source_ip() {
+        let limit = SignInLimit::with_limiter(RateLimiter::new(0.001, 2.0));
+        for path in [
+            "/oauth/Auth/ClassifySignInEmail",
+            "/oauth.Auth/ClassifySignInEmail",
+            "/oauth/Auth/Authorize",
+            "/oauth/Auth/BrokerFormPostCallback",
+        ] {
+            assert!(limit.paths.contains(path), "{path} must be limited");
+        }
+
+        let caller = [203, 0, 113, 7];
+        assert!(limit.refusal(&sign_in_request("/oauth/Auth/ClassifySignInEmail", caller, false)).is_none());
+        assert!(limit.refusal(&sign_in_request("/oauth.Auth/ClassifySignInEmail", caller, true)).is_none());
+
+        let rest = limit
+            .refusal(&sign_in_request("/oauth/Auth/Authorize", caller, false))
+            .expect("the call past the burst must be refused");
+        assert_eq!(rest.status(), StatusCode::TOO_MANY_REQUESTS);
+
+        let grpc = limit
+            .refusal(&sign_in_request("/oauth.Auth/ClassifySignInEmail", caller, true))
+            .expect("a gRPC caller shares the same address's budget");
+        assert_eq!(grpc.headers().get("grpc-status").unwrap(), "8", "RESOURCE_EXHAUSTED");
+
+        assert!(
+            limit.refusal(&sign_in_request("/oauth/Auth/ClassifySignInEmail", [198, 51, 100, 1], false)).is_none(),
+            "another address has its own budget"
+        );
+    }
+
+    /// Only oauth's public routes are limited: an authenticated oauth route and
+    /// any other service's route are not, however many times one address calls.
+    #[test]
+    fn other_routes_are_not_sign_in_limited() {
+        let limit = SignInLimit::with_limiter(RateLimiter::new(0.001, 1.0));
+        let authenticated = ROUTES
+            .iter()
+            .find(|r| r.service_id == "oauth" && r.auth_policy != AuthPolicy::NoAuth)
+            .expect("oauth has an authenticated route");
+        let other = ROUTES
+            .iter()
+            .find(|r| r.service_id != "oauth" && !r.http_path.is_empty())
+            .expect("another service has a REST route");
+        for path in [authenticated.http_path, authenticated.grpc_path, other.http_path, "/"] {
+            for _ in 0..3 {
+                assert!(limit.refusal(&sign_in_request(path, [203, 0, 113, 7], false)).is_none(), "{path} must not be limited");
+            }
+        }
     }
 
     /// A body over the cap is rejected; one under it is served.
