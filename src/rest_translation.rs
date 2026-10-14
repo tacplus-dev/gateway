@@ -202,7 +202,7 @@ async fn fallback(
             .await;
         }
     }
-    spa_or_not_found(&parts.method, parts.uri).await
+    spa_or_not_found(&parts.method, parts.uri, &parts.headers).await
 }
 
 /// The SPA answers browser navigation (`GET`/`HEAD`). Any other method on an
@@ -211,9 +211,10 @@ async fn fallback(
 async fn spa_or_not_found(
     method: &axum::http::Method,
     uri: axum::http::Uri,
+    headers: &axum::http::HeaderMap,
 ) -> axum::response::Response {
     if method == axum::http::Method::GET || method == axum::http::Method::HEAD {
-        return crate::spa::spa_handler(uri).await;
+        return crate::spa::spa_handler(uri, headers).await;
     }
     tracing::warn!(path = %uri.path(), "no route found");
     (
@@ -1542,8 +1543,8 @@ mod tests {
     /// `rest_handler` so no backend state is needed.
     fn root_router() -> Router {
         rest_routes(Router::new(), any(|| async { "rest" })).fallback(
-            |method: axum::http::Method, uri: axum::http::Uri| async move {
-                spa_or_not_found(&method, uri).await
+            |method: axum::http::Method, uri: axum::http::Uri, headers: axum::http::HeaderMap| async move {
+                spa_or_not_found(&method, uri, &headers).await
             },
         )
     }
@@ -1605,6 +1606,35 @@ mod tests {
         let response = send("POST", "/nope").await;
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert_eq!(body_text(response).await, r#"{"error":"unknown route: /nope"}"#);
+    }
+
+    /// The request's Host has to survive the REST fallback for the SPA to pick
+    /// the bundle configured for it. The only test that sets the process-wide
+    /// bundles, under a hostname no other test sends.
+    #[tokio::test]
+    async fn a_bundle_hostname_is_served_its_bundle_through_the_fallback() {
+        use tower::ServiceExt;
+        let dir = std::env::temp_dir().join(format!("gateway-bundle-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).expect("bundle dir");
+        std::fs::write(dir.join("index.html"), "<html><head></head>web app</html>").expect("index");
+        crate::spa::init_web_bundles(&[
+            gateway_model::types::services::gateway::gateway::WebBundle {
+                hostname: "app.fallback.test".into(),
+                dir: dir.display().to_string(),
+                ..Default::default()
+            },
+        ]);
+
+        let request = axum::http::Request::builder()
+            .uri("/projects/7")
+            .header(axum::http::header::HOST, "app.fallback.test:8443")
+            .body(axum::body::Body::empty())
+            .expect("request");
+        let response = root_router().oneshot(request).await.expect("response");
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(body_text(response).await.ends_with("web app</html>"));
     }
 
     #[test]

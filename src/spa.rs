@@ -1,8 +1,12 @@
+use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 
-use axum::http::{StatusCode, header};
+use axum::http::uri::Authority;
+use axum::http::{HeaderMap, StatusCode, Uri, header};
 use axum::response::{IntoResponse, Response};
+
+use gateway_model::types::services::gateway::gateway::WebBundle;
 
 use crate::registry::Registry;
 
@@ -58,16 +62,49 @@ pub fn web_root() -> &'static Option<PathBuf> {
     WEB_ROOT.get_or_init(|| std::env::var("WEB_ROOT").ok().map(PathBuf::from))
 }
 
-/// Serve static files — from WEB_ROOT on disk if set, otherwise from embedded dist/.
+/// Gateway Config.web_bundles, keyed by lowercased hostname. Set once at startup.
+static WEB_BUNDLES: OnceLock<HashMap<String, PathBuf>> = OnceLock::new();
+
+pub fn init_web_bundles(bundles: &[WebBundle]) {
+    WEB_BUNDLES.set(bundles_by_host(bundles)).ok();
+}
+
+fn bundles_by_host(bundles: &[WebBundle]) -> HashMap<String, PathBuf> {
+    bundles
+        .iter()
+        .map(|b| (b.hostname.to_ascii_lowercase(), PathBuf::from(&b.dir)))
+        .collect()
+}
+
+/// Serve static files — from the bundle configured for the request's host if
+/// there is one, else from WEB_ROOT on disk if set, otherwise from embedded dist/.
 /// Falls back to index.html for SPA client-side routing.
-pub async fn spa_handler(uri: axum::http::Uri) -> Response {
+pub async fn spa_handler(uri: Uri, headers: &HeaderMap) -> Response {
+    serve(WEB_BUNDLES.get_or_init(HashMap::new), uri, headers).await
+}
+
+async fn serve(bundles: &HashMap<String, PathBuf>, uri: Uri, headers: &HeaderMap) -> Response {
     let path = uri.path().trim_start_matches('/');
+
+    if let Some(root) = request_host(&uri, headers).and_then(|host| bundles.get(&host)) {
+        return serve_from_disk(root, path).await;
+    }
 
     if let Some(root) = web_root() {
         return serve_from_disk(root, path).await;
     }
 
     serve_from_embedded(path)
+}
+
+/// The request's hostname, lowercased and without its port. HTTP/2 carries it
+/// in `:authority`, which hyper puts in the URI; HTTP/1.1 carries it in `Host`.
+fn request_host(uri: &Uri, headers: &HeaderMap) -> Option<String> {
+    let authority = match uri.authority() {
+        Some(authority) => authority.clone(),
+        None => headers.get(header::HOST)?.to_str().ok()?.parse::<Authority>().ok()?,
+    };
+    Some(authority.host().to_ascii_lowercase())
 }
 
 /// Where a request path lands inside the web root, once `..`, absolute paths
@@ -323,6 +360,107 @@ mod tests {
         let response = serve_from_disk(&fixture.root(), "escape").await;
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         assert_ne!(body_of(response).await, b"SECRET");
+    }
+
+    /// Two bundles, as in production: console and the customer web app, each
+    /// with its own asset and its own index.html.
+    struct Bundles {
+        console: Fixture,
+        app: Fixture,
+    }
+
+    impl Bundles {
+        fn new() -> Self {
+            let bundles = Self { console: Fixture::new(), app: Fixture::new() };
+            std::fs::write(bundles.console.root().join("index.html"), b"<html><head></head>console</html>")
+                .expect("console index");
+            std::fs::write(bundles.app.root().join("index.html"), b"<html><head></head>app</html>")
+                .expect("app index");
+            std::fs::write(bundles.app.root().join("app.js"), b"app bundle").expect("app asset");
+            bundles
+        }
+
+        fn config(&self) -> HashMap<String, PathBuf> {
+            bundles_by_host(&[
+                WebBundle {
+                    hostname: "console.seabeam.net".into(),
+                    dir: self.console.root().display().to_string(),
+                    ..Default::default()
+                },
+                WebBundle {
+                    hostname: "App.Dev.Seabeam.Net".into(),
+                    dir: self.app.root().display().to_string(),
+                    ..Default::default()
+                },
+            ])
+        }
+    }
+
+    fn host(value: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::HOST, value.parse().expect("host"));
+        headers
+    }
+
+    async fn served(bundles: &Bundles, uri: &str, headers: HeaderMap) -> Vec<u8> {
+        let response = serve(&bundles.config(), uri.parse().expect("uri"), &headers).await;
+        assert_eq!(response.status(), StatusCode::OK, "{uri}");
+        body_of(response).await
+    }
+
+    #[tokio::test]
+    async fn each_hostname_is_served_its_own_bundle() {
+        let bundles = Bundles::new();
+
+        assert_eq!(served(&bundles, "/app.js", host("app.dev.seabeam.net")).await, b"app bundle");
+        assert_eq!(served(&bundles, "/app.js", host("console.seabeam.net")).await, b"console.log(1)");
+    }
+
+    /// Browsers send the port when it is not the default, and DNS names are
+    /// case-insensitive; neither may change which bundle is picked.
+    #[tokio::test]
+    async fn the_port_and_case_of_the_host_do_not_matter() {
+        let bundles = Bundles::new();
+
+        for value in ["app.dev.seabeam.net:8443", "APP.DEV.SEABEAM.NET", "App.Dev.Seabeam.Net:443"] {
+            assert_eq!(served(&bundles, "/app.js", host(value)).await, b"app bundle", "{value}");
+        }
+    }
+
+    /// HTTP/2 has no Host header: the hostname arrives as `:authority`, which
+    /// is the URI's authority by the time the handler sees it.
+    #[tokio::test]
+    async fn an_http2_authority_selects_the_bundle_without_a_host_header() {
+        let bundles = Bundles::new();
+
+        let body = served(&bundles, "https://app.dev.seabeam.net:443/app.js", HeaderMap::new()).await;
+        assert_eq!(body, b"app bundle");
+    }
+
+    /// Client-side routes fall back to the index.html of the bundle the host
+    /// picked, not to some other bundle's.
+    #[tokio::test]
+    async fn the_spa_fallback_is_per_bundle() {
+        let bundles = Bundles::new();
+
+        let app = served(&bundles, "/dashboard/settings", host("app.dev.seabeam.net")).await;
+        assert!(app.ends_with(b"app</html>"), "{}", String::from_utf8_lossy(&app));
+        let console = served(&bundles, "/dashboard/settings", host("console.seabeam.net")).await;
+        assert!(console.ends_with(b"console</html>"), "{}", String::from_utf8_lossy(&console));
+    }
+
+    /// A host with no bundle, or no host at all, is served exactly what it was
+    /// served before bundles existed.
+    #[tokio::test]
+    async fn an_unknown_host_keeps_the_existing_behaviour() {
+        let bundles = Bundles::new();
+        let before = body_of(serve(&HashMap::new(), "/app.js".parse().unwrap(), &HeaderMap::new()).await).await;
+
+        for headers in [host("app.seabeam.net"), host("203.0.113.7:8443"), HeaderMap::new()] {
+            let body = served(&bundles, "/app.js", headers).await;
+            assert_eq!(body, before);
+            assert_ne!(body, b"app bundle");
+        }
     }
 
     /// The registry is mounted at `/registry/{file}`, which is the prefix

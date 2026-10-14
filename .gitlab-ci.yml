@@ -115,6 +115,10 @@ build-arm64:
         "${CI_API_V4_URL}/projects/${WEBAPP_PROJECT_ID}/packages/generic/${WEBAPP_PKG}/latest/${WEBAPP_PKG}-latest.tgz" \
         || echo "WARN: webapp not available"
       [ -f webapp.tgz ] && tar -xzf webapp.tgz -C webapp-dist && rm webapp.tgz || true
+    # The customer web app (COPY web-dist/) has no published package yet; it is
+    # staged by `just stage-web` for fleet builds. Until it has one, CI images
+    # carry an empty bundle and its hostnames serve the placeholder page.
+    - mkdir -p web-dist
     # Download schematic client binaries
     - |
       SCHEMATIC_PKG="schematic-${MAJOR}-${MINOR}"

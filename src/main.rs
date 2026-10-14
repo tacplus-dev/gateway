@@ -148,6 +148,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Empty string = same origin (webapp is served by the gateway itself).
     spa::init_bootstrap("");
 
+    // Hostnames that get their own bundle instead of the one above.
+    for bundle in &cfg.web_bundles {
+        tracing::info!(hostname = %bundle.hostname, dir = %bundle.dir, "SPA: web bundle for hostname");
+    }
+    spa::init_web_bundles(&cfg.web_bundles);
+
     if !cfg.enable_http && !cfg.enable_http3 && !cfg.enable_grpc {
         return Err("at least one of enable_http, enable_http3, or enable_grpc must be true".into());
     }
@@ -565,11 +571,15 @@ async fn watch_cert_updates(
     while let Some(msg) = stream.next().await {
         match msg {
             Ok(cert_data) => {
-                if let Some(chain) = cert_data.tls_cert.as_ref() {
-                    match tls::build_server_config(chain) {
+                if cert_data.tls_cert.is_some() {
+                    match tls::build_server_config(&cert_data) {
                         Ok(new_config) => {
                             tls_config.reload_from_config(new_config);
-                            tracing::info!(hostnames = ?cert_data.hostnames, "TLS certificate hot-reloaded");
+                            tracing::info!(
+                                hostnames = ?cert_data.hostnames,
+                                sni_certs = ?cert_data.certs.iter().map(|c| &c.hostname).collect::<Vec<_>>(),
+                                "TLS certificate hot-reloaded"
+                            );
                         }
                         Err(e) => {
                             tracing::error!(error = %e, "failed to build TLS config from renewed cert");

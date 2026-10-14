@@ -25,6 +25,10 @@ RUN chmod +x /usr/local/bin/gateway
 COPY webapp-dist/ /opt/schematic/webapp/
 ENV WEB_ROOT=/opt/schematic/webapp
 
+# Customer web app, served on the hostnames gateway Config.web_bundles maps to
+# /opt/schematic/web. Any other hostname keeps getting the webapp above.
+COPY web-dist/ /opt/schematic/web/
+
 # Schematic client binaries for authenticated download via /client/:os/:arch
 COPY clients/ /opt/schematic/clients/
 

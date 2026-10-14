@@ -46,4 +46,8 @@ RUN chmod +x /usr/local/bin/grpc_health_probe
 COPY --from=builder /build/target/release/gateway /usr/local/bin/gateway
 RUN chmod +x /usr/local/bin/gateway
 
+# Customer web app, served on the hostnames gateway Config.web_bundles maps to
+# /opt/schematic/web.
+COPY web-dist/ /opt/schematic/web/
+
 ENTRYPOINT ["gateway"]
