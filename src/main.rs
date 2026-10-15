@@ -148,11 +148,17 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Empty string = same origin (webapp is served by the gateway itself).
     spa::init_bootstrap("");
 
-    // Hostnames that get their own bundle instead of the one above.
-    for bundle in &cfg.web_bundles {
-        tracing::info!(hostname = %bundle.hostname, dir = %bundle.dir, "SPA: web bundle for hostname");
-    }
-    spa::init_web_bundles(&cfg.web_bundles);
+    // Hostnames that get their own bundle instead of the one above. Applied
+    // again on every gateway config update, not only from the config this pod
+    // first received: a pod that starts mid-roll reads the previous config, and
+    // reading web_bundles once at startup left it serving the console bundle on
+    // every host until it was restarted.
+    apply_web_bundles(&cfg);
+    sm.state_clients()
+        .services()
+        .gateway_config_state()
+        .config()
+        .on_change(Arc::new(apply_web_bundles));
 
     if !cfg.enable_http && !cfg.enable_http3 && !cfg.enable_grpc {
         return Err("at least one of enable_http, enable_http3, or enable_grpc must be true".into());
@@ -528,6 +534,15 @@ fn spawn_cert_chain_reloader(
     tracing::info!("cert_chain hot-reload watcher registered");
 }
 
+/// Serve cfg.web_bundles, logging the bundle set whenever it changes.
+fn apply_web_bundles(cfg: &GatewayConfig) {
+    if spa::set_web_bundles(&cfg.web_bundles) {
+        for bundle in &cfg.web_bundles {
+            tracing::info!(hostname = %bundle.hostname, dir = %bundle.dir, "SPA: web bundle for hostname");
+        }
+    }
+}
+
 /// Spawn a background task that watches LetsEncryptState.cert_data and
 /// hot-reloads the TLS config when the certificate is renewed.
 fn spawn_cert_watcher(
@@ -570,23 +585,7 @@ async fn watch_cert_updates(
 
     while let Some(msg) = stream.next().await {
         match msg {
-            Ok(cert_data) => {
-                if cert_data.tls_cert.is_some() {
-                    match tls::build_server_config(&cert_data) {
-                        Ok(new_config) => {
-                            tls_config.reload_from_config(new_config);
-                            tracing::info!(
-                                hostnames = ?cert_data.hostnames,
-                                sni_certs = ?cert_data.certs.iter().map(|c| &c.hostname).collect::<Vec<_>>(),
-                                "TLS certificate hot-reloaded"
-                            );
-                        }
-                        Err(e) => {
-                            tracing::error!(error = %e, "failed to build TLS config from renewed cert");
-                        }
-                    }
-                }
-            }
+            Ok(cert_data) => tls::apply_cert_data(tls_config, &cert_data),
             Err(e) => {
                 tracing::warn!(error = %e, "WatchCertData stream error");
                 return Err(e.into());

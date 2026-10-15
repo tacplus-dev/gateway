@@ -3,6 +3,7 @@ use std::io;
 use std::sync::Arc;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use axum_server::tls_rustls::RustlsConfig;
 use base64::Engine;
 use rustls::ServerConfig;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
@@ -43,6 +44,28 @@ pub fn build_server_config(data: &LetsEncryptCertData) -> Result<Arc<ServerConfi
     let mut tls_config = builder.with_cert_resolver(Arc::new(resolver));
     tls_config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     Ok(Arc::new(tls_config))
+}
+
+/// Serve one LetsEncryptState.cert_data watch event: the primary certificate
+/// and every named one in it, replacing whatever was served before. An event
+/// with no tls_cert yet, or one that will not build, keeps the current config.
+pub fn apply_cert_data(tls_config: &RustlsConfig, cert_data: &LetsEncryptCertData) {
+    if cert_data.tls_cert.is_none() {
+        return;
+    }
+    match build_server_config(cert_data) {
+        Ok(new_config) => {
+            tls_config.reload_from_config(new_config);
+            tracing::info!(
+                hostnames = ?cert_data.hostnames,
+                sni_certs = ?cert_data.certs.iter().map(|c| &c.hostname).collect::<Vec<_>>(),
+                "TLS certificate hot-reloaded"
+            );
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "failed to build TLS config from renewed cert");
+        }
+    }
 }
 
 /// Picks the certificate by SNI. Keys are lowercase; rustls lowercases the SNI.
@@ -283,6 +306,27 @@ mod tests {
         let config = build_server_config(&cert_data(&console, &[])).expect("config");
 
         assert_eq!(presented_leaf(config, Some("app.seabeam.net")), console_der);
+    }
+
+    /// The defect-10 shape: the gateway starts serving cert_data with only the
+    /// primary certificate, and letsencrypt later delivers the second name's
+    /// own certificate. The next watch event has to make that name answer with
+    /// it, on the config the listener already holds.
+    #[test]
+    fn a_named_certificate_added_after_startup_answers_its_sni() {
+        let (console, console_der) = cert("console.seabeam.net");
+        let (app, app_der) = cert("app.seabeam.net");
+        let tls_config =
+            RustlsConfig::from_config(build_server_config(&cert_data(&console, &[])).expect("config"));
+        assert_eq!(presented_leaf(tls_config.get_inner(), Some("app.seabeam.net")), console_der);
+
+        apply_cert_data(
+            &tls_config,
+            &cert_data(&console, &[("console.seabeam.net", &console), ("app.seabeam.net", &app)]),
+        );
+
+        assert_eq!(presented_leaf(tls_config.get_inner(), Some("app.seabeam.net")), app_der);
+        assert_eq!(presented_leaf(tls_config.get_inner(), Some("console.seabeam.net")), console_der);
     }
 
     /// A named certificate whose key does not match its leaf is rejected as a

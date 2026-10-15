@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, LazyLock, OnceLock, RwLock};
 
 use axum::http::uri::Authority;
 use axum::http::{HeaderMap, StatusCode, Uri, header};
@@ -62,11 +62,22 @@ pub fn web_root() -> &'static Option<PathBuf> {
     WEB_ROOT.get_or_init(|| std::env::var("WEB_ROOT").ok().map(PathBuf::from))
 }
 
-/// Gateway Config.web_bundles, keyed by lowercased hostname. Set once at startup.
-static WEB_BUNDLES: OnceLock<HashMap<String, PathBuf>> = OnceLock::new();
+/// Gateway Config.web_bundles, keyed by lowercased hostname. Replaced on every
+/// gateway config update, so a bundle added after startup is served without a
+/// restart. A request holds its own Arc, never the lock, across the file read.
+static WEB_BUNDLES: LazyLock<RwLock<Arc<HashMap<String, PathBuf>>>> =
+    LazyLock::new(|| RwLock::new(Arc::new(HashMap::new())));
 
-pub fn init_web_bundles(bundles: &[WebBundle]) {
-    WEB_BUNDLES.set(bundles_by_host(bundles)).ok();
+/// Serve `bundles` from now on. Returns whether they differ from what was
+/// being served, so a caller fed every watch event can log only real changes.
+pub fn set_web_bundles(bundles: &[WebBundle]) -> bool {
+    let next = bundles_by_host(bundles);
+    let mut current = WEB_BUNDLES.write().unwrap();
+    if **current == next {
+        return false;
+    }
+    *current = Arc::new(next);
+    true
 }
 
 fn bundles_by_host(bundles: &[WebBundle]) -> HashMap<String, PathBuf> {
@@ -80,7 +91,8 @@ fn bundles_by_host(bundles: &[WebBundle]) -> HashMap<String, PathBuf> {
 /// there is one, else from WEB_ROOT on disk if set, otherwise from embedded dist/.
 /// Falls back to index.html for SPA client-side routing.
 pub async fn spa_handler(uri: Uri, headers: &HeaderMap) -> Response {
-    serve(WEB_BUNDLES.get_or_init(HashMap::new), uri, headers).await
+    let bundles = WEB_BUNDLES.read().unwrap().clone();
+    serve(&bundles, uri, headers).await
 }
 
 async fn serve(bundles: &HashMap<String, PathBuf>, uri: Uri, headers: &HeaderMap) -> Response {

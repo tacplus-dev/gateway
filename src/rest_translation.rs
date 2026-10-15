@@ -1609,28 +1609,37 @@ mod tests {
     }
 
     /// The request's Host has to survive the REST fallback for the SPA to pick
-    /// the bundle configured for it. The only test that sets the process-wide
-    /// bundles, under a hostname no other test sends.
+    /// the bundle configured for it, and a bundle that arrives in a config
+    /// update after startup has to be served without a restart. The only test
+    /// that sets the process-wide bundles, under a hostname no other test sends.
     #[tokio::test]
-    async fn a_bundle_hostname_is_served_its_bundle_through_the_fallback() {
+    async fn a_bundle_added_after_startup_is_served_through_the_fallback() {
         use tower::ServiceExt;
         let dir = std::env::temp_dir().join(format!("gateway-bundle-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).expect("bundle dir");
         std::fs::write(dir.join("index.html"), "<html><head></head>web app</html>").expect("index");
-        crate::spa::init_web_bundles(&[
-            gateway_model::types::services::gateway::gateway::WebBundle {
-                hostname: "app.fallback.test".into(),
-                dir: dir.display().to_string(),
-                ..Default::default()
-            },
-        ]);
+        let request = || {
+            axum::http::Request::builder()
+                .uri("/projects/7")
+                .header(axum::http::header::HOST, "app.fallback.test:8443")
+                .body(axum::body::Body::empty())
+                .expect("request")
+        };
 
-        let request = axum::http::Request::builder()
-            .uri("/projects/7")
-            .header(axum::http::header::HOST, "app.fallback.test:8443")
-            .body(axum::body::Body::empty())
-            .expect("request");
-        let response = root_router().oneshot(request).await.expect("response");
+        // Startup config: no bundle for this host.
+        crate::spa::set_web_bundles(&[]);
+        let before = body_text(root_router().oneshot(request()).await.expect("response")).await;
+        assert!(!before.ends_with("web app</html>"));
+
+        // A later config update adds it.
+        let bundles = [gateway_model::types::services::gateway::gateway::WebBundle {
+            hostname: "app.fallback.test".into(),
+            dir: dir.display().to_string(),
+            ..Default::default()
+        }];
+        assert!(crate::spa::set_web_bundles(&bundles));
+        assert!(!crate::spa::set_web_bundles(&bundles), "an unchanged update is not a change");
+        let response = root_router().oneshot(request()).await.expect("response");
         let _ = std::fs::remove_dir_all(&dir);
 
         assert_eq!(response.status(), StatusCode::OK);
