@@ -281,15 +281,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         cfg.root_ca.clone(),
     );
 
-    // 9. Create trace publisher (shared between gRPC proxy and REST handler).
-    let trace_publish = sm.create_trace_publisher().await;
+    // 9. Trace publisher (shared between gRPC proxy and REST handler). The
+    // topic it published to belonged to agentsensor, a long-dead service; the
+    // proto no longer declares the publish, so traces are dropped until a live
+    // sink exists.
     let trace_publisher: Arc<
         dyn Fn(gateway_model::types::sys::trace::TraceEvent) + Send + Sync,
-    > = Arc::new(move |event| {
-        if trace_publish(event).is_err() {
-            tracing::warn!("trace publisher queue full, dropping trace event");
-        }
-    });
+    > = Arc::new(|_event| {});
 
     // 10. Build gRPC router: Mint (native tonic) + raw proxy for all other services.
     let sm_for_grpc_trace = Arc::clone(&sm);

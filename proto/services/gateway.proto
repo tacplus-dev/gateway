@@ -33,10 +33,9 @@ enum ExternalTlsMode {
 message Config {
 
   option (spec.grpc_config) = {service_name: "gateway"};
-  option (spec.event_publish) = {
-    topic_ref: "agentsensor.TraceEventBus.trace_events"
-    method_s2s: {auth_services: ["*"]}
-  };
+  // The trace events gateway used to publish went to agentsensor's topic;
+  // agentsensor is a long-dead service (Jody, 2026-10-23) and the publish
+  // declaration is gone with it. Traces are dropped until a live sink exists.
 
   // How often to refresh health state (seconds). Default 5.
   int64 health_poll_interval_seconds = 1 [(spec.default_int) = 5];
