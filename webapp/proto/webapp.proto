@@ -1,0 +1,18 @@
+// Copyright (c) 2026 Jody Scott
+// SPDX-License-Identifier: Apache-2.0
+syntax = "proto3";
+
+package webapp;
+
+import "sys/spec.proto";
+
+// webapp is the gateway's own web console, served at the fleet's public name.
+// It is a browser client of the fleet (W2S: gRPC over the gateway's REST
+// translation), not a service: it signs a person in through oauth and mints
+// their per-service tokens through the gateway's Mint front.
+option (spec.service) = {name: "webapp"};
+
+// Sign-in: list providers, start the provider's flow, exchange the callback.
+option (spec.grpc_w2s_client) = {service: "oauth.Auth"};
+// Per-service tokens from the session's refresh token, as every web client.
+option (spec.grpc_w2s_client) = {service: "gateway.Mint"};
