@@ -16,7 +16,7 @@ const ID_TOKEN_SIGNING_ALGS_SUPPORTED: &[&str] = &["EdDSA", "ES256"];
 /// GetOpenIdConfig and ListJwks are served locally from watched JWK keys.
 /// TokenMint and X509Mint are delegated to kernel.Mint — kernel is the cluster
 /// trust root and the sole token + cert signing authority
-/// (sm.s2s().kernel().mint_client()).
+/// (sm.s2s().kernel().minter_client(): the sys minting contract, hosted by kernel).
 /// ListPublicCa serves the root CA cert(s) from gateway config — the CA that
 /// signed the external TLS cert, which clients need to configure TLS trust.
 pub struct GatewayMintService {
@@ -104,7 +104,7 @@ impl Mint for GatewayMintService
         request: tonic::Request<TokenMintRequest>,
     ) -> Result<tonic::Response<TokenMintResponse>, tonic::Status> {
         // TokenMint is proxied to kernel.Mint (the sole token authority).
-        self.sm.s2s().kernel().mint_client().mint_token(request).await
+        self.sm.s2s().kernel().minter_client().mint_token(request).await
     }
 
     async fn mint_x509_cert(
@@ -112,7 +112,7 @@ impl Mint for GatewayMintService
         request: tonic::Request<X509MintRequest>,
     ) -> Result<tonic::Response<X509CertChain>, tonic::Status> {
         // X509Mint is proxied to kernel.Mint (the sole cert signing authority).
-        self.sm.s2s().kernel().mint_client().mint_x509_cert(request).await
+        self.sm.s2s().kernel().minter_client().mint_x509_cert(request).await
     }
 
     async fn list_public_ca(

@@ -6,8 +6,8 @@ use tokio::sync::Notify;
 use tokio_stream::StreamExt;
 use tonic::transport::Channel;
 
-use gateway_model::types::services::kernel::kernel::service_health_state_service_client::ServiceHealthStateServiceClient;
-use gateway_model::types::services::kernel::kernel::InstancesEntriesResponse;
+use gateway_model::types::sys::servicehealth::servicehealth::service_health_state_service_client::ServiceHealthStateServiceClient;
+use gateway_model::types::sys::servicehealth::servicehealth::InstancesEntriesResponse;
 
 const SERVICE_HEALTH_MAX_MESSAGE_BYTES: usize = 64 * 1024 * 1024;
 

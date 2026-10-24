@@ -1331,7 +1331,7 @@ async fn handle_mint(
                 .sm
                 .s2s()
                 .kernel()
-                .mint_client()
+                .minter_client()
                 .mint_token(grpc_req)
                 .await
             {
@@ -1362,7 +1362,7 @@ async fn handle_mint(
                 .sm
                 .s2s()
                 .kernel()
-                .mint_client()
+                .minter_client()
                 .mint_x509_cert(grpc_req)
                 .await
             {
