@@ -17,6 +17,10 @@ option (spec.state_imports) = {source: "kernel.Ca"};
 // MintClientToken, X509Mint) to kernel.Mint — kernel (the cluster trust root)
 // is the sole signing authority.
 option (spec.grpc_s2s_client) = {service: "kernel.Mint"};
+// The minting contract (MintToken, MintX509Cert, ...) is tacplus's sys
+// minter.Minter, hosted by kernel; gateway's client-facing Mint front proxies
+// those calls to it.
+option (spec.grpc_s2s_client) = {service: "minter.Minter"};
 
 // ExternalTlsMode controls how gateway provisions its public-facing TLS certificate.
 enum ExternalTlsMode {
