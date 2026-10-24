@@ -17,10 +17,9 @@
 // the only thing that distinguishes acme from beta is which listener the
 // gateway connected to. That is precisely the decision under test.
 //
-// The registry fixture is the `tenant_owned` set handed to `ProxyState` — no
-// service in the live registry declares `(spec.service).tenant_owned` yet
-// (registry.rs asserts this, and item 4 §1.2 explains why), so the tenant-owned
-// path can only be exercised against a fixture.
+// The registry fixture is the `tenant_owned` set handed to `ProxyState`, so the
+// tenant-owned path is exercised against a fixture whatever the live registry
+// declares (tenantecho declares it in the proof fleet; registry.rs checks that).
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -177,11 +176,11 @@ fn route_under_test() -> &'static RouteInfo {
         .find(|r| {
             !r.server_streaming
                 && !r.client_streaming
-                && r.auth_policy == AuthPolicy::Entitled
+                && matches!(r.auth_policy, AuthPolicy::Entitled | AuthPolicy::AnyUser)
                 && r.target_namespace_field.is_none()
                 && !r.grpc_path.starts_with("/gateway.")
         })
-        .expect("the generated ROUTES table must contain a unary entitled route")
+        .expect("the generated ROUTES table must contain a unary user-authenticated route")
 }
 
 fn proxy_state(

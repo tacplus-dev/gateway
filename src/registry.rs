@@ -53,9 +53,7 @@ pub fn tenant_owned_services() -> std::collections::HashSet<String> {
 }
 
 /// The registry walk behind `tenant_owned_services`, split out so it can be run
-/// against a fixture registry: no service in the live registry declares the
-/// annotation yet (item 4 §1.2), so a test against the embedded one proves only
-/// that nothing is falsely marked.
+/// against a fixture registry as well as the embedded one.
 fn parse_tenant_owned(registry_json: &str) -> std::collections::HashSet<String> {
     let root: serde_json::Value = match serde_json::from_str(registry_json) {
         Ok(v) => v,
@@ -155,16 +153,17 @@ mod tests {
         assert_eq!(owned.len(), 2, "no other service may be marked: {owned:?}");
     }
 
-    /// Guards the claim in the decision doc §1.5: no service in the real
-    /// registry declares the annotation yet, so every tenant-owned code path is
-    /// dead in today's fleet and cannot regress a live route.
+    /// The live registry's tenant-owned set is exactly the services that declare
+    /// the annotation: tenantecho, the two-tenant routing proof, and nothing
+    /// else. A new entry here is a new live tenant-owned route and is meant to be
+    /// noticed (decision-goalA-item5 Open question 1 is live now).
     #[test]
-    fn the_embedded_registry_marks_no_service_tenant_owned_today() {
-        assert!(
-            tenant_owned_services().is_empty(),
-            "a service now declares (spec.service).tenant_owned — the gateway path is live, \
-             and decision-goalA-item5 Open question 1 must be revisited: {:?}",
-            tenant_owned_services()
+    fn the_embedded_registry_marks_exactly_the_declared_tenant_owned_services() {
+        let owned = tenant_owned_services();
+        assert_eq!(
+            owned,
+            std::collections::HashSet::from(["tenantecho".to_string()]),
+            "the fleet's tenant-owned services: {owned:?}"
         );
     }
 
