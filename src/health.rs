@@ -188,6 +188,15 @@ impl HealthWatcher {
                         }
                     }
 
+                    // A tenant-owned instance is also filed under its route key,
+                    // `<svc>-<tenant>`: the proxy routes such a service by WHOSE
+                    // token arrives, and the instance's SPIFFE identity
+                    // (`spiffe://<td>/tenants/<tenant>/services/<svc>`) is the
+                    // only place the instance says which tenant it serves.
+                    if let Some(key) = tenant_route_key_of(&inst.spiffe_id) {
+                        grouped.entry(key).or_default().push(endpoint.clone());
+                    }
+
                     // Index by SPIFFE path if present.
                     if !inst.spiffe_id.is_empty() {
                         if let Some(path) = extract_spiffe_service_path(&inst.spiffe_id) {
@@ -226,6 +235,29 @@ impl HealthWatcher {
     }
 }
 
+/// The health key a tenant-owned service's instance for `tenant` is dialed by:
+/// `<svc>-<tenant>`, the operator's instance name. The proxy builds the same
+/// key from the caller's token; this indexer builds it from the instance.
+pub fn tenant_route_key(service: &str, tenant: &str) -> String {
+    format!("{}-{}", service, tenant)
+}
+
+/// The route key of a tenant-owned instance, from its SPIFFE identity; None for
+/// a shared (/system) service or anything that is not a service identity.
+fn tenant_route_key_of(spiffe_id: &str) -> Option<String> {
+    let id = gateway_spiffe::parse_spiffe_id(spiffe_id).ok()?;
+    if id.subject_kind != gateway_spiffe::SubjectKind::Service {
+        return None;
+    }
+    let mut segments = id.namespace.trim_start_matches('/').split('/');
+    match (segments.next(), segments.next()) {
+        (Some(gateway_spiffe::TENANTS_SEGMENT), Some(tenant)) if !tenant.is_empty() => {
+            Some(tenant_route_key(&id.subject_path, tenant))
+        }
+        _ => None,
+    }
+}
+
 /// Returns true if the instance status is HEALTHY or DEGRADED.
 fn is_routable(status: i32) -> bool {
     use gateway_model::types::sys::healthreport::healthreport::InstanceStatus;
@@ -253,4 +285,49 @@ fn extract_spiffe_service_path(spiffe_id: &str) -> Option<String> {
         return None;
     }
     Some(service_path.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gateway_model::types::sys::healthreport::healthreport::{InstanceStatus, ServiceInstanceHealth};
+    use gateway_model::types::sys::host::host::Host;
+
+    fn instance(service_id: &str, spiffe_id: &str, host: &str) -> ServiceInstanceHealth {
+        ServiceInstanceHealth {
+            service_id: service_id.to_string(),
+            spiffe_id: spiffe_id.to_string(),
+            status: InstanceStatus::Healthy as i32,
+            grpc_endpoint: Some(Host { host: host.to_string(), port: 8443, ..Default::default() }),
+            ..Default::default()
+        }
+    }
+
+    /// The proof fleet runs tenantecho once per tenant. Each instance reports
+    /// service_id "tenantecho" and a /tenants/<t> SPIFFE identity; the proxy
+    /// dials `tenantecho-<t>` for a /tenants/<t> caller, so the index must
+    /// answer that key with that tenant's endpoint and no other.
+    #[test]
+    fn a_tenant_owned_instance_is_indexed_under_its_route_key() {
+        let hw = HealthWatcher::seeded(HashMap::new());
+        let mut resp = InstancesEntriesResponse::default();
+        resp.entries.insert(
+            "a".into(),
+            instance("tenantecho", "spiffe://local.dev/tenants/alpha/services/tenantecho", "tenantecho-alpha0"),
+        );
+        resp.entries.insert(
+            "b".into(),
+            instance("tenantecho", "spiffe://local.dev/tenants/beta/services/tenantecho", "tenantecho-beta0"),
+        );
+        resp.entries.insert(
+            "k".into(),
+            instance("kernel", "spiffe://local.dev/system/seatrials/services/kernel", "kernel-0"),
+        );
+        hw.process_entries(&resp);
+
+        assert_eq!(hw.get_endpoints(&tenant_route_key("tenantecho", "alpha")), vec!["tenantecho-alpha0:8443"]);
+        assert_eq!(hw.get_endpoints(&tenant_route_key("tenantecho", "beta")), vec!["tenantecho-beta0:8443"]);
+        assert!(hw.get_endpoints("kernel-seatrials").is_empty(), "a shared service has no tenant route key");
+        assert_eq!(hw.get_endpoints("kernel"), vec!["kernel-0:8443"]);
+    }
 }

@@ -545,7 +545,7 @@ async fn handle_inner(
             &path,
             auth_header.as_deref(),
         ) {
-            Ok(tenant) => std::borrow::Cow::Owned(format!("{}-{}", service_id, tenant)),
+            Ok(tenant) => std::borrow::Cow::Owned(crate::health::tenant_route_key(service_id, &tenant)),
             Err((code, msg)) => {
                 tracing::warn!(path = %path, service = service_id, error = %msg, "tenant-owned routing rejected");
                 let grpc_code = status_code_to_tonic(code);
