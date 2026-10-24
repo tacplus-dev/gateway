@@ -652,38 +652,41 @@ mod tests {
         }
     }
 
+    // These use kernel's catalog entries, which every fleet gateway is built
+    // with; they used to use the launch bundle's `echo` sample service, which
+    // a fleet need not carry.
     #[test]
     fn flat_grants_accept_generated_package_wildcard() {
-        let entitlements = serde_json::json!({"grants": ["ECHO_ANY"]});
+        let entitlements = serde_json::json!({"grants": ["KERNEL_ANY"]});
         assert!(flat_grants_allow(
             &entitlements,
-            "echo",
-            "/echo.Echo/Ping"
+            "kernel",
+            "/kernel.TenantAdmin/ListTenants"
         ));
         assert!(!flat_grants_allow(
             &entitlements,
-            "sentinel",
-            "/sentinel.Dashboard/GetDashboard"
+            "stratum",
+            "/stratum.Stratum/Anything"
         ));
     }
 
     #[test]
     fn flat_grants_accept_object_wrapper_shape() {
-        let entitlements = serde_json::json!({"grants": [{"token": "ECHO_ANY"}]});
+        let entitlements = serde_json::json!({"grants": [{"token": "KERNEL_ANY"}]});
         assert!(flat_grants_allow(
             &entitlements,
-            "echo",
-            "/echo.Echo/Ping"
+            "kernel",
+            "/kernel.TenantAdmin/ListTenants"
         ));
     }
 
     #[test]
     fn flat_grants_accept_exact_catalog_token() {
-        let entitlements = serde_json::json!({"grants": ["ECHO_ECHO_PING"]});
+        let entitlements = serde_json::json!({"grants": ["KERNEL_TENANT_ADMIN_LIST_TENANTS"]});
         assert!(flat_grants_allow(
             &entitlements,
-            "echo",
-            "/echo.Echo/Ping"
+            "kernel",
+            "/kernel.TenantAdmin/ListTenants"
         ));
     }
 
