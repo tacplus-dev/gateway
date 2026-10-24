@@ -33,3 +33,7 @@ Thumbs.db
 
 # Claude Code
 .claude/
+
+# The web console's client proto keeps the clients/ convention; only the
+# downloadable binaries directory above is build output.
+!webapp/proto/clients/
