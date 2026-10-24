@@ -1,0 +1,10 @@
+# The gateway's own web console: a tacplus TypeScript client generated against
+# the fleet's merged protos (--src, as the image build passes it), served by the
+# gateway from webapp-dist/. Its client dependencies are declared in
+# proto/clients/webapp.proto. Today it is the sign-in page.
+language: typescript
+src: proto
+output-dir: model
+header: |
+  Copyright (c) 2026 Jody Scott
+  SPDX-License-Identifier: Apache-2.0

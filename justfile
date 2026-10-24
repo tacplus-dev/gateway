@@ -24,3 +24,10 @@ stage-web dist:
   rm -rf web-dist
   mkdir -p web-dist
   cp -R "{{dist}}/." web-dist/
+
+# The gateway's own web console (webapp/, a tacplus TypeScript client) into
+# webapp-dist/, which the image serves from /opt/schematic/webapp. FLEET_PROTO
+# is the fleet's merged tree the model generates against.
+webapp fleet_proto:
+  cd webapp && tacplus build --src "{{fleet_proto}}" && npm ci && npm run build
+  rm -rf webapp-dist && cp -R webapp/dist webapp-dist
