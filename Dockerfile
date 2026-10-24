@@ -32,4 +32,10 @@ COPY web-dist/ /opt/schematic/web/
 # Schematic client binaries for authenticated download via /client/:os/:arch
 COPY clients/ /opt/schematic/clients/
 
-ENTRYPOINT ["gateway"]
+# Every service runs under the launcher (github.com/tacplus-dev/launcher): PID 1
+# that forwards signals, propagates the exit code, and kills a deadlocked child
+# on gRPC health. The fleet's image pipeline puts the binary beside the Dockerfile.
+ARG TARGETARCH
+COPY launcher-linux-${TARGETARCH} /usr/local/bin/launcher
+ENV LAUNCH_CMD="gateway" HEALTH_PORT=8443
+ENTRYPOINT ["launcher"]
