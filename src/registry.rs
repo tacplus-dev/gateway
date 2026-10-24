@@ -154,15 +154,16 @@ mod tests {
     }
 
     /// The live registry's tenant-owned set is exactly the services that declare
-    /// the annotation: tenantecho, the two-tenant routing proof, and nothing
-    /// else. A new entry here is a new live tenant-owned route and is meant to be
-    /// noticed (decision-goalA-item5 Open question 1 is live now).
+    /// the annotation: tenantecho (the two-tenant routing proof) and doppelganger
+    /// (one instance per tenant, shared by its users), and nothing else. A new
+    /// entry here is a new live tenant-owned route and is meant to be noticed
+    /// (decision-goalA-item5 Open question 1 is live now).
     #[test]
     fn the_embedded_registry_marks_exactly_the_declared_tenant_owned_services() {
         let owned = tenant_owned_services();
         assert_eq!(
             owned,
-            std::collections::HashSet::from(["tenantecho".to_string()]),
+            std::collections::HashSet::from(["tenantecho".to_string(), "doppelganger".to_string()]),
             "the fleet's tenant-owned services: {owned:?}"
         );
     }
