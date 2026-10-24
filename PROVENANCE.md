@@ -11,3 +11,9 @@ eventbus oauth"*. The private copy runs the launch fleet unchanged; new-design c
 
 Divergences: headers in tacplus.yaml (Jody Scott, Apache-2.0; LICENSE added); `src: proto` (this repo
 holds the service's own proto); `proto/registry.yaml` is a lock of github.com/tacplus-dev/registry.
+
+2026-10-23, later: removed two test modules and one test that depended on things outside this fleet:
+`e2e_personalauth_registration` (personalauth is dead — boneyard), `e2e_entitlement` (drives Scotty's
+TaskActivity/AgentEvent records through stratum's query plane; product records, not platform), and the
+proxy_grpc test asserting personalauth's NoAuth routes. Trace publishing to agentsensor's topic removed
+(agentsensor is dead). The Mint front proxies MintToken/MintX509Cert to the sys minter (minter.Minter).

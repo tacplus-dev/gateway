@@ -805,31 +805,6 @@ mod tests {
             .find(|r| r.grpc_path == grpc_path)
     }
 
-    /// The device-login broker's two RPCs must be reachable unauthenticated:
-    /// the caller has no token yet, which is the whole point of the path.
-    /// Nothing in this repo produces these entries — they exist only because
-    /// `personalauth.proto` declares the RPCs `RPC_FLAG_SELF_AUTHENTICATES` on
-    /// a `service_c2s`, and tacplus turns that into a NoAuth route. The test is
-    /// here so a regeneration that drops them fails loudly instead of taking
-    /// device login offline.
-    #[test]
-    fn the_personalauth_device_login_rpcs_are_noauth_routes() {
-        for path in [
-            "/personalauth.Device/CreateDevicePrincipal",
-            "/personalauth.Device/MintDeviceTokens",
-        ] {
-            let route = route_for(path)
-                .unwrap_or_else(|| panic!("{path} must be in the generated ROUTES table"));
-            assert_eq!(
-                route.auth_policy,
-                AuthPolicy::NoAuth,
-                "{path} must be reachable without a token: {:?}",
-                route.auth_policy
-            );
-            assert_eq!(route.service_id, "personalauth");
-        }
-    }
-
     /// Token-management item 7: the user half of the delegate-bound Offline
     /// Token mint must be reachable through gateway's ORDINARY client-facing
     /// path — no hand-written `Mint` front entry, no proxy special case. The

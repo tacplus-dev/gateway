@@ -22,23 +22,10 @@ mod plain_http;
 mod spa;
 mod tls;
 
-/// End-to-end proof that a caller's entitlements decide whether a proxied gRPC
-/// call reaches the backend. Lives in the binary crate because that is the only
-/// place `proxy_grpc::handle` is reachable from — a `tests/` integration test
-/// cannot link a bin target.
-#[cfg(test)]
-mod e2e_entitlement;
-
 /// End-to-end proof that a tenant-owned service is routed to the caller's own
 /// tenant instance, and that every other service is routed exactly as before.
 #[cfg(test)]
 mod e2e_tenant_routing;
-
-/// End-to-end proof that a fresh device key registers and logs in through the
-/// gateway's NoAuth `personalauth.Device` routes, and that the kernel
-/// registration RPC those routes replaced is no longer reachable at all.
-#[cfg(test)]
-mod e2e_personalauth_registration;
 
 /// End-to-end proof that kernel's C2S `UserMint` surface — the user half of the
 /// delegate-bound Offline Token mint — is reachable through the gateway's
