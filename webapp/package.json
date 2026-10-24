@@ -10,7 +10,8 @@
     "@bufbuild/protobuf": "^2.11.0",
     "@iarna/toml": "^2.2.5",
     "js-yaml": "^4.1.1",
-    "jose": "^5.10.0"
+    "jose": "^5.10.0",
+    "@tacplus-dev/webapp-login": "file:../webapp-login"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

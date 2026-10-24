@@ -1,0 +1,14 @@
+{
+  "name": "@tacplus-dev/webapp-login",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Sign-in for a tacplus fleet's web app: the oauth flow over the consumer's generated clients, and a brandable page.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "files": ["src"],
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
