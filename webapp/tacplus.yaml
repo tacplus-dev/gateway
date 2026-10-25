@@ -5,6 +5,11 @@
 language: typescript
 src: proto
 output-dir: model
+# The web app calls oauth.Auth and gateway.Mint (webapp.proto); against the
+# fleet tree it generates from exactly those contracts.
+depends:
+  - gateway
+  - oauth
 header: |
   Copyright (c) 2026 Jody Scott
   SPDX-License-Identifier: Apache-2.0
