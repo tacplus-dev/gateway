@@ -11,6 +11,10 @@
 // callback → the provider sends the browser back with code+state → exchange
 // them for tokens → the refresh token is the session; per-service tokens are
 // minted from it on demand.
+//
+// The session token is the kernel's session credential: a set of proofs, one
+// per sign-in. Adding a sign-in runs the same provider flow again and then asks
+// kernel to make the two credentials one person (UserMint.MergePeople).
 
 export interface Provider {
   name: string;
@@ -37,6 +41,40 @@ export interface SessionTokens {
    * The generated TokenProvider's shape: a value or a promise of one. */
   provider(service?: string): string | undefined | Promise<string | undefined>;
 }
+
+/** Joins the session's credential with a fresh sign-in's (kernel.UserMint.MergePeople).
+ * Returns the joined credential; throws ConfirmNeeded when kernel's warning path
+ * applies (the fresh sign-in already belongs to an existing account). */
+export interface AccountMerger {
+  mergePeople(current: string, added: string, confirm: boolean): Promise<string>;
+}
+
+/** Kernel's warning path: the added sign-in belongs to an account with its own history. */
+export class ConfirmNeeded extends Error {}
+
+/** One sign-in the session holds, as the credential's proofs record it. */
+export interface SignedInWith {
+  idpId: string;
+  email?: string;
+}
+
+/** The proofs a session credential carries; empty for any other token. */
+export function signedInWith(credential: string | null): SignedInWith[] {
+  if (!credential) return [];
+  try {
+    const parts = credential.split('.');
+    const claims = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>;
+    const proofs = Array.isArray(claims.proofs) ? (claims.proofs as Array<Record<string, unknown>>) : [];
+    return proofs.map((p) => {
+      const c = (p.claims ?? {}) as Record<string, unknown>;
+      return { idpId: String(p.idp_id ?? ''), email: typeof c.email === 'string' ? c.email : undefined };
+    });
+  } catch {
+    return [];
+  }
+}
+
+const ADDING_KEY = 'tp-login-adding';
 
 /** Who is signed in, as the access token says. */
 export interface Identity {
@@ -70,7 +108,42 @@ export class SignIn {
     /** This page's URL, which the provider returns to; must be one the fleet's
      * oauth config allows (allowed_redirect_uri_prefixes). */
     private readonly callbackUrl: string,
+    /** Present when the app lets a person add sign-ins to their session. */
+    private readonly merger?: AccountMerger,
   ) {}
+
+  /** A fresh sign-in waiting for the person to confirm the merge. */
+  private pendingAdded: string | null = null;
+
+  /** Whether this app can add a sign-in to the session. */
+  canAdd(): boolean {
+    return this.merger !== undefined;
+  }
+
+  /** The sign-ins the current session holds. */
+  signedInWith(): SignedInWith[] {
+    return signedInWith(this.tokens.getRefreshToken());
+  }
+
+  /** Sends the browser to a provider to ADD a sign-in to this session. */
+  async startAdding(providerIndex: number): Promise<void> {
+    sessionStorage.setItem(ADDING_KEY, '1');
+    await this.start(providerIndex);
+  }
+
+  /** Completes a merge the person confirmed after ConfirmNeeded. */
+  async confirmAdding(): Promise<void> {
+    const current = this.tokens.getRefreshToken();
+    const added = this.pendingAdded;
+    this.pendingAdded = null;
+    if (!this.merger || !current || !added) throw new Error('Nothing is waiting to be added.');
+    this.tokens.setRefreshToken(await this.merger.mergePeople(current, added, true));
+  }
+
+  /** Drops a fresh sign-in the person chose not to merge. */
+  cancelAdding(): void {
+    this.pendingAdded = null;
+  }
 
   providers(): Promise<Provider[]> {
     return this.auth.listProviders();
@@ -86,9 +159,23 @@ export class SignIn {
     const params = new URLSearchParams(search);
     const error = params.get('error');
     if (error) throw new Error(`Sign-in did not finish (${error}).`);
+    const adding = sessionStorage.getItem(ADDING_KEY) !== null;
+    sessionStorage.removeItem(ADDING_KEY);
     const refresh = await this.auth.mintCallbackTokens(params.get('code') ?? '', params.get('state') ?? '');
-    this.tokens.setRefreshToken(refresh);
     history.replaceState(null, '', window.location.pathname);
+    const current = this.tokens.getRefreshToken();
+    if (!adding || !this.merger || !current) {
+      this.tokens.setRefreshToken(refresh);
+      return;
+    }
+    // Adding: the session (still the current credential, which is also what
+    // authenticates the call) and the fresh sign-in become one person.
+    try {
+      this.tokens.setRefreshToken(await this.merger.mergePeople(current, refresh, false));
+    } catch (err) {
+      if (err instanceof ConfirmNeeded) this.pendingAdded = refresh;
+      throw err;
+    }
   }
 
   /** The signed-in identity, or null when there is no usable session. */

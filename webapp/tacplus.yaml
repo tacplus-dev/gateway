@@ -5,10 +5,16 @@
 language: typescript
 src: proto
 output-dir: model
-# The web app calls oauth.Auth and gateway.Mint (webapp.proto); against the
-# fleet tree it generates from exactly those contracts.
+# The web app calls oauth.Auth, gateway.Mint and kernel.UserMint (webapp.proto);
+# against the fleet tree it generates from exactly those contracts. stratum is
+# here because kernel's contract hosts every service's config, and the records
+# among those (letsencrypt's) need the query plane stratum declares and the
+# broker eventbus declares.
 depends:
   - gateway
+  - eventbus
+  - kernel
+  - stratum
   - oauth
 header: |
   Copyright (c) 2026 Jody Scott
