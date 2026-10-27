@@ -147,6 +147,13 @@ impl UserMint for KernelStandIn {
         Err(unused())
     }
 
+    async fn revoke_device_credential(
+        &self,
+        _: tonic::Request<kernel_pb::RevokeDeviceCredentialRequest>,
+    ) -> Result<tonic::Response<kernel_pb::RevokeDeviceCredentialResponse>, tonic::Status> {
+        Err(unused())
+    }
+
     type BrokerUserMintMcpSessionStream =
         tokio_stream::Empty<Result<McpResponse, tonic::Status>>;
 

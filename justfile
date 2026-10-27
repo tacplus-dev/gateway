@@ -14,7 +14,9 @@ verify:
 
 # What every change must pass: regenerate with the floor's compiler (generated
 # code lives only in target/, so generation touching any file git sees is a
-# failure), then build and test the gateway and webapp-login.
+# failure), then build and test the gateway and webapp-login. The release
+# build is the binary the image ships (target/release/gateway), and the only
+# build that trips main.rs's compile_error! should dev-bypass ever be on.
 gates:
   #!/usr/bin/env bash
   set -euo pipefail
@@ -26,6 +28,7 @@ gates:
     exit 1
   fi
   cargo build --locked --all-targets
+  cargo build --locked --release
   cargo test --locked
   cd webapp-login && npm ci && npm test
 
