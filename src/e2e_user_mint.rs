@@ -301,7 +301,7 @@ fn request_with(
 
 fn mint_request() -> tokenrequest_pb::MintDelegateOfflineTokenRequest {
     tokenrequest_pb::MintDelegateOfflineTokenRequest {
-        delegate_name: "scotty".to_string(),
+        delegate_name: "ticketbot".to_string(),
         delegate_namespace: "/acme".to_string(),
         ..Default::default()
     }
@@ -340,7 +340,7 @@ async fn a_user_mints_a_delegate_offline_token_through_the_gateway() {
     let seen = backend.seen.lock().expect("seen").clone();
     assert_eq!(
         seen,
-        vec![("scotty".to_string(), "/acme".to_string(), true)],
+        vec![("ticketbot".to_string(), "/acme".to_string(), true)],
         "kernel must see the delegate pair the client sent, with the caller's bearer token \
          forwarded — the handler mints against that token's subject"
     );

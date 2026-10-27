@@ -1,8 +1,8 @@
 # Compiler floor: the looper runs the latest patch of this MAJOR.MINOR.
 tacplus: "2.4"
 language: rust
-# pkg kept as copied so the hand-written code keeps compiling; moves with the packages later.
-pkg: com.gitlab.seabeam.controlplane.schematic.services.gateway
+# Rust takes only pkg's last segment: the crate stays gateway-model.
+pkg: com.github.tacplusdev.gateway
 output-dir: target/generated-sources/model
 src: proto
 # gateway.proto declares a client of kernel.Mint and imports kernel.Ca state,

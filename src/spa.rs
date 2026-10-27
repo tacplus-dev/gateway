@@ -395,12 +395,12 @@ mod tests {
         fn config(&self) -> HashMap<String, PathBuf> {
             bundles_by_host(&[
                 WebBundle {
-                    hostname: "console.seabeam.net".into(),
+                    hostname: "console.example.com".into(),
                     dir: self.console.root().display().to_string(),
                     ..Default::default()
                 },
                 WebBundle {
-                    hostname: "App.Dev.Seabeam.Net".into(),
+                    hostname: "App.Dev.Example.Com".into(),
                     dir: self.app.root().display().to_string(),
                     ..Default::default()
                 },
@@ -424,8 +424,8 @@ mod tests {
     async fn each_hostname_is_served_its_own_bundle() {
         let bundles = Bundles::new();
 
-        assert_eq!(served(&bundles, "/app.js", host("app.dev.seabeam.net")).await, b"app bundle");
-        assert_eq!(served(&bundles, "/app.js", host("console.seabeam.net")).await, b"console.log(1)");
+        assert_eq!(served(&bundles, "/app.js", host("app.dev.example.com")).await, b"app bundle");
+        assert_eq!(served(&bundles, "/app.js", host("console.example.com")).await, b"console.log(1)");
     }
 
     /// Browsers send the port when it is not the default, and DNS names are
@@ -434,7 +434,7 @@ mod tests {
     async fn the_port_and_case_of_the_host_do_not_matter() {
         let bundles = Bundles::new();
 
-        for value in ["app.dev.seabeam.net:8443", "APP.DEV.SEABEAM.NET", "App.Dev.Seabeam.Net:443"] {
+        for value in ["app.dev.example.com:8443", "APP.DEV.EXAMPLE.COM", "App.Dev.Example.Com:443"] {
             assert_eq!(served(&bundles, "/app.js", host(value)).await, b"app bundle", "{value}");
         }
     }
@@ -445,7 +445,7 @@ mod tests {
     async fn an_http2_authority_selects_the_bundle_without_a_host_header() {
         let bundles = Bundles::new();
 
-        let body = served(&bundles, "https://app.dev.seabeam.net:443/app.js", HeaderMap::new()).await;
+        let body = served(&bundles, "https://app.dev.example.com:443/app.js", HeaderMap::new()).await;
         assert_eq!(body, b"app bundle");
     }
 
@@ -455,9 +455,9 @@ mod tests {
     async fn the_spa_fallback_is_per_bundle() {
         let bundles = Bundles::new();
 
-        let app = served(&bundles, "/dashboard/settings", host("app.dev.seabeam.net")).await;
+        let app = served(&bundles, "/dashboard/settings", host("app.dev.example.com")).await;
         assert!(app.ends_with(b"app</html>"), "{}", String::from_utf8_lossy(&app));
-        let console = served(&bundles, "/dashboard/settings", host("console.seabeam.net")).await;
+        let console = served(&bundles, "/dashboard/settings", host("console.example.com")).await;
         assert!(console.ends_with(b"console</html>"), "{}", String::from_utf8_lossy(&console));
     }
 
@@ -468,7 +468,7 @@ mod tests {
         let bundles = Bundles::new();
         let before = body_of(serve(&HashMap::new(), "/app.js".parse().unwrap(), &HeaderMap::new()).await).await;
 
-        for headers in [host("app.seabeam.net"), host("203.0.113.7:8443"), HeaderMap::new()] {
+        for headers in [host("app.example.com"), host("203.0.113.7:8443"), HeaderMap::new()] {
             let body = served(&bundles, "/app.js", headers).await;
             assert_eq!(body, before);
             assert_ne!(body, b"app bundle");

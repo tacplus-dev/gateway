@@ -33,7 +33,7 @@ clean:
   rm -rf target
 
 # Stage a built customer web app (its vite dist/) as web-dist/, which the image
-# serves from /opt/schematic/web, e.g. `just stage-web ../../../../sonar/clients/web/dist`.
+# serves from /opt/schematic/web, e.g. `just stage-web ../web/dist`.
 stage-web dist:
   #!/usr/bin/env bash
   set -euo pipefail

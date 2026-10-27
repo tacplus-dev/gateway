@@ -1588,7 +1588,7 @@ mod tests {
 
     #[tokio::test]
     async fn spa_routes_still_serve_the_spa() {
-        for path in ["/", "/scotty", "/sentinel", "/login", "/scotty/tickets/42"] {
+        for path in ["/", "/dashboard", "/sentinel", "/login", "/dashboard/tickets/42"] {
             let response = send("GET", path).await;
             assert_eq!(response.status(), StatusCode::OK, "{path}");
             let content_type = response
@@ -1648,10 +1648,10 @@ mod tests {
 
     #[test]
     fn discovery_advertises_the_bare_origin_as_issuer() {
-        let issuer = issuer_url("dev.seabeam.net");
+        let issuer = issuer_url("dev.example.com");
         let doc = serde_json::to_value(openid_config(&issuer)).expect("json");
-        assert_eq!(doc["issuer"], "https://dev.seabeam.net");
-        assert_eq!(doc["jwks_uri"], "https://dev.seabeam.net/.well-known/jwks.json");
+        assert_eq!(doc["issuer"], "https://dev.example.com");
+        assert_eq!(doc["jwks_uri"], "https://dev.example.com/.well-known/jwks.json");
     }
 
     #[test]

@@ -17,3 +17,12 @@ holds the service's own proto); `proto/registry.yaml` is a lock of github.com/ta
 TaskActivity/AgentEvent records through stratum's query plane; product records, not platform), and the
 proxy_grpc test asserting personalauth's NoAuth routes. Trace publishing to agentsensor's topic removed
 (agentsensor is dead). The Mint front proxies MintToken/MintX509Cert to the sys minter (minter.Minter).
+
+2026-10-27, no SeaBeam (#8): tacplus-dev works by itself, so nothing outside this note and dated records
+names SeaBeam. The gateway's proto is this repository's own (`proto/services/gateway.proto`), not vendored or
+fetched: its contract in the registry lock is `github.com/tacplus-dev/gateway`, and its dependencies come from
+their tacplus-dev homes through the registry. `pkg` is `com.github.tacplusdev.gateway` (the Rust crate is
+still `gateway-model`). Removed: `.gitlab-ci.yml` (SeaBeam's GitLab pipeline and registry; release CI is
+#6) and the GitLab package `registry:` block of `proto/dependencies.yaml`. The proto header, image labels
+and the privacy-page contact now name Jody Scott and tacplus.dev; tests use example.com hostnames and
+neutral names instead of SeaBeam's hosts and products.

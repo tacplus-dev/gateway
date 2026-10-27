@@ -36,8 +36,8 @@ use tokio::net::TcpStream;
 const ACME_CHALLENGE_PREFIX: &str = "/.well-known/acme-challenge/";
 
 /// Two years, subdomains included. No `preload` token: it was never submitted, and
-/// `includeSubDomains` + `preload` would lock every subdomain (mail.seabeam.net, the
-/// dev host) into HTTPS-only in every browser forever (decided 2026-09-30).
+/// `includeSubDomains` + `preload` would lock every subdomain of the domain (its mail
+/// host, the dev host) into HTTPS-only in every browser forever (decided 2026-09-30).
 const HSTS_VALUE: &str = "max-age=63072000; includeSubDomains";
 
 /// Serves the port-80 listener. `acme_backend` is the in-cluster `host:port` of
@@ -246,7 +246,7 @@ mod tests {
         Request::builder()
             .method(method)
             .uri(uri)
-            .header(header::HOST, "console.seabeam.net")
+            .header(header::HOST, "console.example.com")
             .body(Body::empty())
             .unwrap()
     }
@@ -300,13 +300,13 @@ mod tests {
         // certmagic's HTTP-01 solver keys its challenge lookup by the Host
         // header, not the connection it arrived on — rewriting Host to the
         // backend's own address makes it 404 a challenge it is actually
-        // holding for the real hostname (observed live: console.seabeam.net
+        // holding for the real hostname (observed live: the console hostname
         // proxied to letsencrypt0.schematic.svc.cluster.local:8080 came back
         // "no information found to solve challenge for identifier:
         // letsencrypt0.schematic.svc.cluster.local").
         assert!(
-            request_line.contains("host: console.seabeam.net")
-                || request_line.contains("Host: console.seabeam.net"),
+            request_line.contains("host: console.example.com")
+                || request_line.contains("Host: console.example.com"),
             "the backend must see the client's original Host header, not the backend address:\n{request_line}"
         );
     }
@@ -332,7 +332,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::MOVED_PERMANENTLY);
         assert_eq!(
             response.headers().get(header::LOCATION).unwrap(),
-            "https://console.seabeam.net/app/login?next=%2Fhome"
+            "https://console.example.com/app/login?next=%2Fhome"
         );
     }
 
@@ -345,7 +345,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::MOVED_PERMANENTLY);
         assert_eq!(
             response.headers().get(header::LOCATION).unwrap(),
-            "https://console.seabeam.net/"
+            "https://console.example.com/"
         );
     }
 
@@ -359,7 +359,7 @@ mod tests {
                 Request::builder()
                     .method("GET")
                     .uri("/x")
-                    .header(header::HOST, "console.seabeam.net:80")
+                    .header(header::HOST, "console.example.com:80")
                     .body(Body::empty())
                     .unwrap(),
             )
@@ -367,7 +367,7 @@ mod tests {
 
         assert_eq!(
             response.headers().get(header::LOCATION).unwrap(),
-            "https://console.seabeam.net/x"
+            "https://console.example.com/x"
         );
     }
 

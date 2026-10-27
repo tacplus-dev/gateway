@@ -272,40 +272,40 @@ mod tests {
     /// Each public name gets its own single-name certificate, chosen by SNI.
     #[test]
     fn each_hostname_is_served_its_own_certificate() {
-        let (console, console_der) = cert("console.seabeam.net");
-        let (app, app_der) = cert("app.seabeam.net");
+        let (console, console_der) = cert("console.example.com");
+        let (app, app_der) = cert("app.example.com");
         let config = build_server_config(&cert_data(
             &console,
-            &[("console.seabeam.net", &console), ("App.Seabeam.Net", &app)],
+            &[("console.example.com", &console), ("App.Example.Com", &app)],
         ))
         .expect("config");
 
-        assert_eq!(presented_leaf(config.clone(), Some("app.seabeam.net")), app_der);
-        assert_eq!(presented_leaf(config.clone(), Some("APP.seabeam.net")), app_der);
-        assert_eq!(presented_leaf(config, Some("console.seabeam.net")), console_der);
+        assert_eq!(presented_leaf(config.clone(), Some("app.example.com")), app_der);
+        assert_eq!(presented_leaf(config.clone(), Some("APP.example.com")), app_der);
+        assert_eq!(presented_leaf(config, Some("console.example.com")), console_der);
     }
 
     /// No SNI (a bare IP) or a name with no certificate of its own gets
     /// tls_cert, which is everything the gateway served before.
     #[test]
     fn no_or_unknown_sni_is_served_the_primary_certificate() {
-        let (console, console_der) = cert("console.seabeam.net");
-        let (app, _) = cert("app.seabeam.net");
+        let (console, console_der) = cert("console.example.com");
+        let (app, _) = cert("app.example.com");
         let config =
-            build_server_config(&cert_data(&console, &[("app.seabeam.net", &app)])).expect("config");
+            build_server_config(&cert_data(&console, &[("app.example.com", &app)])).expect("config");
 
         assert_eq!(presented_leaf(config.clone(), None), console_der);
-        assert_eq!(presented_leaf(config, Some("other.seabeam.net")), console_der);
+        assert_eq!(presented_leaf(config, Some("other.example.com")), console_der);
     }
 
     /// cert_data from a letsencrypt that predates `certs` serves exactly as
     /// before: one certificate for every name.
     #[test]
     fn cert_data_without_named_certs_serves_tls_cert_alone() {
-        let (console, console_der) = cert("console.seabeam.net");
+        let (console, console_der) = cert("console.example.com");
         let config = build_server_config(&cert_data(&console, &[])).expect("config");
 
-        assert_eq!(presented_leaf(config, Some("app.seabeam.net")), console_der);
+        assert_eq!(presented_leaf(config, Some("app.example.com")), console_der);
     }
 
     /// The defect-10 shape: the gateway starts serving cert_data with only the
@@ -314,29 +314,29 @@ mod tests {
     /// it, on the config the listener already holds.
     #[test]
     fn a_named_certificate_added_after_startup_answers_its_sni() {
-        let (console, console_der) = cert("console.seabeam.net");
-        let (app, app_der) = cert("app.seabeam.net");
+        let (console, console_der) = cert("console.example.com");
+        let (app, app_der) = cert("app.example.com");
         let tls_config =
             RustlsConfig::from_config(build_server_config(&cert_data(&console, &[])).expect("config"));
-        assert_eq!(presented_leaf(tls_config.get_inner(), Some("app.seabeam.net")), console_der);
+        assert_eq!(presented_leaf(tls_config.get_inner(), Some("app.example.com")), console_der);
 
         apply_cert_data(
             &tls_config,
-            &cert_data(&console, &[("console.seabeam.net", &console), ("app.seabeam.net", &app)]),
+            &cert_data(&console, &[("console.example.com", &console), ("app.example.com", &app)]),
         );
 
-        assert_eq!(presented_leaf(tls_config.get_inner(), Some("app.seabeam.net")), app_der);
-        assert_eq!(presented_leaf(tls_config.get_inner(), Some("console.seabeam.net")), console_der);
+        assert_eq!(presented_leaf(tls_config.get_inner(), Some("app.example.com")), app_der);
+        assert_eq!(presented_leaf(tls_config.get_inner(), Some("console.example.com")), console_der);
     }
 
     /// A named certificate whose key does not match its leaf is rejected as a
     /// whole, so the watcher keeps serving the previous config.
     #[test]
     fn a_named_certificate_with_the_wrong_key_is_rejected() {
-        let (console, _) = cert("console.seabeam.net");
-        let (mut app, _) = cert("app.seabeam.net");
+        let (console, _) = cert("console.example.com");
+        let (mut app, _) = cert("app.example.com");
         app.key = console.key.clone();
 
-        assert!(build_server_config(&cert_data(&console, &[("app.seabeam.net", &app)])).is_err());
+        assert!(build_server_config(&cert_data(&console, &[("app.example.com", &app)])).is_err());
     }
 }
