@@ -15,6 +15,14 @@
 // The session token is the kernel's session credential: a set of proofs, one
 // per sign-in. Adding a sign-in runs the same provider flow again and then asks
 // kernel to make the two credentials one person (UserMint.MergePeople).
+//
+// Each proof vouches for the tenants its login was routed to (an org login
+// [org, people], a personal one [people]). An access token is minted for one
+// of them (Mint.MintToken with tenant_namespace); the page keeps that tenant
+// across refreshes and reloads, starting from the first access token's (the
+// org's when the login routed to one), and lets the person switch. A tenant no
+// live proof vouches for is refused PERMISSION_DENIED: the step-up, signing in
+// with that tenant's identity provider.
 
 export interface Provider {
   name: string;
@@ -26,9 +34,17 @@ export interface LoginAuth {
   listProviders(): Promise<Provider[]>;
   /** Starts the provider's flow; returns the URL to send the browser to. */
   authorize(providerIndex: number, callbackUrl: string): Promise<string>;
-  /** Exchanges the provider's return for tokens; returns the refresh token. */
-  mintCallbackTokens(code: string, state: string): Promise<string>;
+  /** Exchanges the provider's return for the session's tokens. */
+  mintCallbackTokens(code: string, state: string): Promise<CallbackTokens>;
   revokeSession(postLogoutRedirectUrl: string): Promise<void>;
+}
+
+/** What a provider's return mints (oauth.CallbackResponse). */
+export interface CallbackTokens {
+  /** The session credential. */
+  refreshToken: string;
+  /** The first access token, in the tenant the login was routed to. */
+  accessToken: string;
 }
 
 /** The session: the refresh token's home and the mint of tokens from it. The
@@ -37,6 +53,8 @@ export interface SessionTokens {
   getRefreshToken(): string | null;
   setRefreshToken(token: string): void;
   clear(): void;
+  /** The tenant the refresh -> access mint asks for (tenant_namespace); null for none. */
+  setTenantNamespace(ns: string | null): void;
   /** A token for `service` ('' for the access token), minted from the session.
    * The generated TokenProvider's shape: a value or a promise of one. */
   provider(service?: string): string | undefined | Promise<string | undefined>;
@@ -52,6 +70,14 @@ export interface AccountMerger {
 /** Kernel's warning path: the added sign-in belongs to an account with its own history. */
 export class ConfirmNeeded extends Error {}
 
+/** Kernel refused a tenant no live proof vouches for: sign in with that tenant's
+ * identity provider (startAdding with the tenant) and the switch completes. */
+export class StepUpNeeded extends Error {
+  constructor(readonly tenant: string, message: string) {
+    super(message);
+  }
+}
+
 /** One sign-in the session holds, as the credential's proofs record it. */
 export interface SignedInWith {
   idpId: string;
@@ -59,22 +85,39 @@ export interface SignedInWith {
 }
 
 /** The proofs a session credential carries; empty for any other token. */
-export function signedInWith(credential: string | null): SignedInWith[] {
+function proofsOf(credential: string | null): Array<Record<string, unknown>> {
   if (!credential) return [];
   try {
     const parts = credential.split('.');
     const claims = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>;
-    const proofs = Array.isArray(claims.proofs) ? (claims.proofs as Array<Record<string, unknown>>) : [];
-    return proofs.map((p) => {
-      const c = (p.claims ?? {}) as Record<string, unknown>;
-      return { idpId: String(p.idp_id ?? ''), email: typeof c.email === 'string' ? c.email : undefined };
-    });
+    return Array.isArray(claims.proofs) ? (claims.proofs as Array<Record<string, unknown>>) : [];
   } catch {
     return [];
   }
 }
 
+/** The sign-ins a session credential holds; empty for any other token. */
+export function signedInWith(credential: string | null): SignedInWith[] {
+  return proofsOf(credential).map((p) => {
+    const c = (p.claims ?? {}) as Record<string, unknown>;
+    return { idpId: String(p.idp_id ?? ''), email: typeof c.email === 'string' ? c.email : undefined };
+  });
+}
+
+/** The tenants a session credential's proofs vouch for, each once, in proof order. */
+export function vouchedTenants(credential: string | null): string[] {
+  const tenants = proofsOf(credential).flatMap((p) =>
+    Array.isArray(p.tenants) ? p.tenants.filter((t): t is string => typeof t === 'string') : []);
+  return [...new Set(tenants)];
+}
+
 const ADDING_KEY = 'tp-login-adding';
+/** The tenant an adding sign-in is the step-up for. */
+const STEP_UP_KEY = 'tp-login-step-up';
+/** The tenant the session's access tokens are minted for; kept across reloads. */
+const TENANT_KEY = 'tp-login-tenant';
+/** The gRPC status kernel refuses an unvouched tenant with, as W2SError.code carries it. */
+const PERMISSION_DENIED = 7;
 
 /** Who is signed in, as the access token says. */
 export interface Identity {
@@ -125,9 +168,56 @@ export class SignIn {
     return signedInWith(this.tokens.getRefreshToken());
   }
 
-  /** Sends the browser to a provider to ADD a sign-in to this session. */
-  async startAdding(providerIndex: number): Promise<void> {
+  /** The tenants the current session vouches for. */
+  tenants(): string[] {
+    return vouchedTenants(this.tokens.getRefreshToken());
+  }
+
+  /** The tenant the session's access tokens are minted for; null before any sign-in. */
+  activeTenant(): string | null {
+    return localStorage.getItem(TENANT_KEY);
+  }
+
+  private setActiveTenant(tenant: string): void {
+    localStorage.setItem(TENANT_KEY, tenant);
+    this.mintFor(tenant);
+  }
+
+  /** Has the session's mint name `tenant`. Only a session credential is
+   * exchanged per tenant: kernel refuses a legacy refresh token (a tenant IdP's
+   * login) that names one, and mints it for its own tenant without. */
+  private mintFor(tenant: string | null): void {
+    this.tokens.setTenantNamespace(proofsOf(this.tokens.getRefreshToken()).length > 0 ? tenant : null);
+  }
+
+  /** Mints an access token for `tenant` and makes it the active one. Throws
+   * StepUpNeeded, leaving the active tenant as it was, when kernel refuses it. */
+  async switchTenant(tenant: string): Promise<Identity> {
+    this.mintFor(tenant);
+    let token: string | undefined;
+    try {
+      token = await Promise.resolve(this.tokens.provider(''));
+    } catch (err) {
+      this.mintFor(this.activeTenant());
+      if ((err as { code?: unknown }).code === PERMISSION_DENIED) {
+        throw new StepUpNeeded(tenant, `This session has no sign-in for ${tenant}. Sign in with that tenant's identity provider.`);
+      }
+      throw err;
+    }
+    if (!token) {
+      this.mintFor(this.activeTenant());
+      throw new Error(`No access token for ${tenant}.`);
+    }
+    this.setActiveTenant(tenant);
+    return identityFromToken(token);
+  }
+
+  /** Sends the browser to a provider to ADD a sign-in to this session; with
+   * `forTenant`, the sign-in is the step-up for it and the switch completes on return. */
+  async startAdding(providerIndex: number, forTenant?: string): Promise<void> {
     sessionStorage.setItem(ADDING_KEY, '1');
+    if (forTenant) sessionStorage.setItem(STEP_UP_KEY, forTenant);
+    else sessionStorage.removeItem(STEP_UP_KEY);
     await this.start(providerIndex);
   }
 
@@ -138,11 +228,20 @@ export class SignIn {
     this.pendingAdded = null;
     if (!this.merger || !current || !added) throw new Error('Nothing is waiting to be added.');
     this.tokens.setRefreshToken(await this.merger.mergePeople(current, added, true));
+    await this.finishStepUp();
   }
 
   /** Drops a fresh sign-in the person chose not to merge. */
   cancelAdding(): void {
     this.pendingAdded = null;
+    sessionStorage.removeItem(STEP_UP_KEY);
+  }
+
+  /** Completes the switch an added sign-in was the step-up for. */
+  private async finishStepUp(): Promise<void> {
+    const tenant = sessionStorage.getItem(STEP_UP_KEY);
+    sessionStorage.removeItem(STEP_UP_KEY);
+    if (tenant) await this.switchTenant(tenant);
   }
 
   providers(): Promise<Provider[]> {
@@ -161,17 +260,23 @@ export class SignIn {
     if (error) throw new Error(`Sign-in did not finish (${error}).`);
     const adding = sessionStorage.getItem(ADDING_KEY) !== null;
     sessionStorage.removeItem(ADDING_KEY);
-    const refresh = await this.auth.mintCallbackTokens(params.get('code') ?? '', params.get('state') ?? '');
+    const minted = await this.auth.mintCallbackTokens(params.get('code') ?? '', params.get('state') ?? '');
+    const refresh = minted.refreshToken;
     history.replaceState(null, '', window.location.pathname);
     const current = this.tokens.getRefreshToken();
     if (!adding || !this.merger || !current) {
+      sessionStorage.removeItem(STEP_UP_KEY);
       this.tokens.setRefreshToken(refresh);
+      // A new session starts in the tenant its first access token is for.
+      this.setActiveTenant(identityFromToken(minted.accessToken).tenant);
       return;
     }
     // Adding: the session (still the current credential, which is also what
-    // authenticates the call) and the fresh sign-in become one person.
+    // authenticates the call) and the fresh sign-in become one person. The
+    // active tenant stays, unless the sign-in was a step-up for another.
     try {
       this.tokens.setRefreshToken(await this.merger.mergePeople(current, refresh, false));
+      await this.finishStepUp();
     } catch (err) {
       if (err instanceof ConfirmNeeded) this.pendingAdded = refresh;
       throw err;
@@ -181,6 +286,7 @@ export class SignIn {
   /** The signed-in identity, or null when there is no usable session. */
   async current(): Promise<Identity | null> {
     if (!this.tokens.getRefreshToken()) return null;
+    this.mintFor(this.activeTenant());
     try {
       const token = await Promise.resolve(this.tokens.provider(''));
       return token ? identityFromToken(token) : null;
@@ -195,6 +301,8 @@ export class SignIn {
       await this.auth.revokeSession(this.callbackUrl);
     } finally {
       this.tokens.clear();
+      localStorage.removeItem(TENANT_KEY);
+      this.tokens.setTenantNamespace(null);
     }
   }
 }

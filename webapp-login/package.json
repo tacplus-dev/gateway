@@ -8,7 +8,11 @@
   "types": "src/index.ts",
   "exports": { ".": "./src/index.ts" },
   "files": ["src"],
+  "scripts": {
+    "test": "tsc && node --experimental-transform-types --test test/*.test.ts"
+  },
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "typescript": "^5.9.3"
   }
 }

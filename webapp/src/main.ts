@@ -36,7 +36,8 @@ const auth: LoginAuth = {
     return (await authClient.authorize(create(AuthorizeRequestSchema, { providerIndex, callbackUrl }))).redirectUrl;
   },
   async mintCallbackTokens(code, state) {
-    return (await authClient.mintCallbackTokens(create(CallbackRequestSchema, { code, state }))).refreshToken;
+    const resp = await authClient.mintCallbackTokens(create(CallbackRequestSchema, { code, state }));
+    return { refreshToken: resp.refreshToken, accessToken: resp.accessToken };
   },
   async revokeSession(postLogoutRedirectUrl) {
     await authClient.revokeSession(create(LogoutRequestSchema, { postLogoutRedirectUrl }));

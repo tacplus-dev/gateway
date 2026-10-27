@@ -4,7 +4,7 @@
 // The sign-in page: one function that owns a container element and renders
 // the flow into it under the consumer's brand. A consumer that wants its own
 // markup uses SignIn (flow.ts) directly and never calls this.
-import { SignIn, ConfirmNeeded, isCallback, type Identity, type Provider } from './flow.js';
+import { SignIn, ConfirmNeeded, StepUpNeeded, isCallback, type Identity, type Provider } from './flow.js';
 
 export interface Brand {
   /** The heading, e.g. the product name. */
@@ -22,7 +22,8 @@ export interface Brand {
   /** Rendered under the providers (terms, help). */
   footerHtml?: string;
   /** Called once someone is signed in; defaults to showing the identity, the
-   * sign-ins the session holds, buttons to add another, and sign out. */
+   * tenants the session vouches for with a switch to each, the sign-ins it
+   * holds, buttons to add another, and sign out. */
   onSignedIn?: (identity: Identity, signOut: () => Promise<void>) => void;
 }
 
@@ -55,6 +56,9 @@ const STYLE = `
 .tp-login .tp-icon svg { width: 100%; height: 100%; }
 .tp-login ul.tp-signins { list-style: none; padding: 0; margin: 0; }
 .tp-login ul.tp-signins li { display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0; }
+.tp-login ul.tp-tenants { list-style: none; padding: 0; margin: 0; }
+.tp-login ul.tp-tenants li { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.35rem 0; word-break: break-all; }
+.tp-login ul.tp-tenants button { display: inline-block; width: auto; margin: 0; padding: 0.35rem 0.75rem; }
 .tp-login .tp-error { color: #b00020; }
 .tp-login dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
 .tp-login dt { opacity: 0.7; } .tp-login dd { margin: 0; word-break: break-all; }
@@ -90,18 +94,25 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
       brand.onSignedIn(me, () => signIn.signOut().then(run));
       return;
     }
+    const tenants = signIn.tenants().map((t) => t === me.tenant
+      ? `<li><strong>${escape(t)}</strong><span>active</span></li>`
+      : `<li>${escape(t)}<button class="tp-secondary" data-tp="switch" data-t="${escape(t)}">Switch</button></li>`).join('');
     const signins = signIn.signedInWith().map((s) =>
       `<li><span class="tp-icon">${providerIcon(s.idpId)}</span>${escape(s.email ?? s.idpId)}</li>`).join('');
     const adding = signIn.canAdd()
       ? `<h2>Add another sign-in</h2>${providerButtons(await signIn.providers(), (p) => `Add ${p.name}`, 'add')}`
       : '';
     render(`<dl><dt>Subject</dt><dd>${escape(me.subject)}</dd><dt>Email</dt><dd>${escape(me.email ?? '')}</dd><dt>Tenant</dt><dd>${escape(me.tenant)}</dd></dl>
+      ${tenants ? `<h2>Tenants</h2><ul class="tp-tenants">${tenants}</ul>` : ''}
       ${signins ? `<h2>Signed in with</h2><ul class="tp-signins">${signins}</ul>` : ''}
       ${adding}
       <button class="tp-secondary" data-tp="out">Sign out</button>`);
     container.querySelector('[data-tp="out"]')?.addEventListener('click', () => signIn.signOut().then(run));
     for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="add"]')) {
       b.addEventListener('click', () => signIn.startAdding(Number(b.dataset.i)).catch(fail));
+    }
+    for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="switch"]')) {
+      b.addEventListener('click', () => signIn.switchTenant(b.dataset.t ?? '').then(run, fail));
     }
   };
 
@@ -130,9 +141,30 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
     });
   };
 
+  // Kernel's step-up: no sign-in in the session vouches for the tenant asked
+  // for. Signing in with that tenant's provider adds it and finishes the switch.
+  const showStepUp = async (err: StepUpNeeded) => {
+    const providers = signIn.canAdd()
+      ? providerButtons(await signIn.providers(), (p) => `Sign in with ${p.name}`, 'step-up')
+      : '';
+    render(`<p>${escape(err.message)}</p>${providers}
+      <button class="tp-secondary" data-tp="cancel">Cancel</button>`);
+    for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="step-up"]')) {
+      b.addEventListener('click', () => signIn.startAdding(Number(b.dataset.i), err.tenant).catch(fail));
+    }
+    container.querySelector('[data-tp="cancel"]')?.addEventListener('click', () => {
+      signIn.cancelAdding();
+      run();
+    });
+  };
+
   const fail = (err: unknown) => {
     if (err instanceof ConfirmNeeded) {
       showConfirm(err.message);
+      return;
+    }
+    if (err instanceof StepUpNeeded) {
+      showStepUp(err).catch(fail);
       return;
     }
     const msg = err instanceof Error ? err.message : String(err);
