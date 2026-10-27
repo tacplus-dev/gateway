@@ -1,6 +1,6 @@
 # Multi-stage build: compile Rust for linux/arm64, then create runtime image.
 # Used for local development builds when cross-compilation tools aren't available.
-FROM --platform=linux/arm64 rust:bookworm AS builder
+FROM --platform=linux/arm64 rust:trixie AS builder
 
 # Install build dependencies.
 RUN apt-get update && apt-get install -y --no-install-recommends \
