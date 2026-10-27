@@ -495,11 +495,13 @@ mod tests {
 
     #[test]
     fn a_bucket_refills_over_time() {
-        let limiter = RateLimiter::new(1000.0, 1.0);
+        // 20/s refills a token every 50ms: slow enough that the back-to-back
+        // second call cannot refill on a loaded machine, as 1ms at 1000/s did.
+        let limiter = RateLimiter::new(20.0, 1.0);
         assert!(limiter.allow("k"));
         assert!(!limiter.allow("k"));
-        std::thread::sleep(std::time::Duration::from_millis(20));
-        assert!(limiter.allow("k"), "20ms at 1000/s must have refilled the bucket");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        assert!(limiter.allow("k"), "100ms at 20/s must have refilled the bucket");
     }
 
     #[test]

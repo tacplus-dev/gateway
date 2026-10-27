@@ -87,6 +87,7 @@ SPIFFE service either serve the SPA (`GET`/`HEAD`) or return a JSON 404.
 
 ```bash
 just        # generate + compile
+just gates  # generate (checks it writes only target/), build, test
 just clean  # remove build artifacts
 ```
 

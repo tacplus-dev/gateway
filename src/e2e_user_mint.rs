@@ -43,6 +43,7 @@ use gateway_token::token::Token;
 use gateway_x509::x509::{ImmutableCertChain, X509KeyUsage};
 
 use gateway_model::types::services::kernel::kernel as kernel_pb;
+use gateway_model::types::sys::mcp::mcp::{McpRequest, McpResponse};
 use gateway_model::types::sys::tokenrequest::tokenrequest as tokenrequest_pb;
 use kernel_pb::mint_client::MintClient;
 use kernel_pb::user_mint_client::UserMintClient;
@@ -62,6 +63,10 @@ const KERNEL_SERVICE: &str = "kernel";
 const CODE: &str = "the-code-the-user-hands-the-delegate";
 
 // ── the backend ─────────────────────────────────────────────────────────────
+
+fn unused() -> tonic::Status {
+    tonic::Status::unimplemented("not part of this test")
+}
 
 /// Stands in for kernel's `UserMint` surface. It records the delegate it was
 /// asked about and whether the caller's bearer token arrived with the call, so
@@ -91,6 +96,65 @@ impl UserMint for KernelStandIn {
                 expires_at_ms: unix_now() * 1000 + 300_000,
             },
         ))
+    }
+
+    async fn merge_credentials(
+        &self,
+        _: tonic::Request<kernel_pb::MergeCredentialsRequest>,
+    ) -> Result<tonic::Response<kernel_pb::MergeCredentialsResponse>, tonic::Status> {
+        Err(unused())
+    }
+
+    async fn merge_people(
+        &self,
+        _: tonic::Request<kernel_pb::MergePeopleRequest>,
+    ) -> Result<tonic::Response<kernel_pb::MergePeopleResponse>, tonic::Status> {
+        Err(unused())
+    }
+
+    async fn get_linked_accounts(
+        &self,
+        _: tonic::Request<kernel_pb::GetLinkedAccountsRequest>,
+    ) -> Result<tonic::Response<kernel_pb::GetLinkedAccountsResponse>, tonic::Status> {
+        Err(unused())
+    }
+
+    async fn delete_identity_link(
+        &self,
+        _: tonic::Request<kernel_pb::DeleteIdentityLinkRequest>,
+    ) -> Result<tonic::Response<kernel_pb::DeleteIdentityLinkResponse>, tonic::Status> {
+        Err(unused())
+    }
+
+    async fn delete_account(
+        &self,
+        _: tonic::Request<kernel_pb::DeleteAccountRequest>,
+    ) -> Result<tonic::Response<kernel_pb::DeleteAccountResponse>, tonic::Status> {
+        Err(unused())
+    }
+
+    async fn revoke_sessions(
+        &self,
+        _: tonic::Request<kernel_pb::RevokeSessionsRequest>,
+    ) -> Result<tonic::Response<kernel_pb::RevokeSessionsResponse>, tonic::Status> {
+        Err(unused())
+    }
+
+    async fn revoke_credential_proof(
+        &self,
+        _: tonic::Request<kernel_pb::RevokeCredentialProofRequest>,
+    ) -> Result<tonic::Response<kernel_pb::RevokeCredentialProofResponse>, tonic::Status> {
+        Err(unused())
+    }
+
+    type BrokerUserMintMcpSessionStream =
+        tokio_stream::Empty<Result<McpResponse, tonic::Status>>;
+
+    async fn broker_user_mint_mcp_session(
+        &self,
+        _: tonic::Request<tonic::Streaming<McpRequest>>,
+    ) -> Result<tonic::Response<Self::BrokerUserMintMcpSessionStream>, tonic::Status> {
+        Err(unused())
     }
 }
 

@@ -1,9 +1,25 @@
+# Compiler floor: the looper runs the latest patch of this MAJOR.MINOR.
+tacplus: "2.4"
 language: rust
 # pkg kept as copied so the hand-written code keeps compiling; moves with the packages later.
 pkg: com.gitlab.seabeam.controlplane.schematic.services.gateway
 output-dir: target/generated-sources/model
 src: proto
+# gateway.proto declares a client of kernel.Mint and imports kernel.Ca state,
+# and imports letsencrypt.LetsEncryptState.
+depends:
+  - kernel
+  - letsencrypt
+# Test-time needs, not the contract: the form_post end-to-end test stands in
+# for oauth.Auth, and registry.rs pins the fleet's tenant-owned services
+# (tenantecho and doppelganger declare it).
+test-depends:
+  - oauth
+  - tenantecho
+  - doppelganger
 header: |
   Copyright (c) 2026 Jody Scott
   SPDX-License-Identifier: Apache-2.0
+# The gateway proxies and validates every service in the fleet (its ROUTES
+# table covers each one), so it really uses the whole fleet's servers.
 grpc-servers: all
