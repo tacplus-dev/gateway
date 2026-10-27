@@ -1,0 +1,91 @@
+= init
+> Bash gh issue view 6 --repo tacplus-dev/gateway --comments; ls; cat justfile tacplus.yaml; git branch -a
+< ARCHITECTURE.md Cargo.lock Cargo.toml Dockerfile Dockerfile.cross GATEWAY_PROGRESS.md LICENSE PROVENANCE.md QUESTIONS.md README.md decisions dist justfile proto src tacplus.yaml webapp webapp-login # Local development builds only — not used in CI/CD.  TACPLUS := env_var_or_default("TACPLUS_BIN", "ta...
+The issue view printed nothing. Let me retry.
+> Bash gh issue view 6 --repo tacplus-dev/gateway --comments 2>&1; echo "exit=$?"; gh issue view 6 --repo tacplus-dev/gateway --json title,body,labels,state,comments 2>&1
+< exit=0 {"body":"Blocked-by: #1\n\n## What\n\nRelease this service by version, so fleets pin it by release line (tacplus-dev/tacplus#180), not by commit\n(Jody, 2026-10-27).\n\n- **Tags:** `vMAJOR.MINOR.PATCH` on main (and on `release/MAJOR.MINOR` branches for patches to an older\n  line). Start at *...
+> Bash gh issue view 1 --repo tacplus-dev/gateway --json title,body,state,labels,comments 2>&1 | head -80; gh issue view 180 --repo tacplus-dev/tacplus --json title,body,state 2>&1 | head -60; ls .github 2>&1; git tag; ls decisions; cat Dockerfile | head -60
+< {"body":"Blocked-by: tacplus-dev/tacplus#161\n\n## What\n\nDeclare this repository's tacplus floor: add `tacplus: \"2.4\"` to `tacplus.yaml`, regenerate with tacplus 2.4,\nand make the repository build and pass its gates on it.\n\n## Why\n\nThe repository loopers (github.com/tacplus-dev/looper) run ...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash cat Dockerfile.cross; ls -la dist webapp; cat .gitignore .dockerignore 2>/dev/null; grep -n -i -A3 "image\|release\|docker\|web-dist\|clients/\|launcher" README.md | head -120
+< # Multi-stage build: compile Rust for linux/arm64, then create runtime image. # Used for local development builds when cross-compilation tools aren't available. FROM --platform=linux/arm64 rust:trixie AS builder  # Install build dependencies. RUN apt-get update && apt-get install -y --no-install-rec...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash grep -n -i "image\|web-dist\|webapp-dist\|clients\|launcher\|fleet" README.md ARCHITECTURE.md QUESTIONS.md | head -80; gh search issues --owner tacplus-dev "Release: tag vMAJOR.MINOR.PATCH" --json repository,number,state,labels --limit 40 2>&1 | head -50
+< README.md:14:  clients ──► HTTPS ──►   │  axum server (HTTP/1.1 + HTTP/2 + H3)   │ ARCHITECTURE.md:15:  REST clients ────┐ ARCHITECTURE.md:17:  gRPC clients ────┘ ARCHITECTURE.md:57:Handles all gRPC traffic, both from native gRPC clients and from `rest_translation`. QUESTIONS.md:67:called after iden...
+= thinking_tokens
+= thinking_tokens
+> Bash cd /tmp && rm -rf ref && mkdir ref && cd ref && gh repo clone tacplus-dev/nsproxy -- --depth 50 -q 2>&1 | tail -2; ls nsproxy nsproxy/.github/workflows 2>&1; gh issue view 3 --repo tacplus-dev/nsproxy --comments 2>&1 | tail -40
+< nsproxy: Dockerfile LICENSE Makefile README.md api cmd config go.mod go.sum internal scripts  nsproxy/.github/workflows: ci.yml release.yml author:	jodydadescott association:	member edited:	false status:	none -- Done in 63e0464 on main, released as **v0.1.0**.  **What changed** - `.github/workflows/...
+= thinking_tokens
+= thinking_tokens
+> Bash cd /tmp/ref && gh repo clone tacplus-dev/fleet-seatrials -- --depth 1 -q 2>&1|tail -2; gh repo clone tacplus-dev/fleet-dev -- --depth 1 -q 2>&1|tail -2; grep -rn -i "gateway" fleet-seatrials fleet-dev --include=*.yaml --include=*.yml --include=justfile --include=Makefile --include=*.sh --include=*.m...
+= task_started
+= task_notification
+< fleet-seatrials/build/proto/registry.yaml fleet-seatrials/README.md fleet-seatrials/images/service.cloudbuild.yaml fleet-seatrials/images/build.sh fleet-seatrials/deploy/init.sh fleet-seatrials/deploy/bootstrap/services/kernel.yaml fleet-seatrials/deploy/bootstrap/services/gateway.yaml fleet-seatria...
+I've read issue #6 and its precedent (nsproxy's release, already done). Now I'm checking how the fleet builds the gateway image today, because the gateway image bundles fleet-specific artifacts.
+> Bash cd /tmp/ref/fleet-seatrials && cat images/build.sh | head -150; grep -n -i -B2 -A12 "gateway" images/service.cloudbuild.yaml | head -80
+< #!/usr/bin/env bash # Copyright (c) 2026 Jody Scott # SPDX-License-Identifier: Apache-2.0 # # Builds the fleet's images on Cloud Build, one per service in fleet.lock, from # the exact commits the lock names, against this checkout's build/proto. # #   images/build.sh tacplus            # the tacplus ...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash grep -rn "ROUTES" src | head -10; cat webapp/tacplus.yaml; grep -n "secrets\.\|registry\|launcher\|tacplus" /tmp/ref/nsproxy/.github/workflows/release.yml | head -20; ls /tmp/ref/fleet-seatrials/images; cat /tmp/ref/fleet-seatrials/images/pins.yaml; grep -n -A6 "gateway" /tmp/ref/fleet-seatrials/fle...
+< src/proxy_grpc.rs:343:    // Look up route info from the generated ROUTES table. ROUTES is the complete src/proxy_grpc.rs:346:    // allow-by-default: every S2S-only method (which carries no ROUTES entry, and src/proxy_grpc.rs:350:    let route_info = match gateway_model::s2sm::rest_dispatch::ROUTES...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+Before writing anything I hit a design conflict, so I'm posting the question to the issue instead of committing.
+> Bash cat > /tmp/q6.md <<'EOF' **Needs a decision before this can be built: the gateway's image is shaped by the fleet, so one release image can't serve every fleet as it stands.**  tacplus#180 item 4 says a fleet uses the service's published release image by digest. For most services that works (nsproxy#...
+< https://github.com/tacplus-dev/gateway/issues/6#issuecomment-6446155806 https://github.com/tacplus-dev/gateway/issues/6
+I stopped issue #6 without committing anything. I posted a question on the issue with my recommendation and added the `needs-decision` label.
+
+**Why it can't be built as written:** tacplus#180 has fleets run each service's published release image. The gateway's image isn't the same for every fleet, so one release image can't serve them all:
+- **Route table:** `grpc-servers: all` compiles the routes from whichever proto tree the gateway is built against. Any gRPC path not in that table is rejected (`src/proxy_grpc.rs:350`). A release image built from the registry would reject calls to services or contract versions a fleet adds after that release.
+- **Web console (`webapp-dist/`):** it's built against the fleet's merged protos.
+- **Other contents:** the customer web app (`web-dist/`), the client binaries (`clients/`) and the launcher binary are all supplied by the fleet.
+
+**Options I put in the comment:**
+- **A. Release against the registry:** the tag build uses the registry as it is at the tag. Any contract change anywhere in the fleet then needs a new gateway release before fleets can route it.
+- **B. Make the gateway the exception (my recommendation):** tag `vX.Y.Z`, cut GitHub releases, and fleets keep building the gateway image themselves from the released tag. This is how fleet-seatrials builds it today.
+- **C. Load the route table at runtime (follow-up):** read it from the fleet's protos instead of compiling it in, so one image serves every fleet. That's a real gateway change and would be its own issue.
+
+**Also needed:** for A or B, the release workflow will need an org secret. GitHub's built-in token can't read the private registry repo, the compiler image or the launcher.
+
+Once someone picks an option and supplies the secret, I'll follow the nsproxy release:
+- the workflow;
+- tag and release-notes scripts with fixture tests;
+- a README "Releasing" section;
+- tagging `v0.1.0`.
+= success: I stopped issue #6 without committing anything. I posted a question on the issue with my recommendation and added the `needs-decision` label.
+
+**Why it can't be built as written:** tacplus#180 has fleets run each service's published release image. The gateway's image isn't the same for every fleet, so one release image can't serve them all:
+- **Route table:** `grpc-servers: all` compiles the routes from whichever proto tree the gateway is built against. Any gRPC path not in that table is rejected (`src/proxy_grpc.rs:350`). A release image built from the registry would reject calls to services or contract versions a fleet adds after that release.
+- **Web console (`webapp-dist/`):** it's built against the fleet's merged protos.
+- **Other contents:** the customer web app (`web-dist/`), the client binaries (`clients/`) and the launcher binary are all supplied by the fleet.
+
+**Options I put in the comment:**
+- **A. Release against the registry:** the tag build uses the registry as it is at the tag. Any contract change anywhere in the fleet then needs a new gateway release before fleets can route it.
+- **B. Make the gateway the exception (my recommendation):** tag `vX.Y.Z`, cut GitHub releases, and fleets keep building the gateway image themselves from the released tag. This is how fleet-seatrials builds it today.
+- **C. Load the route table at runtime (follow-up):** read it from the fleet's protos instead of compiling it in, so one image serves every fleet. That's a real gateway change and would be its own issue.
+
+**Also needed:** for A or B, the release workflow will need an org secret. GitHub's built-in token can't read the private registry repo, the compiler image or the launcher.
+
+Once someone picks an option and supplies the secret, I'll follow the nsproxy release:
+- the workflow;
+- tag and release-notes scripts with fixture tests;
+- a README "Releasing" section;
+- tagging `v0.1.0`.
