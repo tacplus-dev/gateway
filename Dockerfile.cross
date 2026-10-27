@@ -15,10 +15,10 @@ WORKDIR /build
 # Copy all source files including tacplus-generated crates.
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
-COPY target/generated-sources/tacplus ./target/generated-sources/tacplus
+COPY target/generated-sources/model ./target/generated-sources/model
 
 # Remove any pre-compiled artifacts that are wrong architecture.
-RUN find target/generated-sources/tacplus/target -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+RUN find target/generated-sources/model/target -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
 
 # Copy the pre-built SPA into dist/ for RustEmbed to embed at compile time.
 COPY dist ./dist
