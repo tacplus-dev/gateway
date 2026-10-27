@@ -1,25 +1,31 @@
-# Roadmap: gateway
+# Roadmap: tacplus
 
 Owned by Jody; changed only by an agent at Jody's request. Loopers propose in PROPOSALS.md.
 
 ## Now
-The edge proxy (Rust): routes REST and gRPC to backend services, serves OIDC discovery and JWKS, proxies mint calls to kernel, falls back to SPIFFE path routing.
-Also serves the sign-in webapp. Unreleased; tacplus floor 2.4.
+tacplus compiles annotated proto definitions into complete services (Go, Rust, Java) and clients (TypeScript, Python, Swift, C#).
+Latest release: v2.4.1 (2026-10-27). 2.4 is the line with the global registry and the version floor (#161).
+Release lines with branches: 2.0 through 2.4.
 
 ## Next
-- Gates: the e2e_user_mint kernel stand-in lacks UserMint.RevokeDeviceCredential, build fails on main (#14)
-- Release: tag from v0.1.0 and publish the image (#6; needs Jody's decision: the image is shaped by the fleet; also blocked on tacplus-dev/looper#12)
+- Move CI, images, releases and nightlies from GitHub Actions to the GitLab build pipeline (#194, after looper#17)
+- No tacplus image: `build:X.Y` per line with a `tacplus` script that fetches and verifies the newest binary; verify (Kani, JBMC) and fuzzing run there; Go not formally verified (#193)
+- Fetch layer: authenticate GitHub clones with GH_TOKEN, only to github.com (#191)
+- Images: bump moby/go-archive to 0.3.0 (CVE-2026-17106) and patch the release lines (#190)
+- Generated Rust chassis: rsa and crypto-bigint advisories (#186)
+- Fleets pin services by release line (MAJOR.MINOR to latest patch), not commit (#180)
+- JWK verification: infer a missing alg from the token within the key's family (#179)
+- Route tenant-owned RPCs by a declared target-tenant field (#170)
+- Records: generated write surface, entry/map locks, durability levels, Watch, for 2.5 (#163) (needs Jody's decision)
+- diskstore archive: public wiring helper for hand-opened RedoLogs (#145) (needs Jody's decision)
+- Make the three well-known platform names proto-declared instead of baked into the generator (#1) (needs Jody's decision)
 
 ## Later
-- Image: grpc-health-probe v0.4.48 to v0.4.60 (#11; blocked on #14)
-- Update h2, quinn-proto, rustls, rustls-webpki, webpki-roots (#9; blocked on #14)
-- crypto-bigint 0.5.5 and rsa 0.9.10 advisories via generated chassis crates (#10; blocked on tacplus-dev/tacplus#186)
-- Port SeaBeam gateway f3002b7..d0b7ad44 (#7; blocked on #6)
-- Route tenant-owned calls by the request's target-tenant field (#3; blocked on tacplus-dev/tacplus#170)
-- Identity step 4 in the console: linked accounts, sign out everywhere, delete account, tenant step-up (#2; blocked on tacplus-dev/fleet-seatrials#1)
-- Keep the Let's Encrypt certificate across a kernel restart (tacplus-dev/roadmap:decisions/tacplus-dev-stable-gate-2026-10-25.md)
-- Tenant placement resolver behind the resolve-a-target seam, tabled (tacplus-dev/roadmap:decisions/deployments-per-cluster-2026-10-26.md)
-- Version-aware routing for canary, design needed (tacplus-dev/roadmap:decisions/fleets-and-canary-huddle-2026-10-22.md)
+- Fleet builder gathers service webapp pieces and clients, builds the merged webapp and the fleet's gateway (#195, after #180; contract needs Jody's OK)
+- Split the build image by language (build-go, build-rust, build-java, …), each with its toolchain and verifier (tacplus-dev/roadmap:decisions/tacplus-images-2026-10-27.md)
+- Retire the linked claim from the generated namespace backstop (#171), blocked on #170 and tacplus-dev/kernel#4
+- diskstore archive: stable member id across restarts (#143), blocked on #163
+- diskstore archive: retention of old segments and checkpoints (#144), blocked on #163
 
 ## Not doing
 - Nothing recorded yet.
