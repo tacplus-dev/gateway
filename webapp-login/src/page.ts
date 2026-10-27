@@ -23,7 +23,8 @@ export interface Brand {
   footerHtml?: string;
   /** Called once someone is signed in; defaults to showing the identity, the
    * tenants the session vouches for with a switch to each, the sign-ins it
-   * holds, buttons to add another, and sign out. */
+   * holds with a sign-out of each provider, buttons to add a provider it does
+   * not hold, and sign out of all. */
   onSignedIn?: (identity: Identity, signOut: () => Promise<void>) => void;
 }
 
@@ -56,6 +57,8 @@ const STYLE = `
 .tp-login .tp-icon svg { width: 100%; height: 100%; }
 .tp-login ul.tp-signins { list-style: none; padding: 0; margin: 0; }
 .tp-login ul.tp-signins li { display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0; }
+.tp-login ul.tp-signins .tp-who { flex: 1; word-break: break-all; }
+.tp-login ul.tp-signins button { display: inline-block; width: auto; margin: 0; padding: 0.35rem 0.75rem; }
 .tp-login ul.tp-tenants { list-style: none; padding: 0; margin: 0; }
 .tp-login ul.tp-tenants li { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.35rem 0; word-break: break-all; }
 .tp-login ul.tp-tenants button { display: inline-block; width: auto; margin: 0; padding: 0.35rem 0.75rem; }
@@ -97,17 +100,31 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
     const tenants = signIn.tenants().map((t) => t === me.tenant
       ? `<li><strong>${escape(t)}</strong><span>active</span></li>`
       : `<li>${escape(t)}<button class="tp-secondary" data-tp="switch" data-t="${escape(t)}">Switch</button></li>`).join('');
-    const signins = signIn.signedInWith().map((s) =>
-      `<li><span class="tp-icon">${providerIcon(s.idpId)}</span>${escape(s.email ?? s.idpId)}</li>`).join('');
-    const adding = signIn.canAdd()
-      ? `<h2>Add another sign-in</h2>${providerButtons(await signIn.providers(), (p) => `Add ${p.name}`, 'add')}`
+    // Per provider: one the session holds is signed out of (every sign-in with
+    // it), one it does not is added.
+    const states = await signIn.providerStates();
+    const held = new Map<string, string[]>();
+    for (const s of signIn.signedInWith()) held.set(s.idpId, [...(held.get(s.idpId) ?? []), s.email ?? s.idpId]);
+    const signins = [...held].map(([idpId, who]) => {
+      const name = states.find((p) => p.held === idpId)?.provider.name ?? idpId;
+      const out = signIn.canSignOutOfOne()
+        ? `<button class="tp-secondary" data-tp="out-of" data-idp="${escape(idpId)}">Sign out of ${escape(name)}</button>`
+        : '';
+      return `<li><span class="tp-icon">${providerIcon(idpId)}</span><span class="tp-who">${escape(who.join(', '))}</span>${out}</li>`;
+    }).join('');
+    const addable = states.filter((p) => !p.held).map((p) => p.provider);
+    const adding = signIn.canAdd() && addable.length > 0
+      ? `<h2>Add another sign-in</h2>${providerButtons(addable, (p) => `Add ${p.name}`, 'add')}`
       : '';
     render(`<dl><dt>Subject</dt><dd>${escape(me.subject)}</dd><dt>Email</dt><dd>${escape(me.email ?? '')}</dd><dt>Tenant</dt><dd>${escape(me.tenant)}</dd></dl>
       ${tenants ? `<h2>Tenants</h2><ul class="tp-tenants">${tenants}</ul>` : ''}
       ${signins ? `<h2>Signed in with</h2><ul class="tp-signins">${signins}</ul>` : ''}
       ${adding}
-      <button class="tp-secondary" data-tp="out">Sign out</button>`);
+      <button class="tp-secondary" data-tp="out">Sign out of all</button>`);
     container.querySelector('[data-tp="out"]')?.addEventListener('click', () => signIn.signOut().then(run));
+    for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="out-of"]')) {
+      b.addEventListener('click', () => signIn.signOutOf(b.dataset.idp ?? '').then(run, fail));
+    }
     for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="add"]')) {
       b.addEventListener('click', () => signIn.startAdding(Number(b.dataset.i)).catch(fail));
     }

@@ -14,6 +14,12 @@ Sign-in for a tacplus fleet's web app, as a library. Two layers:
   (`tenants()`), and switches (`switchTenant`). A tenant kernel refuses is `StepUpNeeded`:
   signing in with that tenant's provider (`startAdding(i, tenant)`) adds it and finishes the
   switch.
+- Sign-ins per provider: `providerStates()` says, for each provider the fleet offers, whether
+  the session holds a sign-in with it (matched by name to the proof's `idp_id`). With a
+  `ProofRevoker` (over `kernel.UserMint.RevokeCredentialProof`), `signOutOf(idpId)` drops that
+  provider's sign-ins and keeps the session in the tenant kernel's new access token is for;
+  signing out of the last one is `signOut()`, which ends the session. The page offers "Sign out
+  of <provider>" for a held provider, "Add <provider>" for the others, and "Sign out of all".
 - `mountSignIn` (page.ts): a page that renders the flow into a container under a `Brand`
   (title, subtitle, logo, accent, labels, footer, and what to do once signed in). An app
   that wants its own markup uses `SignIn` and skips this.

@@ -17,5 +17,6 @@ option (spec.grpc_w2s_client) = {service: "oauth.Auth"};
 // Per-service tokens from the session's refresh token, as every web client.
 option (spec.grpc_w2s_client) = {service: "gateway.Mint"};
 // Adding a sign-in to the session: two credentials become one person
-// (kernel.UserMint.MergePeople, the identity record's Link).
+// (kernel.UserMint.MergePeople, the identity record's Link); signing out of one
+// provider drops its proofs (kernel.UserMint.RevokeCredentialProof).
 option (spec.grpc_w2s_client) = {service: "kernel.UserMint"};

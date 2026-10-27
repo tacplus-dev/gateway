@@ -15,6 +15,8 @@
 // The session token is the kernel's session credential: a set of proofs, one
 // per sign-in. Adding a sign-in runs the same provider flow again and then asks
 // kernel to make the two credentials one person (UserMint.MergePeople).
+// Signing out of one provider drops that provider's proofs and keeps the rest
+// (UserMint.RevokeCredentialProof); dropping the last is signing out of all.
 //
 // Each proof vouches for the tenants its login was routed to (an org login
 // [org, people], a personal one [people]). An access token is minted for one
@@ -67,6 +69,22 @@ export interface AccountMerger {
   mergePeople(current: string, added: string, confirm: boolean): Promise<string>;
 }
 
+/** What is left of a session after signing out of one provider. */
+export interface RemainingSession {
+  /** The re-signed session credential, without that provider's proofs. */
+  credential: string;
+  /** An access token from the remaining proofs: in the bearer's tenant if one
+   * still vouches it, else people's. */
+  accessToken: string;
+}
+
+/** Signs the session out of one provider (kernel.UserMint.RevokeCredentialProof). */
+export interface ProofRevoker {
+  /** Drops every proof of `idpId` from `credential`; null when none is left
+   * (the session is over). */
+  revokeProof(credential: string, idpId: string): Promise<RemainingSession | null>;
+}
+
 /** Kernel's warning path: the added sign-in belongs to an account with its own history. */
 export class ConfirmNeeded extends Error {}
 
@@ -101,6 +119,24 @@ export function signedInWith(credential: string | null): SignedInWith[] {
   return proofsOf(credential).map((p) => {
     const c = (p.claims ?? {}) as Record<string, unknown>;
     return { idpId: String(p.idp_id ?? ''), email: typeof c.email === 'string' ? c.email : undefined };
+  });
+}
+
+/** A provider the fleet offers, and the idp_id of the session's sign-in with it
+ * when the session holds one. */
+export interface ProviderState {
+  provider: Provider;
+  held?: string;
+}
+
+/** Which of `providers` the sign-ins hold. A provider's configured name is
+ * matched to a sign-in's idp_id (kernel's fixed people providers: google,
+ * apple, microsoft) by name, as providerIcon matches its mark. */
+export function providerStates(providers: Provider[], signins: SignedInWith[]): ProviderState[] {
+  return providers.map((provider) => {
+    const name = provider.name.toLowerCase();
+    const held = signins.find((s) => s.idpId !== '' && name.includes(s.idpId.toLowerCase()));
+    return held ? { provider, held: held.idpId } : { provider };
   });
 }
 
@@ -153,6 +189,8 @@ export class SignIn {
     private readonly callbackUrl: string,
     /** Present when the app lets a person add sign-ins to their session. */
     private readonly merger?: AccountMerger,
+    /** Present when the app lets a person sign out of one provider. */
+    private readonly revoker?: ProofRevoker,
   ) {}
 
   /** A fresh sign-in waiting for the person to confirm the merge. */
@@ -166,6 +204,16 @@ export class SignIn {
   /** The sign-ins the current session holds. */
   signedInWith(): SignedInWith[] {
     return signedInWith(this.tokens.getRefreshToken());
+  }
+
+  /** Whether this app can sign the session out of one provider. */
+  canSignOutOfOne(): boolean {
+    return this.revoker !== undefined;
+  }
+
+  /** The fleet's providers, each with the session's sign-in with it, if any. */
+  async providerStates(): Promise<ProviderState[]> {
+    return providerStates(await this.providers(), this.signedInWith());
   }
 
   /** The tenants the current session vouches for. */
@@ -293,6 +341,21 @@ export class SignIn {
     } catch {
       return null;
     }
+  }
+
+  /** Signs the session out of one provider and keeps the other sign-ins. The
+   * last one is signing out of all: the session ends. */
+  async signOutOf(idpId: string): Promise<void> {
+    const current = this.tokens.getRefreshToken();
+    const held = signedInWith(current);
+    if (!held.some((s) => s.idpId === idpId)) throw new Error(`This session is not signed in with ${idpId}.`);
+    if (!this.revoker || !current || held.every((s) => s.idpId === idpId)) return this.signOut();
+    const remaining = await this.revoker.revokeProof(current, idpId);
+    if (!remaining?.credential) return this.signOut();
+    this.tokens.setRefreshToken(remaining.credential);
+    // Tenants only that provider vouched for are gone; kernel minted the
+    // access token in the one the session is in now.
+    this.setActiveTenant(identityFromToken(remaining.accessToken).tenant);
   }
 
   /** Ends the session on the fleet and forgets it here, whatever the fleet said. */

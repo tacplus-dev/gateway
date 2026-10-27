@@ -8,9 +8,9 @@
 // hands them to the library through its two small interfaces; the library
 // itself imports no generated code.
 import { create } from '@bufbuild/protobuf';
-import { ConfirmNeeded, SignIn, mountSignIn, type AccountMerger, type LoginAuth } from '@tacplus-dev/webapp-login';
+import { ConfirmNeeded, SignIn, mountSignIn, type AccountMerger, type LoginAuth, type ProofRevoker } from '@tacplus-dev/webapp-login';
 import { MintTokenProvider, ServiceManager, W2SError } from '../model/w2sm/index.js';
-import { MergePeopleRequestSchema } from '../model/types/services/kernel/services/index.js';
+import { MergePeopleRequestSchema, RevokeCredentialProofRequestSchema } from '../model/types/services/kernel/services/index.js';
 import {
   AuthorizeRequestSchema,
   CallbackRequestSchema,
@@ -64,5 +64,15 @@ const merger: AccountMerger = {
   },
 };
 
-const signIn = new SignIn(auth, tokens, `${window.location.origin}/`, merger);
+// kernel.UserMint.RevokeCredentialProof, as the library's ProofRevoker: signing
+// out of one provider. No credential back means none is left.
+const revoker: ProofRevoker = {
+  async revokeProof(credential, idpId) {
+    const resp = await userMint.revokeCredentialProof(create(RevokeCredentialProofRequestSchema, { credential, idpId }));
+    const remaining = resp.credential?.base64 ?? '';
+    return remaining ? { credential: remaining, accessToken: resp.accessToken?.base64 ?? '' } : null;
+  },
+};
+
+const signIn = new SignIn(auth, tokens, `${window.location.origin}/`, merger, revoker);
 mountSignIn(document.getElementById('app') as HTMLElement, signIn, { title: 'Sign in' });
