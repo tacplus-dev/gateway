@@ -1,0 +1,239 @@
+= init
+> Bash gh issue view 3 --repo tacplus-dev/gateway --comments; ls; cat tacplus.yaml justfile 2>/dev/null | head -80
+< ARCHITECTURE.md Cargo.lock Cargo.toml Dockerfile Dockerfile.cross GATEWAY_PROGRESS.md HISTORY.md LICENSE PROPOSALS.md PROVENANCE.md QUESTIONS.md README.md ROADMAP.md STATE.md decisions dist justfile proto src tacplus.yaml target webapp webapp-login # Compiler floor: the looper runs the latest patch ...
+The issue view printed nothing. Let me retry.
+> Bash gh issue view 3 --repo tacplus-dev/gateway --comments 2>&1; echo "rc=$?"; gh issue view 3 --repo tacplus-dev/gateway --json title,body,labels,comments,state 2>&1 | head -200
+< rc=0 {"body":"Blocked-by: tacplus-dev/tacplus#170\nBlocked-by: tacplus-dev/kernel#3\nBlocked-by: #1\n\n## What\n\nRoute every call to a tenant-owned service by its declared target-tenant field (tacplus#170) to the instance\nregistered for that tenant id, instead of deriving the tenant from the calle...
+> Bash for i in tacplus-dev/tacplus#170 tacplus-dev/kernel#3 tacplus-dev/gateway#1; do r=${i%#*}; n=${i#*#}; echo "== $i"; gh issue view $n --repo $r --json title,state,closedAt,body,comments --jq '.title, .state, .closedAt, .body, (.comments[]|.author.login+": "+.body)' 2>&1 | head -60; done
+< == tacplus-dev/tacplus#170 Route tenant-owned RPCs by a declared target-tenant field CLOSED 2026-10-28T07:42:08Z Blocked-by: #161 Timeout: 10h  ## What  **Route by a declared request field.** Every RPC of a tenant-owned service (`tenant_owned: true`) declares the request field that carries the **tar...
+= thinking_tokens
+= thinking_tokens
+> Bash gh issue view 170 --repo tacplus-dev/tacplus --json comments --jq '.comments[]|"---- "+.author.login+" "+.createdAt+"\n"+.body' | tail -n +40; gh release list --repo tacplus-dev/tacplus --limit 5
+< - **The gateway `Dispatcher.Conn` takes the target tenant as an argument** (`""` for a platform service). This is a changed generated surface, so it ships in a minor. - **A client-streaming or bidi S2S stream is opened for one tid,** and every message on it must name that tid.  Once the carrier ques...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash cat $(which tacplus) | head -50; cat STATE.md; cat PROPOSALS.md | head -60; ls decisions src; wc -l src/*.rs | sort -n | tail -20
+< #!/usr/bin/env bash # Copyright (c) 2026 Jody Scott # SPDX-License-Identifier: Apache-2.0 # # tacplus, as the looper image provides it: not a binary, but the tacplus # compiler image for this repository's MAJOR.MINOR floor, always at that # line's latest patch (Jody 2026-10-26). The floor is the `ta...
+> Bash docker manifest inspect ghcr.io/tacplus-dev/tacplus/tacplus:2.5 >/dev/null 2>&1 && echo has-2.5 || echo no-2.5; gh issue list --repo tacplus-dev/tacplus --state open --limit 40; gh api repos/tacplus-dev/tacplus/contents/ROADMAP.md -H 'Accept: application/vnd.github.raw' | grep -n -i -E '2\.5|release...
+< no-2.5 197	OPEN	verify (JBMC): Proof.java compiled against target/generated-sources/tacplus, but 2.4 generates into <output-dir>/model; every harness fails to compile	bug	2026-10-27T20:27:27Z 196	OPEN	Kitchensink: verify and fuzz the generator once per release; coverage check in every service build	...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash cat src/registry.rs src/resolver.rs; grep -n -i "tenant" src/proxy_grpc.rs src/main.rs src/rest_translation.rs src/auth.rs | head -80
+< /// Embedded registry.json from tacplus generation. const REGISTRY_JSON: &str = include_str!("../target/generated-sources/model/registry.json");  /// Embedded registry schema. const REGISTRY_SCHEMA_JSON: &str =     include_str!("../target/generated-sources/model/registry.schema.json");  /// Embedded...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash ls target/generated-sources/model/ 2>/dev/null | head; grep -rl "route_field" target/generated-sources/model 2>/dev/null | head; gh api /orgs/tacplus-dev/packages/container/tacplus%2Ftacplus/versions --jq '.[].metadata.container.tags' 2>&1 | head -20
+< AGENT.md Cargo.toml chassis grants lib.rs meta_data.rs proto registry.json registry.schema.json s2sm {"message":"You need at least read:packages scope to get a package's versions.","documentation_url":"https://docs.github.com/rest/packages/packages#list-package-versions-for-a-package-owned-by-an-org...
+> Bash cd /tmp && for t in main nightly latest edge 2.5.0-rc; do docker manifest inspect ghcr.io/tacplus-dev/tacplus/tacplus:$t >/dev/null 2>&1 && echo "has $t" || echo "no $t"; done; gh api repos/tacplus-dev/tacplus/commits/main --jq '.sha+" "+.commit.message' | head -3; gh api repos/tacplus-dev/tacplus/c...
+= task_started
+= task_notification
+< has main no nightly has latest no edge no 2.5.0-rc aaba3493cf0a56ac6c1af04d3bbd39815801b4a4 HISTORY.md: #170 (looper) # State: tacplus  Overwritten to stay current (loopers and agents). Last updated: 2026-10-28 by looper (#170).  - **Version / line:** v2.4.1 (latest release, 2026-10-27); main is the...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash gh api repos/tacplus-dev/roadmap/contents/decisions/issue-flow-2026-10-27.md -H 'Accept: application/vnd.github.raw' | grep -n -i -E -B2 -A8 'release|floor|minor' | head -120
+< 4- 5-- **Bug** (the code does not do what it already promises: a defect, a vulnerability, a broken gate): it is fixed, and 6:  a **new patch release** ships on every supported release line that has it (docs/VERSIONING.md: main plus a backport 7:  to each `release/MAJOR.MINOR` whose `.0` is under twe...
+= thinking_tokens
+= thinking_tokens
+> Bash gh api repos/tacplus-dev/tacplus/contents/docs/VERSIONING.md -H 'Accept: application/vnd.github.raw' | head -80; gh search issues --owner tacplus-dev "2.5" --state open --limit 20 2>&1 | head
+< # Versioning and release policy  Decided 2026-10-15. This binds releases, the images, the fix looper and every consumer of tacplus.  ## Versions  tacplus releases are `MAJOR.MINOR.PATCH` git tags `vMAJOR.MINOR.PATCH` (`.github/workflows/release.yml` builds the binaries from the tag).  - **A patch is...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash for t in main-aaba3493cf0a56ac6c1af04d3bbd39815801b4a4 main-aaba349 main-6a8849fc; do docker manifest inspect ghcr.io/tacplus-dev/tacplus/tacplus:$t >/dev/null 2>&1 && echo "has $t" || echo "no $t"; done; docker pull -q ghcr.io/tacplus-dev/tacplus/tacplus:main >/dev/null; docker image inspect ghcr.i...
+= task_started
+= task_notification
+< no main-aaba3493cf0a56ac6c1af04d3bbd39815801b4a4 no main-aaba349 no main-6a8849fc 2026-10-28T04:36:46.285279194Z {"org.opencontainers.image.description":"tacplus and the protoc plugins for every target language","org.opencontainers.image.revision":"41c99a8027d96d88f6e15fcf5f6399ad17b3c7e6","org.open...
+= thinking_tokens
+= thinking_tokens
+> Bash gh run list --repo tacplus-dev/tacplus --branch main --limit 6 2>&1; gh api repos/tacplus-dev/tacplus/compare/41c99a8027d96d88f6e15fcf5f6399ad17b3c7e6...main --jq '.ahead_by, [.commits[].commit.message|split("\n")[0]]'
+< in_progress		HISTORY.md: #170 (looper)	CI	main	push	40651803303	5m36s	2026-10-28T07:42:23Z completed	success	HISTORY.md: #170 (looper)	planning-files	main	push	40651803869	10s	2026-10-28T07:42:23Z pending		HISTORY.md: #170 (looper)	Images	main	push	40651803304	5m36s	2026-10-28T07:42:23Z in_progress	...
+= thinking_tokens
+= thinking_tokens
+The compiler image that contains #170 is still building on tacplus CI, so I'm reading the gateway's routing code and the new generated Rust surface in tacplus's source while it finishes.
+> Bash /usr/local/bin/repo-looper --repo gateway --issue 3 --checkpoint "Read #3 and its blockers; 2.5 unreleased, waiting for tacplus main image with #170 (6a8849fc) to develop against; nothing changed yet" 2>&1 | tail -2; sed -n 480,620p src/proxy_grpc.rs
+< remote:  [2026-10-28T07:48:06Z] checkpoint of #3 (a step) pushed to looper/gateway-3:  2 files changed, 125 insertions(+)                             trace_id: probe.trace_id.clone(),                             round: Some(round),                             kind: TraceEventKind::ExternalRequest.in...
+> Bash sed -n 1,140p src/proxy_grpc.rs; sed -n 300,480p src/proxy_grpc.rs
+< use std::pin::Pin; use std::sync::Arc; use std::task::{Context, Poll};  use axum::body::Body; use axum::response::Response; use http::{Request, StatusCode}; use http_body::Frame; use http_body_util::BodyExt; use tokio_stream::wrappers::ReceiverStream; use tower::{Service, ServiceExt};  use crate::au...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash mkdir -p /tmp/tp && cd /tmp/tp && (test -d tacplus || gh repo clone tacplus-dev/tacplus tacplus -- --depth 1 -q) && cd tacplus && git log --oneline -1 && git show --stat HEAD~1 | grep -i -E 'rust|gateway|dispatch' | head -40
+< aaba349 HISTORY.md: #170 (looper) fatal: ambiguous argument 'HEAD~1': unknown revision or path not in the working tree. Use '--' to separate paths from revisions, like this: 'git <command> [<revision>...] -- [<file>...]' Shell cwd was reset to /builds/looper/gateway/checkout
+> Bash cd /tmp/tp/tacplus && git fetch -q --depth 3 origin main && git show --stat HEAD~1 | grep -i -E 'rust|gateway|dispatch|route' | head -50
+<     Tenant-owned services are routed by a declared field; MCP takes the tenant from the token (#170)     (spec.rpc).route_field, a plain top-level string naming the target tenant id;     registry.json (route_field, route_field_number, any_tenant) and the shared     route plan, and generated into eve...
+> Bash cd /tmp/tp/tacplus && git show HEAD~1 -- pkg/internal/rust/types/restdispatch_gen.go pkg/internal/rust/types/rest_dispatch_tenant_route_test.go | head -250; grep -rn -i "route" docs/API.md | head -30
+< commit 6a8849fc2a780b69b5e24a072bbe92eb7b40f0ba Author: jodydadescott <jody@thescottsweb.com> Date:   Wed Oct 28 07:41:31 2026 +0000      Tenant-owned services are routed by a declared field; MCP takes the tenant from the token (#170)          Decision tenant-routing-2026-10-26: the request names it...
+= thinking_tokens
+= thinking_tokens
+> Bash cd /tmp/tp/tacplus && sed -n 215,235p docs/API.md; awk '/## Tenant-owned services are routed by a declared field/,/^## [^T]/' docs/USER.md | head -80; gh run list --repo tacplus-dev/tacplus --workflow Images --limit 2
+< value (control or non-ASCII bytes) is answered `502` in all three languages, never written into `Location`.  Every route of a tenant-owned service also carries its `(spec.rpc) .route_field`: the field name, its proto3 JSON name and its wire number (`restdispatch.Route` in the planner; empty and `0` ...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash gh issue view 15 --repo tacplus-dev/gateway --json body --jq .body | head -40; for r in tenantecho doppelganger; do echo "== $r"; gh api "search/code?q=route_field+repo:tacplus-dev/$r" --jq '.items[].path' 2>&1 | head; gh issue list --repo tacplus-dev/$r --state all --limit 5; done
+< Blocked-by: tacplus-dev/tacplus#170  ## What  When the gateway routes an MCP session carrier (`Broker<Service>McpSession`, a bidi stream of `mcp.McpRequest`) of a **tenant-owned** service, the session's tenant must come from the caller's access token, never from the client:  - Choose the target inst...
+> Bash cd /tmp/tp && for r in tenantecho doppelganger; do (test -d $r || gh repo clone tacplus-dev/$r $r -- --depth 1 -q); echo "== $r"; grep -rn -E "tenant_owned|route_field|^\s*rpc " $r --include=*.proto | head -20; done
+< == tenantecho tenantecho/proto/services/tenantecho.proto:17:option (spec.service) = {name: "tenantecho", tenant_owned: true}; tenantecho/proto/services/tenantecho.proto:80:  rpc Ping(PingRequest) returns (PingResponse) { tenantecho/proto/services/tenantecho.proto:87:  rpc PingPigeon(PingPigeonReques...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash sed -n 1,120p src/e2e_tenant_routing.rs; grep -rn "doppelganger" src | head
+< // End-to-end proof, over real sockets, that the gateway sends a caller to THEIR // tenant's instance of a tenant-owned service — and that nothing else changes. // // What is real here: // //   * the real `proxy_grpc::handle`, entered with a real gRPC-framed request; //   * the real `GatewayAuth` ov...
+> Bash sed -n 120,389p src/e2e_tenant_routing.rs
+<     })     .expect("jwk") }  fn unix_now() -> i64 {     std::time::SystemTime::now()         .duration_since(std::time::UNIX_EPOCH)         .expect("clock")         .as_secs() as i64 }  /// A user token in `namespace`, entitled to everything. /// /// `{"all": true}` is the admin bypass, and using it...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash cd /tmp/tp && sed -n 17,100p tenantecho/proto/services/tenantecho.proto; cat tenantecho/tacplus.yaml doppelganger/tacplus.yaml 2>/dev/null | grep -E 'tacplus:'; gh run list --repo tacplus-dev/tacplus --workflow Images --limit 2
+< option (spec.service) = {name: "tenantecho", tenant_owned: true}; // PingPigeon asks the coop for a pigeon over S2S. option (spec.grpc_s2s_client) = {service: "coop.Coop"};  message Config {   option (spec.grpc_config) = {service_name: "tenantecho"};    // PingPigeon is a dog: it puts a task on a pi...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash rm -f /tmp/tacplus-pull-main && docker pull -q ghcr.io/tacplus-dev/tacplus/tacplus:main >/dev/null && docker image inspect ghcr.io/tacplus-dev/tacplus/tacplus:main --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' && TACPLUS_MINOR=main timeout 900 tacplus build --tag latest > /...
+= task_started
+= task_notification
+< 6a8849fc2a780b69b5e24a072bbe92eb7b40f0ba rc=1 Error: tacplus.yaml: tacplus: "2.4" cannot be satisfied by an unstamped tacplus build (0.0.0); install a stamped build (just install) or a release
+> Bash cp tacplus.yaml /tmp/tacplus.yaml.bak && sed -i 's/^tacplus: "2.4"/#tacplus: "2.4"/' tacplus.yaml && TACPLUS_MINOR=main timeout 900 tacplus build --tag latest > /tmp/gen-main.log 2>&1; echo rc=$?; cp /tmp/tacplus.yaml.bak tacplus.yaml; git status --short; tail -20 /tmp/gen-main.log
+< rc=1 2026-10-28T07:49:16.247Z	INFO	using --tag 'latest' — building from HEAD, version set to 0.0.0-SNAPSHOT 2026-10-28T07:49:16.275Z	INFO	loaded registry	{"path": "/builds/looper/gateway/checkout/proto/registry.yaml", "services": 1, "vservices": 0} 2026-10-28T07:49:16.275Z	INFO	using cached proto so...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash grep -n -B3 -A15 "fn tenant_route_key" src/health.rs; grep -rn -i "tid\b\|InstanceName" /tmp/tp/tacplus/docs/USER.md | head -10
+< 238-/// The health key a tenant-owned service's instance for `tenant` is dialed by: 239-/// `<svc>-<tenant>`, the operator's instance name. The proxy builds the same 240-/// key from the caller's token; this indexer builds it from the instance. 241:pub fn tenant_route_key(service: &str, tenant: &str...
+= thinking_tokens
+= thinking_tokens
+> Bash gh search issues --owner tacplus-dev "tid" --limit 20 2>&1 | head -20; gh api repos/tacplus-dev/roadmap/contents/ROADMAP.md -H 'Accept: application/vnd.github.raw' | grep -n -i -E 'tid|tenant' | head -20
+< tacplus-dev/operator	3	open	Several deployments per cluster: tac-<deployment> and tac-<deployment>-<tid> namespaces	approved, feature	2026-10-27T20:24:06Z tacplus-dev/fleet-seatrials	4	open	Move seatrials to tac-seatrials namespaces: config and a migration runbook	approved, feature	2026-10-27T20:24:...
+> Bash gh api repos/tacplus-dev/roadmap/contents/decisions/tenant-routing-2026-10-26.md -H 'Accept: application/vnd.github.raw'; gh api repos/tacplus-dev/roadmap/contents/ROADMAP.md -H 'Accept: application/vnd.github.raw' | sed -n 70,80p
+< # Tenant routing: the request names its tenant — DECIDED 2026-10-26  Huddle Jody + the kernel identity session, 2026-10-26. Follows `deployments-per-cluster-2026-10-26.md` (tenant ids, namespaces, the tabled placement resolver).  ## The problem (Jody)  In SeaBeam each tenant has a crew; a user of a ...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash cat > /tmp/c3.md <<'EOF' Looper: I stopped before committing. Nothing is changed on main. #3 can't land from this repository alone: three things outside it, none with an open issue, have to happen first. Two of them need a decision.  ## 1. No compiler can generate the route surface yet (tacplus 2.5 ...
+< https://github.com/tacplus-dev/gateway/issues/3#issuecomment-6463629018 https://github.com/tacplus-dev/gateway/issues/3
+> Bash git status --short; /usr/local/bin/repo-looper --repo gateway --issue 3 --checkpoint "Stopped with needs-decision (no commit): needs a tacplus 2.5 release, route fields in tenantecho/doppelganger, and a decision on whether instances are registered by tid. Design is in the issue comment." 2>&1 | tail...
+< [2026-10-28T07:50:10Z] checkpoint of #3 (a step) pushed to looper/gateway-3:  2 files changed, 256 insertions(+)
+I stopped issue #3 without committing. I posted the open questions and my recommendations on the issue ([comment](https://github.com/tacplus-dev/gateway/issues/3#issuecomment-6463629018)) and added the `needs-decision` label. Nothing changed on main, no gates ran, and the issue stays open.
+
+Three things outside this repository have to happen first, and none has an issue yet:
+
+1. **There is no compiler that can build the routing yet.** tacplus#170 is on tacplus main but unreleased; the newest release is v2.4.1, and 2.4 has no route fields. I tried the published build of tacplus main, which includes #170. It refuses every repository's declared compiler version, including kernel's, so nothing in the fleet can build against it. I recommended releasing tacplus v2.5.0 now, or a properly versioned pre-release if 2.5 has to wait for tacplus#163.
+2. **tenantecho and doppelganger don't declare route fields.** The gateway's tests depend on both. Under 2.5 the compiler refuses to build a tenant-owned service whose calls don't name their target tenant, so the gateway's build would fail. I recommended one issue on each repository and asked for approval before filing them, since they change another repository's contract.
+3. **Tenant instances aren't registered by tenant id.** The gateway finds a tenant's instance by a name built from its certificate identity, and that identity still uses the tenant's name (kernel#3 left that out of scope). The new route field carries the 8-character tenant id. I recommended giving tenant instances identities based on the id, so the gateway stays a single lookup. That touches kernel, the operator and tacplus. The alternative is the gateway looking up id-to-name in kernel on each call.
+
+The comment also lays out the gateway change for when these are settled:
+- One function decides the target for both the REST and gRPC paths, so a placement resolver can slot in there later.
+- Streams are routed by their first message, and every later message must name the same tenant.
+- Routing from the caller's token is removed.
+- The end-to-end routing test is rewritten to the issue's acceptance criteria.
+- The MCP follow-up, #15, is folded into the same change.
+
+The run is checkpointed to `looper/gateway-3`.
+= success: I stopped issue #3 without committing. I posted the open questions and my recommendations on the issue ([comment](https://github.com/tacplus-dev/gateway/issues/3#issuecomment-6463629018)) and added the `needs-decision` label. Nothing changed on main, no gates ran, and the issue stays open.
+
+Three things outside this repository have to happen first, and none has an issue yet:
+
+1. **There is no compiler that can build the routing yet.** tacplus#170 is on tacplus main but unreleased; the newest release is v2.4.1, and 2.4 has no route fields. I tried the published build of tacplus main, which includes #170. It refuses every repository's declared compiler version, including kernel's, so nothing in the fleet can build against it. I recommended releasing tacplus v2.5.0 now, or a properly versioned pre-release if 2.5 has to wait for tacplus#163.
+2. **tenantecho and doppelganger don't declare route fields.** The gateway's tests depend on both. Under 2.5 the compiler refuses to build a tenant-owned service whose calls don't name their target tenant, so the gateway's build would fail. I recommended one issue on each repository and asked for approval before filing them, since they change another repository's contract.
+3. **Tenant instances aren't registered by tenant id.** The gateway finds a tenant's instance by a name built from its certificate identity, and that identity still uses the tenant's name (kernel#3 left that out of scope). The new route field carries the 8-character tenant id. I recommended giving tenant instances identities based on the id, so the gateway stays a single lookup. That touches kernel, the operator and tacplus. The alternative is the gateway looking up id-to-name in kernel on each call.
+
+The comment also lays out the gateway change for when these are settled:
+- One function decides the target for both the REST and gRPC paths, so a placement resolver can slot in there later.
+- Streams are routed by their first message, and every later message must name the same tenant.
+- Routing from the caller's token is removed.
+- The end-to-end routing test is rewritten to the issue's acceptance criteria.
+- The MCP follow-up, #15, is folded into the same change.
+
+The run is checkpointed to `looper/gateway-3`.
