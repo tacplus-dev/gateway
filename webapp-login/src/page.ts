@@ -17,6 +17,9 @@ export interface Brand {
   accent?: string;
   /** The button label for a provider; defaults to "Continue with <name>". */
   providerLabel?: (p: Provider) => string;
+  /** The label a provider's button takes once clicked, until the browser has
+   * left for the provider; defaults to "Signing in with <name>…". */
+  providerPendingLabel?: (p: Provider) => string;
   /** The mark shown on a provider's button; defaults to providerIcon(p.name). */
   providerIconHtml?: (p: Provider) => string;
   /** Rendered under the providers (terms, help). */
@@ -63,6 +66,7 @@ const STYLE = `
 .tp-login ul.tp-tenants li { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.35rem 0; word-break: break-all; }
 .tp-login ul.tp-tenants button { display: inline-block; width: auto; margin: 0; padding: 0.35rem 0.75rem; }
 .tp-login .tp-error { color: #b00020; }
+.tp-login .tp-error:empty { display: none; }
 .tp-login dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
 .tp-login dt { opacity: 0.7; } .tp-login dd { margin: 0; word-break: break-all; }
 .tp-login .tp-footer { opacity: 0.7; font-size: 0.85rem; margin-top: 1.5rem; }
@@ -91,6 +95,32 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
     providers.map((p) =>
       `<button class="tp-provider" data-tp="${kind}" data-i="${p.providerIndex}"><span class="tp-icon">${icon(p)}</span>${escape(label(p))}</button>`,
     ).join('');
+  // Where a failed redirect says why, beside the buttons it put back.
+  const errorLine = '<p class="tp-error" data-tp="error" role="alert"></p>';
+  const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+  // A provider button, once clicked, says so until the browser has left for
+  // the provider, and every button of its kind is disabled so a second click
+  // starts no second flow. A redirect that fails puts them back, with why.
+  const onProvider = (providers: Provider[], kind: string, pending: (p: Provider) => string, go: (i: number) => Promise<void>) => {
+    const buttons = [...container.querySelectorAll<HTMLButtonElement>(`button[data-tp="${kind}"]`)];
+    const error = container.querySelector<HTMLElement>('[data-tp="error"]');
+    for (const b of buttons) {
+      b.addEventListener('click', () => {
+        const i = Number(b.dataset.i);
+        const p = providers.find((q) => q.providerIndex === i);
+        const idle = b.innerHTML;
+        for (const x of buttons) x.disabled = true;
+        if (p) b.innerHTML = `<span class="tp-icon">${icon(p)}</span>${escape(pending(p))}`;
+        if (error) error.textContent = '';
+        go(i).catch((err) => {
+          for (const x of buttons) x.disabled = false;
+          b.innerHTML = idle;
+          if (err instanceof ConfirmNeeded || err instanceof StepUpNeeded || !error) fail(err);
+          else error.textContent = message(err);
+        });
+      });
+    }
+  };
 
   const showIdentity = async (me: Identity) => {
     if (brand.onSignedIn) {
@@ -119,15 +149,13 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
     render(`<dl><dt>Subject</dt><dd>${escape(me.subject)}</dd><dt>Email</dt><dd>${escape(me.email ?? '')}</dd><dt>Tenant</dt><dd>${escape(me.tenant)}</dd></dl>
       ${tenants ? `<h2>Tenants</h2><ul class="tp-tenants">${tenants}</ul>` : ''}
       ${signins ? `<h2>Signed in with</h2><ul class="tp-signins">${signins}</ul>` : ''}
-      ${adding}
+      ${adding}${adding ? errorLine : ''}
       <button class="tp-secondary" data-tp="out">Sign out of all</button>`);
     container.querySelector('[data-tp="out"]')?.addEventListener('click', () => signIn.signOut().then(run));
     for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="out-of"]')) {
       b.addEventListener('click', () => signIn.signOutOf(b.dataset.idp ?? '').then(run, fail));
     }
-    for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="add"]')) {
-      b.addEventListener('click', () => signIn.startAdding(Number(b.dataset.i)).catch(fail));
-    }
+    onProvider(addable, 'add', (p) => `Adding ${p.name}…`, (i) => signIn.startAdding(i));
     for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="switch"]')) {
       b.addEventListener('click', () => signIn.switchTenant(b.dataset.t ?? '').then(run, fail));
     }
@@ -139,10 +167,8 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
       render('<p>No sign-in provider is configured for this fleet.</p>');
       return;
     }
-    render(providerButtons(providers, brand.providerLabel ?? ((p: Provider) => `Continue with ${p.name}`), 'p'));
-    for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="p"]')) {
-      b.addEventListener('click', () => signIn.start(Number(b.dataset.i)).catch(fail));
-    }
+    render(providerButtons(providers, brand.providerLabel ?? ((p: Provider) => `Continue with ${p.name}`), 'p') + errorLine);
+    onProvider(providers, 'p', brand.providerPendingLabel ?? ((p: Provider) => `Signing in with ${p.name}…`), (i) => signIn.start(i));
   };
 
   // Kernel's warning path: the added sign-in already belongs to an account.
@@ -161,14 +187,13 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
   // Kernel's step-up: no sign-in in the session vouches for the tenant asked
   // for. Signing in with that tenant's provider adds it and finishes the switch.
   const showStepUp = async (err: StepUpNeeded) => {
-    const providers = signIn.canAdd()
-      ? providerButtons(await signIn.providers(), (p) => `Sign in with ${p.name}`, 'step-up')
+    const providers = signIn.canAdd() ? await signIn.providers() : [];
+    const buttons = providers.length > 0
+      ? providerButtons(providers, (p) => `Sign in with ${p.name}`, 'step-up') + errorLine
       : '';
-    render(`<p>${escape(err.message)}</p>${providers}
+    render(`<p>${escape(err.message)}</p>${buttons}
       <button class="tp-secondary" data-tp="cancel">Cancel</button>`);
-    for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="step-up"]')) {
-      b.addEventListener('click', () => signIn.startAdding(Number(b.dataset.i), err.tenant).catch(fail));
-    }
+    onProvider(providers, 'step-up', (p) => `Signing in with ${p.name}…`, (i) => signIn.startAdding(i, err.tenant));
     container.querySelector('[data-tp="cancel"]')?.addEventListener('click', () => {
       signIn.cancelAdding();
       run();
@@ -184,8 +209,7 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
       showStepUp(err).catch(fail);
       return;
     }
-    const msg = err instanceof Error ? err.message : String(err);
-    render(`<p class="tp-error">${escape(msg)}</p><button class="tp-secondary" data-tp="retry">Try again</button>`);
+    render(`<p class="tp-error">${escape(message(err))}</p><button class="tp-secondary" data-tp="retry">Try again</button>`);
     container.querySelector('[data-tp="retry"]')?.addEventListener('click', () => {
       history.replaceState(null, '', window.location.pathname);
       run();
@@ -203,4 +227,7 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
   };
 
   run();
+  // Back from the provider's page, a browser may restore this one as it was
+  // left, still signing in: show it afresh.
+  window.addEventListener('pageshow', (e) => { if (e.persisted) run(); });
 }

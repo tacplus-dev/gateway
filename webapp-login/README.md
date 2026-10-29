@@ -21,8 +21,11 @@ Sign-in for a tacplus fleet's web app, as a library. Two layers:
   signing out of the last one is `signOut()`, which ends the session. The page offers "Sign out
   of <provider>" for a held provider, "Add <provider>" for the others, and "Sign out of all".
 - `mountSignIn` (page.ts): a page that renders the flow into a container under a `Brand`
-  (title, subtitle, logo, accent, labels, footer, and what to do once signed in). An app
-  that wants its own markup uses `SignIn` and skips this.
+  (title, subtitle, logo, accent, labels, footer, and what to do once signed in). A clicked
+  provider button says "Signing in with <provider>…" (`providerPendingLabel`), or "Adding
+  <provider>…", until the browser leaves for the provider, and its fellow buttons are disabled;
+  a redirect that fails puts them back, with the error. An app that wants its own markup uses
+  `SignIn` and skips this.
 
 The gateway's own console (`../webapp`) is the first consumer, with the default brand;
 a company's web app brings its own `Brand` and its own clients.
