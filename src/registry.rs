@@ -154,8 +154,10 @@ mod tests {
     }
 
     /// The live registry's tenant-owned set is exactly the services that declare
-    /// the annotation: tenantecho (the two-tenant routing proof) and doppelganger
-    /// (one instance per tenant, shared by its users), and nothing else. A new
+    /// the annotation: tenantecho (the two-tenant routing proof), doppelganger
+    /// (one instance per tenant, shared by its users) and stratum (one instance
+    /// per tenant, tacplus-dev/roadmap decisions/stratum-per-tenant-2026-10-25.md,
+    /// stratum#2), and nothing else. A new
     /// entry here is a new live tenant-owned route and is meant to be noticed
     /// (decision-goalA-item5 Open question 1 is live now).
     #[test]
@@ -163,7 +165,11 @@ mod tests {
         let owned = tenant_owned_services();
         assert_eq!(
             owned,
-            std::collections::HashSet::from(["tenantecho".to_string(), "doppelganger".to_string()]),
+            std::collections::HashSet::from([
+                "tenantecho".to_string(),
+                "doppelganger".to_string(),
+                "stratum".to_string(),
+            ]),
             "the fleet's tenant-owned services: {owned:?}"
         );
     }

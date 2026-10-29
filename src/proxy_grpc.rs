@@ -791,6 +791,9 @@ mod tests {
             target_namespace_field: None,
             form_body: false,
             redirect_field: None,
+            route_field: None,
+            route_field_json: None,
+            route_field_number: 0,
         };
 
         let (physical_service, entitlement_service) = route_identity(&route);

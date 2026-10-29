@@ -1,5 +1,5 @@
 # Compiler floor: the looper runs the latest patch of this MAJOR.MINOR.
-tacplus: "2.4"
+tacplus: "2.5"
 language: rust
 # Rust takes only pkg's last segment: the crate stays gateway-model.
 pkg: com.github.tacplusdev.gateway
