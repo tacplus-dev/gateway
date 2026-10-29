@@ -7,6 +7,7 @@ The edge proxy (Rust): routes REST and gRPC to backend services, serves OIDC dis
 Also serves the sign-in webapp. Unreleased; tacplus floor 2.4.
 
 ## Next
+- Login page: "Signing in with <provider>…" once a button is clicked (#17)
 - Gates: the e2e_user_mint kernel stand-in lacks UserMint.RevokeDeviceCredential, build fails on main (#14)
 - Release by tag (v0.1.0) with notes, no deployable image: the gateway is built per fleet by the fleet builder with the merged webapp (#6; tacplus-dev/roadmap:decisions/gateway-per-fleet-2026-10-27.md; after tacplus-dev/looper#17 and #12)
 
