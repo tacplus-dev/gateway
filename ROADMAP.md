@@ -4,7 +4,7 @@ Owned by Jody; changed only by an agent at Jody's request. Loopers propose in PR
 
 ## Now
 The edge proxy (Rust): routes REST and gRPC to backend services, serves OIDC discovery and JWKS, proxies mint calls to kernel, falls back to SPIFFE path routing.
-Also serves the sign-in webapp. Unreleased; tacplus floor 2.4.
+Also serves the sign-in webapp. Unreleased; tacplus floor 2.5 (#18).
 
 ## Next
 - Login page: "Signing in with <provider>…" once a button is clicked (#17)
