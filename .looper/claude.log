@@ -1,0 +1,47 @@
+= init
+> Bash gh issue view 10 --repo tacplus-dev/gateway --comments; ls; cat tacplus.yaml justfile
+< author:	jodydadescott association:	member edited:	false status:	none -- Hub triage (2026-10-27): no decision needed. The advisory is in tacplus-generated crates, so it is fixed in tacplus (tacplus-dev/tacplus#186) and taken here by relocking. Waits for: #1 tacplus-dev/tacplus#186 . -- ARCHITECTURE.m...
+The issue body didn't show; let me get it in full.
+> Bash gh issue view 10 --repo tacplus-dev/gateway --json title,body,labels,state; gh issue view 1 --repo tacplus-dev/gateway --json title,state,body | head -50; gh issue view 186 --repo tacplus-dev/tacplus --json title,state,body,closedAt
+< {"body":"Blocked-by: #1\nBlocked-by: tacplus-dev/tacplus#186\n\n## Finding\n\n`cargo audit` (cargo-audit 0.22.2, advisory DB fetched 2026-10-27) on main @ 8fd2304 reports two advisories that a\nlockfile update cannot fix:\n\n```\n$ cargo audit\nCrate:     crypto-bigint\nVersion:   0.5.5\nTitle:     ...
+> Bash gh issue view 186 --repo tacplus-dev/tacplus --comments | tail -60; gh release list --repo tacplus-dev/tacplus --limit 5; tacplus --version; git tag
+< | 2.5 | #216 | v2.5.2 | | 2.4 | #217 | v2.4.3 | | 2.3 | #218 | v2.3.4 | | 2.2 | #219 | v2.2.2 | | 2.1 | #220 | v2.1.5 | | 2.0 | #221 | v2.0.12 |  Branches 2.0–2.4 predate #179, so I re-applied the change to their own token and jwk code; their alg rules are unchanged. For 2.0, 2.1, 2.3 and 2.4 only t...
+> Bash gh pr view 216 --repo tacplus-dev/tacplus --json state,title,mergedAt; gh issue list --repo tacplus-dev/tacplus --search "v2.5.2 in:title" --state all --limit 5; grep -E '^name = "(rsa|crypto-bigint|elliptic-curve)"' -A1 Cargo.lock
+< {"mergedAt":null,"state":"OPEN","title":"[release/2.5] Rust chassis: RSA and ECDSA on aws-lc-rs, off rsa 0.9 and elliptic-curve 0.13 (#186)"} name = "crypto-bigint" version = "0.5.5" -- name = "elliptic-curve" version = "0.13.8" -- name = "rsa" version = "0.9.10"
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash gh issue list --repo tacplus-dev/tacplus --state open --search "2.5.2" --limit 10; gh pr view 216 --repo tacplus-dev/tacplus --comments | tail -30
+< GraphQL: Your token has not been granted the required scopes to execute this query. The 'login' field requires one of the following scopes: ['read:org'], but your token has only been granted the: ['repo', 'workflow'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens., ...
+> Bash gh api "repos/tacplus-dev/tacplus/issues/216/comments" --jq '.[].body' | tail -30; gh api "search/issues?q=repo:tacplus-dev/tacplus+is:open+2.5.2" --jq '.items[]|"\(.number) \(.title)"'
+< (Bash completed with no output)
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash /usr/local/bin/repo-looper --repo gateway --issue 10 --checkpoint "Nothing changed: the fix (tacplus 3429fd66) reaches the 2.5 floor only in v2.5.2, cut after tacplus#216 merges (open). Left: once v2.5.2 exists, regenerate + cargo update to drop rsa/crypto-bigint 0.5/elliptic-curve 0.13, cargo audit...
