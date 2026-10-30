@@ -97,10 +97,9 @@ impl DialCounter {
 fn jwk_for(key: &keys::ImmutableKey) -> ImmutableJwk {
     let (x, y) = match key.public_key() {
         keys::PublicKey::EcP256(ec) => {
-            let point = ec.to_encoded_point(false);
             (
-                base64_utils::encode_base64_url(point.x().expect("x")),
-                base64_utils::encode_base64_url(point.y().expect("y")),
+                base64_utils::encode_base64_url(ec.x()),
+                base64_utils::encode_base64_url(ec.y()),
             )
         }
         _ => panic!("this test signs with P-256"),

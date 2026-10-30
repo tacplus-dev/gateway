@@ -573,7 +573,6 @@ mod tests {
         let keys::PublicKey::EcP256(ec) = key.public_key() else {
             panic!("these tests sign with P-256");
         };
-        let point = ec.to_encoded_point(false);
         ImmutableJwk::new(Jwk {
             kty: "EC".to_string(),
             alg: Some(key.alg().to_string()),
@@ -582,8 +581,8 @@ mod tests {
             n: None,
             e: None,
             crv: Some("P-256".to_string()),
-            x: Some(base64_utils::encode_base64_url(point.x().expect("x"))),
-            y: Some(base64_utils::encode_base64_url(point.y().expect("y"))),
+            x: Some(base64_utils::encode_base64_url(ec.x())),
+            y: Some(base64_utils::encode_base64_url(ec.y())),
             exp: None,
             created: None,
         })
