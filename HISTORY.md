@@ -10,3 +10,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-02 looper issue Gates fail on main: Cargo.lock is stale after tacplus 2.5.5 moved the generated chassis to the digest 0.11 stack (tacplus#215) (#22, b4576ef)
 - 2026-11-03 looper issue Trace: gateway.Mint's MintToken/MintX509Cert (gRPC and REST) have no test that trace_id reaches kernel (#23, dee25d0)
 - 2026-11-03 looper issue Trace: the gRPC proxy and REST translation have no test that the caller's trace_id reaches the backend (#24, b52decf)
+- 2026-11-03 looper issue TLS: cert_chain from config is the only path (hot-swapped on config change, no restart); retire letsencrypt mode (#25, 0b0743f)
