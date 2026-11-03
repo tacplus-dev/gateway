@@ -14,7 +14,6 @@ use tokio_stream::wrappers::ReceiverStream;
 use uuid::Uuid;
 
 use gateway_model::s2sm::rest_dispatch::{self, AuthPolicy, RouteInfo, ROUTES};
-use gateway_model::s2sm::ServiceManager;
 use gateway_model::types::sys::jwk::jwk::Jwk as ProtoJwk;
 use gateway_model::types::sys::jwk::jwk::JwkUseType;
 use gateway_model::types::sys::key::key::KeyType;
@@ -40,7 +39,8 @@ fn is_mint_x509_grpc_path(path: &str) -> bool {
 /// Application state for REST translation.
 pub struct RestState {
     pub proxy: Arc<ProxyState>,
-    pub sm: Arc<ServiceManager>,
+    /// Kernel's minting surface, for the TokenMint and X509Mint translations.
+    pub minter: Arc<dyn crate::mint::KernelMinter>,
     pub auth: Arc<GatewayAuth>,
     /// The CA that signed gateway's external TLS cert, from gateway config —
     /// exactly what `mint::GatewayMintService` serves on the native gRPC
@@ -1327,13 +1327,7 @@ async fn handle_mint(
             };
             let grpc_req = rest_dispatch::with_metadata(req, auth_header, request_id);
             // TokenMint is proxied to kernel.Mint (the sole token authority).
-            match state
-                .sm
-                .s2s()
-                .kernel()
-                .minter_client()
-                .mint_token(grpc_req)
-                .await
+            match state.minter.mint_token(grpc_req).await
             {
                 Ok(resp) => json_response(&resp.into_inner()),
                 Err(status) => {
@@ -1358,13 +1352,7 @@ async fn handle_mint(
                 };
             let grpc_req = rest_dispatch::with_metadata(req, auth_header, request_id);
             // X509Mint is proxied to kernel.Mint (the sole cert signing authority).
-            match state
-                .sm
-                .s2s()
-                .kernel()
-                .minter_client()
-                .mint_x509_cert(grpc_req)
-                .await
+            match state.minter.mint_x509_cert(grpc_req).await
             {
                 Ok(resp) => json_response(&resp.into_inner()),
                 Err(status) => {

@@ -11,16 +11,52 @@ use crate::auth::GatewayAuth;
 
 const ID_TOKEN_SIGNING_ALGS_SUPPORTED: &[&str] = &["EdDSA", "ES256"];
 
+/// Kernel's minting surface, as gateway.Mint's TokenMint and X509Mint reach it
+/// on both the gRPC handlers and their REST translations. The running gateway's
+/// is its ServiceManager (sm.s2s().kernel().minter_client()); the seam exists so
+/// those handlers can be driven against a kernel stand-in in tests, where no
+/// ServiceManager can be built (it bootstraps against a live kernel).
+#[tonic::async_trait]
+pub trait KernelMinter: Send + Sync {
+    async fn mint_token(
+        &self,
+        request: tonic::Request<TokenMintRequest>,
+    ) -> Result<tonic::Response<TokenMintResponse>, tonic::Status>;
+
+    async fn mint_x509_cert(
+        &self,
+        request: tonic::Request<X509MintRequest>,
+    ) -> Result<tonic::Response<X509CertChain>, tonic::Status>;
+}
+
+/// The request is forwarded as it came, so its trace_id (field 200) reaches kernel.
+#[tonic::async_trait]
+impl KernelMinter for ServiceManager {
+    async fn mint_token(
+        &self,
+        request: tonic::Request<TokenMintRequest>,
+    ) -> Result<tonic::Response<TokenMintResponse>, tonic::Status> {
+        self.s2s().kernel().minter_client().mint_token(request).await
+    }
+
+    async fn mint_x509_cert(
+        &self,
+        request: tonic::Request<X509MintRequest>,
+    ) -> Result<tonic::Response<X509CertChain>, tonic::Status> {
+        self.s2s().kernel().minter_client().mint_x509_cert(request).await
+    }
+}
+
 /// Gateway Mint service implementation.
 ///
 /// GetOpenIdConfig and ListJwks are served locally from watched JWK keys.
 /// TokenMint and X509Mint are delegated to kernel.Mint — kernel is the cluster
 /// trust root and the sole token + cert signing authority
-/// (sm.s2s().kernel().minter_client(): the sys minting contract, hosted by kernel).
+/// (`KernelMinter`: the sys minting contract, hosted by kernel).
 /// ListPublicCa serves the root CA cert(s) from gateway config — the CA that
 /// signed the external TLS cert, which clients need to configure TLS trust.
 pub struct GatewayMintService {
-    sm: Arc<ServiceManager>,
+    minter: Arc<dyn KernelMinter>,
     auth: Arc<GatewayAuth>,
     issuer_url: String,
     root_ca: Vec<X509Cert>,
@@ -28,13 +64,13 @@ pub struct GatewayMintService {
 
 impl GatewayMintService {
     pub fn new(
-        sm: Arc<ServiceManager>,
+        minter: Arc<dyn KernelMinter>,
         auth: Arc<GatewayAuth>,
         issuer_url: String,
         root_ca: Vec<X509Cert>,
     ) -> Self {
         Self {
-            sm,
+            minter,
             auth,
             issuer_url,
             root_ca,
@@ -104,7 +140,7 @@ impl Mint for GatewayMintService
         request: tonic::Request<TokenMintRequest>,
     ) -> Result<tonic::Response<TokenMintResponse>, tonic::Status> {
         // TokenMint is proxied to kernel.Mint (the sole token authority).
-        self.sm.s2s().kernel().minter_client().mint_token(request).await
+        self.minter.mint_token(request).await
     }
 
     async fn mint_x509_cert(
@@ -112,7 +148,7 @@ impl Mint for GatewayMintService
         request: tonic::Request<X509MintRequest>,
     ) -> Result<tonic::Response<X509CertChain>, tonic::Status> {
         // X509Mint is proxied to kernel.Mint (the sole cert signing authority).
-        self.sm.s2s().kernel().minter_client().mint_x509_cert(request).await
+        self.minter.mint_x509_cert(request).await
     }
 
     async fn list_public_ca(

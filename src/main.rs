@@ -40,6 +40,11 @@ mod e2e_user_mint;
 #[cfg(test)]
 mod e2e_form_post;
 
+/// End-to-end proof that gateway.Mint's kernel-bound RPCs, gRPC and REST, carry
+/// the caller's trace_id to kernel.
+#[cfg(test)]
+mod e2e_mint_trace;
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -262,7 +267,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // root_ca comes from config — the CA that signed the external TLS cert.
     // Clients call ListPublicCa to retrieve it for TLS trust configuration.
     let mint_service = mint::GatewayMintService::new(
-        Arc::clone(&sm),
+        Arc::clone(&sm) as Arc<dyn mint::KernelMinter>,
         Arc::clone(&gateway_auth),
         issuer_url.clone(),
         cfg.root_ca.clone(),
@@ -306,7 +311,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // 11. Build REST state (shares ProxyState — all auth is in proxy_grpc).
     let rest_state = Arc::new(rest_translation::RestState {
         proxy: Arc::clone(&proxy_state),
-        sm: Arc::clone(&sm),
+        minter: Arc::clone(&sm) as Arc<dyn mint::KernelMinter>,
         auth: Arc::clone(&gateway_auth),
         root_ca: cfg.root_ca.clone(),
         issuer_url: issuer_url.clone(),
