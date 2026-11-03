@@ -884,6 +884,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "x509",
+ "x509-parser",
 ]
 
 [[package]]

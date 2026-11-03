@@ -64,7 +64,6 @@ use gateway_model::s2sm::ServiceManager;
 use gateway_model::types::sys::host::host::Host;
 use gateway_model::types::services::gateway::gateway::Config as GatewayConfig;
 use gateway_model::types::services::gateway::gateway::ExternalTlsMode;
-use gateway_model::types::services::letsencrypt::letsencrypt::lets_encrypt_state_service_client::LetsEncryptStateServiceClient;
 use crate::health::TokenProvider;
 
 #[tokio::main]
@@ -165,35 +164,24 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Use the generated token provider from ServiceManager.
     let token_provider = sm.token_provider();
 
-    // 3. Build external TLS config based on external_tls_mode.
-    // Use the generated token provider from ServiceManager.
-    let tls_config = match cfg.external_tls_mode() {
-        ExternalTlsMode::CertChain => {
-            tracing::info!("external TLS mode: cert_chain");
-            tls::build_server_config_from_pem(&cfg.external_cert_pem, &cfg.external_key_pem)?
-        }
-        ExternalTlsMode::Letsencrypt => {
-            tracing::info!("external TLS mode: letsencrypt");
-            // Start on the cluster-CA edge chain -- the same material cert_chain
-            // mode serves -- and never block startup on a public certificate.
-            // Gateway owns port 80, which is what answers letsencrypt's HTTP-01
-            // challenge, so waiting here for a cert deadlocked its own issuance:
-            // no listener -> no challenge -> no cert -> no listener. The watcher
-            // spawned below hot-swaps the real certificate in the moment
-            // LetsEncryptState delivers one.
-            tls::build_server_config_from_pem(&cfg.external_cert_pem, &cfg.external_key_pem)?
-        }
-        ExternalTlsMode::Unspecified => {
-            return Err("external_tls_mode must be set in gateway config (cert_chain or letsencrypt)".into());
-        }
-    };
+    // 3. Build external TLS config from the config's cert_chain, the only mode
+    // (letsencrypt is retired, #25). A config still naming letsencrypt decodes
+    // as Unspecified and is refused here, as is an expired certificate or a key
+    // that is not its own: the gateway does not start on a certificate no
+    // client would accept.
+    if cfg.external_tls_mode() != ExternalTlsMode::CertChain {
+        return Err("external_tls_mode must be cert_chain in gateway config".into());
+    }
+    tracing::info!("external TLS mode: cert_chain");
+    let tls_config = tls::build_server_config_from_pem(&cfg.external_cert_pem, &cfg.external_key_pem)
+        .map_err(|e| format!("external_cert_pem/external_key_pem refused: {e}"))?;
     let tls_acceptor = axum_server::tls_rustls::RustlsConfig::from_config(tls_config);
 
-    // Spawn cert hot-reload watchers. BOTH external TLS modes need one.
+    // Hot-reload the certificate on config change.
     //
     // cert_chain was previously treated as static config, read once by the fetch()
-    // above and never looked at again. But a supplied certificate expires just as
-    // a letsencrypt one does -- a public CA cert is typically 90 days, a private
+    // above and never looked at again. But a supplied certificate expires -- a
+    // public CA cert is typically 90 days, a private
     // CA cert whatever the issuer sets -- and the renewed PEM is delivered through
     // GatewayConfigState like any other runtime config. With no watcher, gateway
     // kept serving the superseded certificate until someone restarted the pod, and
@@ -202,11 +190,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     //
     // The generated state client already maintains the watch and exposes
     // on_change; only the call site was missing.
-    if cfg.external_tls_mode() == ExternalTlsMode::Letsencrypt {
-        spawn_cert_watcher(kernel_channel.clone(), token_provider.clone(), tls_acceptor.clone());
-    } else if cfg.external_tls_mode() == ExternalTlsMode::CertChain {
-        spawn_cert_chain_reloader(sm.clone(), tls_acceptor.clone(), &cfg);
-    }
+    spawn_cert_chain_reloader(sm.clone(), tls_acceptor.clone(), &cfg);
 
     // 4. Log the compile-time route table.
     registry::Registry::load();
@@ -407,36 +391,21 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let app: limits::EdgeService<hyper::body::Incoming> =
         limits::with_edge_limits(app, &edge_limits);
 
-    // 13. Start the plaintext listener, when configured. The gateway owns the
-    // edge's port 80 as well as 443 — one LoadBalancer carries both — so this
-    // is what proxies ACME HTTP-01 challenges to the letsencrypt service and
-    // redirects everything else to https. Bound before the TLS listener so a
-    // bind failure kills startup instead of being lost in a background task.
+    // 13. Start the plaintext listener, when configured. When one LoadBalancer
+    // carries the edge's port 80 as well as 443, this is what redirects it to
+    // https. Bound before the TLS listener so a bind failure kills startup
+    // instead of being lost in a background task.
     if let Some(http_listener) = cfg.http_listener.as_ref() {
         let http_addr = host_to_socket_addr(http_listener);
-        let acme_backend = cfg
-            .acme_backend
-            .as_ref()
-            .map(|host| format!("{}:{}", host.host, host.port));
-        if acme_backend.is_none() {
-            tracing::warn!(
-                "http_listener is set but acme_backend is not — ACME HTTP-01 challenges \
-                 will be answered 503 and no certificate can be issued or renewed"
-            );
-        }
-        plain_http::serve(http_addr, acme_backend.clone()).await?;
-        tracing::info!(
-            addr = %http_addr,
-            acme_backend = acme_backend.as_deref().unwrap_or(""),
-            "listening (plaintext, ACME challenge + https redirect)"
-        );
+        plain_http::serve(http_addr).await?;
+        tracing::info!(addr = %http_addr, "listening (plaintext, https redirect)");
     }
 
     // 14. Start TLS listener — serves both HTTP and gRPC on the same port.
     tracing::info!(addr = %tcp_addr, "listening (TLS, HTTP+gRPC)");
 
     // Gateway builds the ServiceManager with new() but never calls run(), because
-    // it serves external TLS (LetsEncrypt / CertChain) rather than the SM's
+    // it serves external TLS (the config's cert_chain) rather than the SM's
     // auto-TLS. The SM sets grpc_health to NOT_SERVING in new() and flips it to
     // SERVING inside run() — so without this call the plaintext health listener on
     // 8444 stays NOT_SERVING forever and k8s startup probes fail indefinitely
@@ -466,65 +435,32 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Hot-reload the external TLS certificate in cert_chain mode when a renewed
-/// cert/key is written to GatewayConfigState.
+/// Hot-reload the external TLS certificate when a renewed cert/key is written
+/// to GatewayConfigState (tls::CertChainReloader: unchanged PEMs are no reload,
+/// a refused certificate keeps the current one serving).
 ///
 /// Registers a change callback on the generated state client, which already
 /// maintains the watch -- no hand-rolled stream, per the tacplus rule that
 /// generated capabilities are used rather than duplicated.
-///
-/// The callback fires on ANY gateway config change, so it compares the PEMs
-/// against the ones currently being served and does nothing unless they actually
-/// differ. Without that, toggling an unrelated field would rebuild and swap the
-/// TLS config for no reason.
-///
-/// A rejected certificate is logged and DISCARDED: the previously loaded, working
-/// certificate keeps serving. Swapping in a broken cert because someone pasted a
-/// malformed PEM would take the public endpoint down, which is strictly worse than
-/// continuing on the old one until it is corrected.
 fn spawn_cert_chain_reloader(
     sm: Arc<ServiceManager>,
     tls_config: axum_server::tls_rustls::RustlsConfig,
     initial: &GatewayConfig,
 ) {
-    let serving = Arc::new(std::sync::Mutex::new((
-        initial.external_cert_pem.clone(),
-        initial.external_key_pem.clone(),
-    )));
+    let reloader = tls::CertChainReloader::new(tls_config, initial);
 
     sm.state_clients()
         .services()
         .gateway_config_state()
         .config()
-        .on_change(Arc::new(move |new_cfg: &GatewayConfig| {
-            if new_cfg.external_tls_mode() != ExternalTlsMode::CertChain {
-                return;
-            }
-            {
-                let current = serving.lock().unwrap();
-                if current.0 == new_cfg.external_cert_pem && current.1 == new_cfg.external_key_pem {
-                    return;
-                }
-            }
-            match tls::build_server_config_from_pem(
-                &new_cfg.external_cert_pem,
-                &new_cfg.external_key_pem,
-            ) {
-                Ok(new_config) => {
-                    tls_config.reload_from_config(new_config);
-                    let mut current = serving.lock().unwrap();
-                    *current = (
-                        new_cfg.external_cert_pem.clone(),
-                        new_cfg.external_key_pem.clone(),
-                    );
-                    tracing::info!("external TLS certificate hot-reloaded from gateway config");
-                }
-                Err(e) => tracing::error!(
-                    error = %e,
-                    "renewed external_cert_pem/external_key_pem rejected; \
-                     continuing to serve the previous certificate"
-                ),
-            }
+        .on_change(Arc::new(move |new_cfg: &GatewayConfig| match reloader.apply(new_cfg) {
+            Ok(true) => tracing::info!("external TLS certificate hot-reloaded from gateway config"),
+            Ok(false) => {}
+            Err(e) => tracing::error!(
+                error = %e,
+                "renewed external_cert_pem/external_key_pem rejected; \
+                 continuing to serve the previous certificate"
+            ),
         }));
 
     tracing::info!("cert_chain hot-reload watcher registered");
@@ -537,59 +473,6 @@ fn apply_web_bundles(cfg: &GatewayConfig) {
             tracing::info!(hostname = %bundle.hostname, dir = %bundle.dir, "SPA: web bundle for hostname");
         }
     }
-}
-
-/// Spawn a background task that watches LetsEncryptState.cert_data and
-/// hot-reloads the TLS config when the certificate is renewed.
-fn spawn_cert_watcher(
-    channel: tonic::transport::Channel,
-    token_provider: TokenProvider,
-    tls_config: axum_server::tls_rustls::RustlsConfig,
-) {
-    tokio::spawn(async move {
-        loop {
-            match watch_cert_updates(channel.clone(), &token_provider, &tls_config).await {
-                Ok(()) => tracing::warn!("WatchCertData stream ended, reconnecting"),
-                Err(e) => {
-                    tracing::error!(error = %e, "WatchCertData cert watcher failed, retrying in 5s");
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                }
-            }
-        }
-    });
-}
-
-async fn watch_cert_updates(
-    channel: tonic::transport::Channel,
-    token_provider: &TokenProvider,
-    tls_config: &axum_server::tls_rustls::RustlsConfig,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let mut client = LetsEncryptStateServiceClient::new(channel);
-
-    let mut request = tonic::Request::new(Default::default());
-    if let Ok(token) = (token_provider)().await {
-        let val: tonic::metadata::MetadataValue<tonic::metadata::Ascii> =
-            format!("Bearer {}", token).parse()
-                .map_err(|e| format!("invalid token metadata: {e}"))?;
-        request.metadata_mut().insert("authorization", val);
-    }
-
-    let response = client.watch_cert_data(request).await?;
-    let mut stream = response.into_inner();
-
-    tracing::info!("TLS cert watcher stream started");
-
-    while let Some(msg) = stream.next().await {
-        match msg {
-            Ok(cert_data) => tls::apply_cert_data(tls_config, &cert_data),
-            Err(e) => {
-                tracing::warn!(error = %e, "WatchCertData stream error");
-                return Err(e.into());
-            }
-        }
-    }
-
-    Ok(())
 }
 
 async fn healthz() -> StatusCode {

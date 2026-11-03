@@ -12,7 +12,6 @@ import "sys/x509.proto";
 import "sys/tokenrequest.proto";
 
 option (spec.service) = {gateway: true, rest_dispatch: true};
-option (spec.state_imports) = {source: "letsencrypt.LetsEncryptState"};
 option (spec.state_imports) = {source: "kernel.Ca"};
 // gateway's C2S Mint front proxies all token + cert ops (TokenMint,
 // MintClientToken, X509Mint) to kernel.Mint — kernel (the cluster trust root)
@@ -28,11 +27,14 @@ enum ExternalTlsMode {
   EXTERNAL_TLS_MODE_UNSPECIFIED = 0;
 
   // CERT_CHAIN: use the cert and key supplied in external_cert_pem / external_key_pem.
+  // The only mode: the deployment's pipeline obtains and renews the certificate
+  // and delivers it in this config, which the gateway hot-swaps on every change
+  // (tacplus-dev/roadmap:decisions/certificates-by-pipeline-2026-11-03.md).
   EXTERNAL_TLS_MODE_CERT_CHAIN  = 1;
 
-  // LETSENCRYPT: obtain and renew the certificate automatically via LetsEncrypt.
-  // Gateway subscribes RO to LetsEncryptState for the current cert.
-  EXTERNAL_TLS_MODE_LETSENCRYPT = 2;
+  // LETSENCRYPT (the gateway watching LetsEncryptState) is retired, #25.
+  reserved 2;
+  reserved "EXTERNAL_TLS_MODE_LETSENCRYPT";
 }
 
 message Config {
@@ -64,50 +66,44 @@ message Config {
   ExternalTlsMode external_tls_mode = 7;
 
   // external_hostnames lists the domain names gateway serves externally.
-  // Used for SNI-based cert selection at runtime. In LETSENCRYPT mode,
-  // letsencrypt.Config.hostnames must match this list.
+  // The certificate in external_cert_pem must cover each of them.
   repeated string external_hostnames = 8 [(spec.assert_max_size) = 16];
 
-  // external_cert_pem is the PEM-encoded certificate chain for CERT_CHAIN mode.
-  // Ignored in LETSENCRYPT mode. Supplied via secrets overlay — never committed to VCS.
+  // external_cert_pem is the PEM-encoded certificate chain, leaf first.
+  // Supplied via secrets overlay — never committed to VCS. A new value is
+  // served to new connections as soon as the config carries it; one whose
+  // leaf has expired, or whose key is not external_key_pem, is refused and the
+  // current certificate kept.
   string external_cert_pem = 9;
 
-  // external_key_pem is the PEM-encoded private key for CERT_CHAIN mode.
-  // Ignored in LETSENCRYPT mode. Supplied via secrets overlay — never committed to VCS.
+  // external_key_pem is the PEM-encoded private key of external_cert_pem's leaf.
+  // Supplied via secrets overlay — never committed to VCS.
   string external_key_pem = 10;
 
   // root_ca holds the root CA certificate(s) that clients should trust when
   // connecting to the gateway's external HTTPS endpoint. Served via PublicCa
   // so clients (schematicctl, webapp) can configure TLS trust automatically.
-  // Required in CERT_CHAIN mode. Omit in LETSENCRYPT mode (publicly trusted).
+  // Omit when the certificate is publicly trusted.
   repeated x509.X509Cert root_ca = 11 [(spec.assert_max_size) = 4];
 
-  // http_listener is the PLAINTEXT listener behind the edge's port 80. The
-  // gateway owns port 80 as well as 443: one LoadBalancer carries both, so
-  // there is no second externally-exposed Service to reach the ACME responder
-  // with.
+  // http_listener is the PLAINTEXT listener behind the edge's port 80, when
+  // one LoadBalancer carries both 443 and 80 to the gateway.
   //
   // On this listener the gateway does exactly three things:
-  //   - GET/HEAD /.well-known/acme-challenge/* is proxied to acme_backend
+  //   - GET/HEAD of the blob paths (/b/*, /upload/*) gets a 404
   //   - any other GET/HEAD gets a 301 to the same path on https://
   //   - any other method gets a 405
   //
-  // Empty disables the listener — nothing binds. It has no declared default
-  // because the answer depends on external_tls_mode, which tacplus cannot
-  // express as a conditional default: the operator sets it (to 0.0.0.0:8080,
-  // the container-side port the LoadBalancer's port 80 targets) exactly when
-  // external_tls_mode = LETSENCRYPT, and leaves it empty otherwise.
+  // Empty disables the listener — nothing binds. The operator sets it (to
+  // 0.0.0.0:8080, the container-side port the LoadBalancer's port 80 targets)
+  // when the edge forwards port 80.
   host.Host http_listener = 12;
 
-  // acme_backend is the IN-CLUSTER address of the letsencrypt service's
-  // HTTP-01 responder — its own http_listener, reachable on the letsencrypt
-  // ClusterIP Service. The gateway is the only thing that reaches it; the
-  // responder is no longer exposed outside the cluster.
-  //
-  // Empty while http_listener is set means challenge requests are answered
-  // 503: the redirect and 405 halves still work, but no certificate can be
-  // issued. Set together with http_listener.
-  host.Host acme_backend = 13;
+  // acme_backend (the letsencrypt service's HTTP-01 responder, proxied from
+  // http_listener) is retired with letsencrypt mode, #25: the deployment's
+  // pipeline answers ACME by DNS-01, nothing in the cluster does.
+  reserved 13;
+  reserved "acme_backend";
 
   // web_bundles chooses the static bundle served on a hostname. A browser
   // request (GET/HEAD the REST routes do not claim) whose Host matches a
@@ -117,8 +113,8 @@ message Config {
   // assets). Every bundle is same-origin with the API: one listener, one
   // certificate, so there is no CORS.
   //
-  // Each hostname must also be in external_hostnames -- and, in LETSENCRYPT
-  // mode, in letsencrypt.Config.hostnames -- or browsers reject the cert.
+  // Each hostname must also be in external_hostnames, and covered by
+  // external_cert_pem, or browsers reject the cert.
   repeated WebBundle web_bundles = 14 [(spec.assert_max_size) = 16];
 }
 

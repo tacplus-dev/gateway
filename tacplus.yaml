@@ -5,11 +5,9 @@ language: rust
 pkg: com.github.tacplusdev.gateway
 output-dir: target/generated-sources/model
 src: proto
-# gateway.proto declares a client of kernel.Mint and imports kernel.Ca state,
-# and imports letsencrypt.LetsEncryptState.
+# gateway.proto declares a client of kernel.Mint and imports kernel.Ca state.
 depends:
   - kernel
-  - letsencrypt
 # Test-time needs, not the contract: the form_post end-to-end test stands in
 # for oauth.Auth, and registry.rs pins the fleet's tenant-owned services
 # (tenantecho and doppelganger declare it).

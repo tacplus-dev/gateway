@@ -209,7 +209,7 @@ Provides tonic `Channel` objects to healthy backends. Uses round-robin selection
 
 ### TLS
 
-- **Frontend**: Publicly-signed cert from kernel's `GatewayTlsState`, hot-reloaded on change.
+- **Frontend**: The cert and key in the gateway's own config (`external_cert_pem` / `external_key_pem`, `EXTERNAL_TLS_MODE_CERT_CHAIN`, the only mode), put there by the deployment's pipeline. Hot-swapped for new handshakes whenever kernel's system-config refresh delivers a new pair, with no restart and no dropped connection; an expired cert or a key that is not its own is refused, at startup and on reload, and the current cert kept (`src/tls.rs`).
 - **Backend**: mTLS using bootstrap CAs + dynamic CAs from kernel's `CaState`. All service certs have `SAN DNS:kernel` (from X509Mint).
 
 ## File Map (Target)

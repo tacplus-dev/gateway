@@ -39,6 +39,9 @@ tower-http = { version = "0.6", features = ["cors", "limit", "map-request-body"]
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
+# The external certificate's expiry, checked before it is served; the version
+# servicemanager already locks.
+x509-parser = "0.16"
 mime_guess = "2"
 gateway-model = { path = "target/generated-sources/model" }
 gateway-jwk = { package = "jwk", path = "target/generated-sources/model/chassis/jwk" }
