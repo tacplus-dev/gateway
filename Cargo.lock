@@ -875,6 +875,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-stream",
+ "tokio-tungstenite",
  "tonic",
  "tonic-health",
  "tower",

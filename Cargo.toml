@@ -53,3 +53,5 @@ gateway-grpcserver = { package = "grpcserver", path = "target/generated-sources/
 [dev-dependencies]
 gateway-key = { package = "key", path = "target/generated-sources/model/chassis/key" }
 gateway-x509 = { package = "x509", path = "target/generated-sources/model/chassis/x509" }
+# The WebSocket end-to-end test's client; the version axum's `ws` already locks.
+tokio-tungstenite = "0.28"

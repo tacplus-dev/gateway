@@ -45,22 +45,27 @@ use gateway_x509::x509::{ImmutableCertChain, X509KeyUsage};
 use gateway_model::types::services::kernel::kernel as kernel_pb;
 use gateway_model::types::sys::mcp::mcp::{McpRequest, McpResponse};
 use gateway_model::types::sys::tokenrequest::tokenrequest as tokenrequest_pb;
+use gateway_model::types::sys::tokenrequest::{TokenMintRequest, TokenMintResponse, X509MintRequest};
+use gateway_model::types::sys::x509::x509::X509CertChain;
 use kernel_pb::mint_client::MintClient;
 use kernel_pb::user_mint_client::UserMintClient;
 use kernel_pb::user_mint_server::{UserMint, UserMintServer};
 
 use crate::auth::GatewayAuth;
 use crate::health::{HealthWatcher, ServiceEndpoint};
+use crate::mint::KernelMinter;
 use crate::proxy_grpc::{self, ProxyState};
 use crate::resolver::Resolver;
+use crate::rest_translation::{self, RestState};
 
 const TRUST_DOMAIN: &str = "user-mint-e2e.test";
 /// The `service_id` the generated route for `/kernel.UserMint/*` names, and
 /// therefore the key the gateway looks up in its endpoint table.
 const KERNEL_SERVICE: &str = "kernel";
 /// The one-time code the stand-in hands back. The real one is 64 base64url
-/// chars of `SecureRandom`; this only has to be recognisable.
-const CODE: &str = "the-code-the-user-hands-the-delegate";
+/// chars of `SecureRandom`; this only has to be recognisable, and as long: the
+/// REST leg validates the response against the contract's 64-char minimum.
+const CODE: &str = "the-code-the-user-hands-the-delegate_padded-to-the-contracts-64c";
 
 // ── the backend ─────────────────────────────────────────────────────────────
 
@@ -71,10 +76,12 @@ fn unused() -> tonic::Status {
 /// Stands in for kernel's `UserMint` surface. It records the delegate it was
 /// asked about and whether the caller's bearer token arrived with the call, so
 /// the test can assert the gateway forwards the credential the handler mints
-/// against rather than swallowing it.
+/// against rather than swallowing it; and, apart, the `trace_id` (field 200) of
+/// each request it decoded.
 #[derive(Default)]
 struct KernelStandIn {
     seen: Mutex<Vec<(String, String, bool)>>,
+    trace_ids: Mutex<Vec<String>>,
 }
 
 #[tonic::async_trait]
@@ -86,6 +93,7 @@ impl UserMint for KernelStandIn {
     {
         let had_auth = request.metadata().get("authorization").is_some();
         let req = request.into_inner();
+        self.trace_ids.lock().expect("trace_ids").push(req.trace_id);
         self.seen
             .lock()
             .expect("seen")
@@ -305,6 +313,38 @@ fn request_with(
     request
 }
 
+/// The REST router, in front of the same proxy. `UserMint` is proxied, not one
+/// of the gateway.Mint routes the minter serves, so it is never consulted.
+fn rest_router(proxy: Arc<ProxyState>) -> axum::Router {
+    struct NoMinter;
+
+    #[tonic::async_trait]
+    impl KernelMinter for NoMinter {
+        async fn mint_token(
+            &self,
+            _: tonic::Request<TokenMintRequest>,
+        ) -> Result<tonic::Response<TokenMintResponse>, tonic::Status> {
+            Err(unused())
+        }
+
+        async fn mint_x509_cert(
+            &self,
+            _: tonic::Request<X509MintRequest>,
+        ) -> Result<tonic::Response<X509CertChain>, tonic::Status> {
+            Err(unused())
+        }
+    }
+
+    let auth = Arc::clone(&proxy.auth);
+    rest_translation::router(Arc::new(RestState {
+        proxy,
+        minter: Arc::new(NoMinter),
+        auth,
+        root_ca: vec![],
+        issuer_url: "https://gateway.example".to_string(),
+    }))
+}
+
 fn mint_request() -> tokenrequest_pb::MintDelegateOfflineTokenRequest {
     tokenrequest_pb::MintDelegateOfflineTokenRequest {
         delegate_name: "ticketbot".to_string(),
@@ -416,5 +456,92 @@ async fn the_delegate_half_stays_off_the_client_path() {
         tonic::Code::NotFound,
         "a routed kernel.Mint method must get past the route table, proving the NOT_FOUND \
          above is the table refusing the path rather than kernel being absent: {sibling:?}"
+    );
+}
+
+// ── trace propagation ───────────────────────────────────────────────────────
+//
+// The standing rule (tacplus-dev/looper#51): each handler with a causal
+// downstream call has a test that the `trace_id` it received arrives on it.
+// The proxy forwards the caller's buffered bytes as they came, so field 200 is
+// carried; these pin that against a re-serialization through a type without it,
+// or a JSON→proto mapping that drops it.
+
+const TRACE_ID: &str = "4bf92f3577b34da6a3ce929d0e0e4736";
+
+/// `proxy_grpc::handle`'s unary path: the gRPC caller's `trace_id` reaches kernel.
+#[tokio::test]
+async fn the_grpc_proxy_carries_the_trace_id_to_the_backend() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
+    let signing_key = keys::generate_ec_p256_key().expect("signing key");
+    let backend = Arc::new(KernelStandIn::default());
+    let kernel = spawn_kernel(backend.clone()).await;
+    let gateway_uri = spawn_gateway(proxy_state(kernel, jwk_for(&signing_key))).await;
+
+    UserMintClient::new(channel(&gateway_uri).await)
+        .mint_delegate_offline_token(request_with(
+            Some(&user_token(&signing_key)),
+            tokenrequest_pb::MintDelegateOfflineTokenRequest {
+                trace_id: TRACE_ID.to_string(),
+                ..mint_request()
+            },
+        ))
+        .await
+        .unwrap_or_else(|e| panic!("a user's mint must reach kernel through the gateway: {e:?}"));
+
+    assert_eq!(
+        *backend.trace_ids.lock().expect("trace_ids"),
+        vec![TRACE_ID.to_string()],
+        "kernel must receive the trace_id the gRPC caller sent"
+    );
+}
+
+/// REST unary translation (`rest_handler` → `dispatch_unary` →
+/// `dispatch_via_proxy` → `proxy_grpc::handle`): the JSON body's `traceId`
+/// reaches kernel.
+#[tokio::test]
+async fn rest_unary_translation_carries_the_trace_id_to_the_backend() {
+    use tower::ServiceExt;
+
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
+    let signing_key = keys::generate_ec_p256_key().expect("signing key");
+    let backend = Arc::new(KernelStandIn::default());
+    let kernel = spawn_kernel(backend.clone()).await;
+    let router = rest_router(proxy_state(kernel, jwk_for(&signing_key)));
+
+    let response = router
+        .oneshot(
+            axum::http::Request::post("/kernel/UserMint/MintDelegateOfflineToken")
+                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .header(axum::http::header::AUTHORIZATION, user_token(&signing_key))
+                .body(axum::body::Body::from(
+                    serde_json::json!({
+                        "delegateName": "ticketbot",
+                        "delegateNamespace": "/acme",
+                        "traceId": TRACE_ID,
+                    })
+                    .to_string(),
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("router answers");
+
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), 1 << 20)
+        .await
+        .expect("body");
+    assert_eq!(
+        status,
+        axum::http::StatusCode::OK,
+        "REST MintDelegateOfflineToken must reach kernel: {}",
+        String::from_utf8_lossy(&body)
+    );
+    assert_eq!(
+        *backend.trace_ids.lock().expect("trace_ids"),
+        vec![TRACE_ID.to_string()],
+        "kernel must receive the trace_id of the REST body"
     );
 }

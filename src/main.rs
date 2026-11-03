@@ -45,6 +45,12 @@ mod e2e_form_post;
 #[cfg(test)]
 mod e2e_mint_trace;
 
+/// End-to-end proof that the proxy's streaming paths — gRPC server-streaming,
+/// REST server-streaming (SSE) and WebSocket client-streaming — carry the
+/// caller's trace_id to the backend.
+#[cfg(test)]
+mod e2e_stream_trace;
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 
