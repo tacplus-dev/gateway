@@ -11,6 +11,7 @@ Also serves the sign-in webapp. Unreleased; tacplus floor 2.5 (#18).
 - Login page: "Signing in with <provider>…" once a button is clicked (#17)
 - Gates: the e2e_user_mint kernel stand-in lacks UserMint.RevokeDeviceCredential, build fails on main (#14)
 - Release by tag (v0.1.0) with notes, no deployable image: the gateway is built per fleet by the fleet builder with the merged webapp (#6; tacplus-dev/roadmap:decisions/gateway-per-fleet-2026-10-27.md; after tacplus-dev/looper#17 and #12)
+- TLS: cert_chain from config is the only path, hot-swapped on config change with no restart; letsencrypt mode retired (#25). Agent, at Jody's request, 2026-11-03 (`tacplus-dev/roadmap:decisions/certificates-by-pipeline-2026-11-03.md`).
 
 ## Later
 - Image: grpc-health-probe v0.4.48 to v0.4.60 (#11; blocked on #14)
