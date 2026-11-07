@@ -1,0 +1,69 @@
+= init
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash gh issue view 27 --repo tacplus-dev/gateway --comments; gh issue view 27 --repo tacplus-dev/gateway --json labels,author; gh api repos/tacplus-dev/gateway/issues/27/timeline --jq '.[] | select(.event=="labeled") | [.actor.login,.label.name] | @tsv'; ls; cat tacplus.yaml; cat justfile; git tag; git b...
+< author:	tacplus-looper association:	none edited:	false status:	none -- The looper of gateway starts this issue with its limit 4h capped at 4h by this job (https://gitlab.com/tacplus-dev/looper/-/jobs/17834691877), which ends sooner: the run stops by itself before then, its work checkpointed, and the...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash gh issue view 18 --repo tacplus-dev/gateway --comments | head -80; gh api repos/tacplus-dev/gateway/issues/18/timeline --jq '.[] | select(.event=="labeled" or .event=="closed") | [.event,.actor.login,(.label.name//"")] | @tsv'; gh api repos/tacplus-dev/roadmap/contents/decisions/issue-flow-2026-10-2...
+< author:	jodydadescott association:	member edited:	false status:	none -- Watch session: **yes, Stratum is tenant-owned.** That's decided in tacplus-dev/roadmap `decisions/stratum-per-tenant-2026-10-25.md` and built in stratum#2. Add `"stratum"` to the tenant-owned registry test's set, and do the reco...
+= thinking_tokens
+= thinking_tokens
+> Bash cd /builds/looper/gateway/issues/27; gh api 'repos/tacplus-dev/gateway/collaborators/tacplus-looper[bot]/permission' 2>&1 | head -5; for r in doppelganger/issues/13 kmaker/issues/13 operator/issues/23; do echo "== $r"; gh api repos/tacplus-dev/$r/timeline --jq '.[] | select(.event=="labeled" or .eve...
+< {"permission":"none","user":{"login":"tacplus-looper[bot]","id":353041960,"node_id":"BOT_kgDOFQr-KA","avatar_url":"https://avatars.githubusercontent.com/u/342669832?v=4","gravatar_id":"","url":"https://api.github.com/users/tacplus-looper%5Bbot%5D","html_url":"https://github.com/apps/tacplus-looper",...
+= thinking_tokens
+= thinking_tokens
+> Bash cd /tmp; gh api repos/tacplus-dev/roadmap/contents/items/tacplus-registry-and-floor.md -H 'Accept: application/vnd.github.raw' | grep -n -i -E 'approv|scan|floor|looper' | head -40; gh search issues --owner tacplus-dev "auto-approve OR self-approve OR approved" --limit 20 --json repository,number,ti...
+< 1:# tacplus global registry and version floor 3:- **Status:** active (design agreed 2026-10-23, built on branch `registry-and-floor` of 11:  tacplus `docs/USER.md` "Service Registry"; `pkg/registry/global.go`; `pkg/tacplusyaml/floor.go`; 42:- **Floor:** `tacplus: "MAJOR.MINOR"` in `tacplus.yaml`, en...
+= thinking_tokens
+= thinking_tokens
+> Bash cd /builds/looper/gateway/issues/27; gh api repos/tacplus-dev/roadmap/contents/items/tacplus-registry-and-floor.md -H 'Accept: application/vnd.github.raw' | grep -n -i -E 'latest|follow|bump|raise' ; grep -n -i -E 'floor|2\.5' STATE.md ROADMAP.md | head
+< 87:-> latest patch; none -> latest), staged without its dependencies.yaml, and merged into the generation. 88:Direct dependencies only; transitive following is the fleet build's (item 3). Verified: a consumer with 106:- **No versions in any registry.** The fleet manifest pins what a fleet runs (MAJO...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash cd /builds/looper/gateway/issues/27; gh release list --repo tacplus-dev/tacplus --limit 6; gh release view v2.6.0 --repo tacplus-dev/tacplus --json body --jq .body | grep -n -i -A12 'upgrading from 2.5' | head -30; gh api repos/tacplus-dev/gateway/collaborators/jodydadescott/permission --jq .permiss...
+< v2.5.12		v2.5.12	2026-11-06T07:36:39Z v2.4.11		v2.4.11	2026-11-06T07:37:33Z v2.3.11		v2.3.11	2026-11-06T07:36:53Z v2.2.9		v2.2.9	2026-11-06T07:37:28Z v2.1.12		v2.1.12	2026-11-06T07:37:21Z v2.0.19		v2.0.19	2026-11-06T07:36:20Z 35:## Upgrading from 2.5 36-1. **Pin the release and commit the pin:** 37-...
+= thinking_tokens
+= thinking_tokens
+> Bash cd /builds/looper/gateway/issues/27; cat > /tmp/c27.md <<'EOF' **Needs a decision. I have not changed anything or committed.**  Before working this I checked who approved it. `tacplus-looper[bot]` filed this issue and added `bug` and `approved` itself. The timeline has no other actor. GitHub reports...
+< https://github.com/tacplus-dev/gateway/issues/27#issuecomment-6712540874 https://github.com/tacplus-dev/gateway/issues/27
+I didn't raise the floor. Nobody with write access approved issue #27, so I asked for a decision on the issue, added `needs-decision`, and stopped without committing.
+
+**Why I stopped:**
+- **No real approval:** `tacplus-looper[bot]` opened #27 and added its own `bug` and `approved` labels. GitHub reports that bot's permission on this repo as `none`. The earlier floor raise, #18, was approved by Jody. The sibling issues (doppelganger#13, kmaker#13, operator#23) were self-approved the same way.
+- **Not clearly a bug:** the issue says itself that the gates pass at floor 2.5. The rule it cites ("the floor follows the latest released line") isn't written in the roadmap item it links. tacplus v2.6.0's own upgrade notes say to raise the floor to 2.6 only "if you use any 2.6 feature", and the gateway doesn't use any yet.
+- **Wrong release type:** as a bug, this run would also have to tag a `v0.1.1` patch release. Raising the floor drops support for the older compiler line, which fits a minor release better than a patch.
+- **New step:** committing `tacplus.lock` is a new pinning step for this repo, worth Jody confirming.
+
+**What I recommended in the comment:** if Jody wants the floor to follow the latest line, they approve the issue and say whether `v0.1.1` should be cut. The next run then sets `tacplus: "2.6"`, commits `tacplus.lock`, updates STATE.md and runs `just gates` on 2.6.1. If not, they close the issue and the floor stays at 2.5. I also flagged that the bot approving its own issues is a problem to raise with the looper.
+
+Comment: https://github.com/tacplus-dev/gateway/issues/27#issuecomment-6712540874
+= success: I didn't raise the floor. Nobody with write access approved issue #27, so I asked for a decision on the issue, added `needs-decision`, and stopped without committing.
+
+**Why I stopped:**
+- **No real approval:** `tacplus-looper[bot]` opened #27 and added its own `bug` and `approved` labels. GitHub reports that bot's permission on this repo as `none`. The earlier floor raise, #18, was approved by Jody. The sibling issues (doppelganger#13, kmaker#13, operator#23) were self-approved the same way.
+- **Not clearly a bug:** the issue says itself that the gates pass at floor 2.5. The rule it cites ("the floor follows the latest released line") isn't written in the roadmap item it links. tacplus v2.6.0's own upgrade notes say to raise the floor to 2.6 only "if you use any 2.6 feature", and the gateway doesn't use any yet.
+- **Wrong release type:** as a bug, this run would also have to tag a `v0.1.1` patch release. Raising the floor drops support for the older compiler line, which fits a minor release better than a patch.
+- **New step:** committing `tacplus.lock` is a new pinning step for this repo, worth Jody confirming.
+
+**What I recommended in the comment:** if Jody wants the floor to follow the latest line, they approve the issue and say whether `v0.1.1` should be cut. The next run then sets `tacplus: "2.6"`, commits `tacplus.lock`, updates STATE.md and runs `just gates` on 2.6.1. If not, they close the issue and the floor stays at 2.5. I also flagged that the bot approving its own issues is a problem to raise with the looper.
+
+Comment: https://github.com/tacplus-dev/gateway/issues/27#issuecomment-6712540874
