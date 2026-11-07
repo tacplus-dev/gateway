@@ -27,6 +27,12 @@ mod tls;
 #[cfg(test)]
 mod e2e_tenant_routing;
 
+/// End-to-end proof that an MCP session of a tenant-owned service reaches the
+/// caller token's tenant, with that tenant stamped on every frame, and that a
+/// frame naming another tenant is refused (#15).
+#[cfg(test)]
+mod e2e_mcp_tenant;
+
 /// End-to-end proof that kernel's C2S `UserMint` surface — the user half of the
 /// delegate-bound Offline Token mint — is reachable through the gateway's
 /// generic routing with no hand-written front, and that the S2S delegate half

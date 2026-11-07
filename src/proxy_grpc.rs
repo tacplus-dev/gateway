@@ -61,6 +61,16 @@ pub(crate) fn route_identity(
     (service_id, entitlement_service)
 }
 
+/// Whether `route` is a service's MCP session carrier: the method tacplus
+/// generates as `Broker<Service>McpSession`, a bidi stream of `mcp.McpRequest`.
+pub(crate) fn is_mcp_carrier(route: &gateway_model::s2sm::rest_dispatch::RouteInfo) -> bool {
+    let method = route.grpc_path.rsplit('/').next().unwrap_or("");
+    route.client_streaming
+        && route.server_streaming
+        && method.starts_with("Broker")
+        && method.ends_with("McpSession")
+}
+
 /// Minimal prost message to extract trace_id (field 200) from any protobuf
 /// message without full deserialization. prost skips unknown fields,
 /// so this works on any message type that has trace_id at field 200.
@@ -178,44 +188,19 @@ fn validated_streaming_body(
             buffer.extend_from_slice(data);
 
             loop {
-                if buffer.len() < 5 {
-                    break;
-                }
-                let msg_len =
-                    u32::from_be_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]) as usize;
-                if buffer[0] != 0 {
-                    let _ = tx
-                        .send(Err(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            "compressed gRPC frames are not supported by gateway validation",
-                        )))
-                        .await;
-                    return;
-                }
-                if msg_len > MAX_GRPC_MESSAGE_BYTES {
-                    let _ = tx
-                        .send(Err(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            "gRPC message exceeds gateway validation limit",
-                        )))
-                        .await;
-                    return;
-                }
-                let frame_len = 5 + msg_len;
-                if buffer.len() < frame_len {
-                    if buffer.len() > 5 + MAX_GRPC_MESSAGE_BYTES {
+                let grpc_frame = match next_grpc_frame(&mut buffer) {
+                    Ok(Some(grpc_frame)) => grpc_frame,
+                    Ok(None) => break,
+                    Err(msg) => {
                         let _ = tx
                             .send(Err(std::io::Error::new(
                                 std::io::ErrorKind::InvalidData,
-                                "incomplete gRPC frame exceeds gateway validation limit",
+                                msg,
                             )))
                             .await;
                         return;
                     }
-                    break;
-                }
-
-                let grpc_frame = buffer.split_to(frame_len).freeze();
+                };
                 let proto_bytes = &grpc_frame[5..];
 
                 if let Err(status) =
@@ -285,6 +270,139 @@ fn validated_streaming_body(
                 }
 
                 if tx.send(Ok(grpc_frame)).await.is_err() {
+                    return;
+                }
+            }
+        }
+
+        if !buffer.is_empty() {
+            let _ = tx
+                .send(Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "incomplete trailing gRPC frame",
+                )))
+                .await;
+        }
+    });
+
+    Body::from_stream(ReceiverStream::new(rx))
+}
+
+/// Splits the next complete gRPC message frame (5-byte header and payload) off
+/// the front of `buffer`, or `Ok(None)` while it is still incomplete. Refuses a
+/// compressed frame and one over the gateway's validation limit.
+fn next_grpc_frame(buffer: &mut bytes::BytesMut) -> Result<Option<bytes::Bytes>, &'static str> {
+    if buffer.len() < 5 {
+        return Ok(None);
+    }
+    if buffer[0] != 0 {
+        return Err("compressed gRPC frames are not supported by gateway validation");
+    }
+    let msg_len = u32::from_be_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]) as usize;
+    if msg_len > MAX_GRPC_MESSAGE_BYTES {
+        return Err("gRPC message exceeds gateway validation limit");
+    }
+    let frame_len = 5 + msg_len;
+    if buffer.len() < frame_len {
+        return Ok(None);
+    }
+    Ok(Some(buffer.split_to(frame_len).freeze()))
+}
+
+/// One `mcp.McpRequest` as it goes on to a tenant-owned service's MCP carrier:
+/// in the session's `tenant`, the caller token's (tacplus#170). A frame with no
+/// tenant is stamped by appending the field (protobuf's last value wins), so the
+/// rest of the message goes on byte for byte; a frame already naming the
+/// session's tenant goes on as it is; a frame naming any other tenant is
+/// refused. The client, and the model behind it, never choose the tenant.
+fn stamp_mcp_tenant(message: &[u8], tenant: &str) -> Result<Vec<u8>, tonic::Status> {
+    use gateway_model::types::sys::mcp::McpRequest;
+
+    let request = <McpRequest as prost::Message>::decode(message)
+        .map_err(|e| tonic::Status::invalid_argument(format!("decode: {e}")))?;
+    if request.tenant == tenant {
+        return Ok(message.to_vec());
+    }
+    if !request.tenant.is_empty() {
+        // The client's value is not echoed: it is not ours to repeat.
+        return Err(tonic::Status::permission_denied(format!(
+            "MCP frame names a tenant other than this session's ({tenant}); the session's tenant is the caller token's"
+        )));
+    }
+    let mut stamped = message.to_vec();
+    stamped.extend(prost::Message::encode_to_vec(&McpRequest {
+        tenant: tenant.to_string(),
+        ..Default::default()
+    }));
+    Ok(stamped)
+}
+
+/// Wrap the request stream of a tenant-owned service's MCP carrier so that
+/// every frame is stamped with `tenant` (see `stamp_mcp_tenant`). A frame it
+/// refuses ends the stream there: neither it nor anything after it is
+/// forwarded.
+fn tenant_stamped_body(mut body: Body, path: String, tenant: String) -> Body {
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(16);
+
+    tokio::spawn(async move {
+        let mut buffer = bytes::BytesMut::new();
+
+        while let Some(frame_result) = body.frame().await {
+            let frame = match frame_result {
+                Ok(frame) => frame,
+                Err(e) => {
+                    let _ = tx
+                        .send(Err(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("request body read error: {e}"),
+                        )))
+                        .await;
+                    return;
+                }
+            };
+
+            let Some(data) = frame.data_ref() else {
+                continue;
+            };
+            buffer.extend_from_slice(data);
+
+            loop {
+                let grpc_frame = match next_grpc_frame(&mut buffer) {
+                    Ok(Some(grpc_frame)) => grpc_frame,
+                    Ok(None) => break,
+                    Err(msg) => {
+                        let _ = tx
+                            .send(Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                msg,
+                            )))
+                            .await;
+                        return;
+                    }
+                };
+
+                let message = match stamp_mcp_tenant(&grpc_frame[5..], &tenant) {
+                    Ok(message) => message,
+                    Err(status) => {
+                        tracing::warn!(
+                            path = %path,
+                            tenant = %tenant,
+                            error = %status.message(),
+                            "MCP frame tenant refused"
+                        );
+                        let kind = if status.code() == tonic::Code::PermissionDenied {
+                            std::io::ErrorKind::PermissionDenied
+                        } else {
+                            std::io::ErrorKind::InvalidData
+                        };
+                        let _ = tx
+                            .send(Err(std::io::Error::new(kind, status.to_string())))
+                            .await;
+                        return;
+                    }
+                };
+
+                if tx.send(Ok(bytes::Bytes::from(frame_grpc(&message)))).await.is_err() {
                     return;
                 }
             }
@@ -374,6 +492,31 @@ async fn handle_inner(
     // before forwarding.
     let is_streaming = route_info.server_streaming || route_info.client_streaming;
 
+    // A tenant-owned service is deployed once per tenant, as `<svc>-<tenant>`
+    // (the operator's `ServiceInstance.InstanceName()`, item 4 §2.3), so the
+    // health entry to dial depends on WHOSE token this is. Every other service —
+    // the majority — keeps routing by name and never looks at the namespace
+    // claim. Resolved before the body is read: an MCP session carrier's frames
+    // are stamped with this tenant as they stream through (#15).
+    let caller_tenant = if proxy.tenant_owned.contains(service_id) {
+        match proxy.auth.caller_tenant(
+            auth_policy,
+            service_id,
+            entitlement_service,
+            &path,
+            auth_header.as_deref(),
+        ) {
+            Ok(tenant) => Some(tenant),
+            Err((code, msg)) => {
+                tracing::warn!(path = %path, service = service_id, error = %msg, "tenant-owned routing rejected");
+                let grpc_code = status_code_to_tonic(code);
+                return tonic_status_to_response(tonic::Status::new(grpc_code, msg));
+            }
+        }
+    } else {
+        None
+    };
+
     let (parts, body) = req.into_parts();
 
     // active_trace_id is set when a unary request carries a trace_id (field 200).
@@ -410,6 +553,14 @@ async fn handle_inner(
                 auth_header.clone(),
             ),
             StreamingValidation::AlreadyValidated => body,
+        };
+        // An MCP session of a tenant-owned service is in the caller token's
+        // tenant, never one the client or the model names (tacplus#170).
+        let body = match &caller_tenant {
+            Some(tenant) if is_mcp_carrier(route_info) => {
+                tenant_stamped_body(body, path.clone(), tenant.clone())
+            }
+            _ => body,
         };
         let streaming_body = StreamingBody(body);
         let tonic_body = tonic::body::Body::new(streaming_body);
@@ -532,28 +683,10 @@ async fn handle_inner(
         Request::from_parts(parts, tonic_body)
     };
 
-    // A tenant-owned service is deployed once per tenant, as `<svc>-<tenant>`
-    // (the operator's `ServiceInstance.InstanceName()`, item 4 §2.3), so the
-    // health entry to dial depends on WHOSE token this is. Every other service —
-    // the majority — keeps routing by name and never looks at the namespace
-    // claim, so `route_key` is `service_id` and nothing below changes.
-    let route_key = if proxy.tenant_owned.contains(service_id) {
-        match proxy.auth.caller_tenant(
-            auth_policy,
-            service_id,
-            entitlement_service,
-            &path,
-            auth_header.as_deref(),
-        ) {
-            Ok(tenant) => std::borrow::Cow::Owned(crate::health::tenant_route_key(service_id, &tenant)),
-            Err((code, msg)) => {
-                tracing::warn!(path = %path, service = service_id, error = %msg, "tenant-owned routing rejected");
-                let grpc_code = status_code_to_tonic(code);
-                return tonic_status_to_response(tonic::Status::new(grpc_code, msg));
-            }
-        }
-    } else {
-        std::borrow::Cow::Borrowed(service_id)
+    // A shared service's `route_key` is `service_id`, and nothing below changes.
+    let route_key = match &caller_tenant {
+        Some(tenant) => std::borrow::Cow::Owned(crate::health::tenant_route_key(service_id, tenant)),
+        None => std::borrow::Cow::Borrowed(service_id),
     };
 
     // Forward to backend service.
@@ -876,6 +1009,71 @@ mod tests {
             "kernel.Mint.CreatePersonalPrincipal is externally routable again — a no-auth flag \
              was re-added to it in kernel.proto. Registration must only be reachable through \
              the personalauth broker (decision-goalB-q1-broker-service-design.md §6)."
+        );
+    }
+
+    fn mcp_request(payload: &str, tenant: &str) -> Vec<u8> {
+        prost::Message::encode_to_vec(&gateway_model::types::sys::mcp::McpRequest {
+            payload: payload.to_string(),
+            tenant: tenant.to_string(),
+        })
+    }
+
+    fn decoded(message: &[u8]) -> gateway_model::types::sys::mcp::McpRequest {
+        prost::Message::decode(message).expect("an McpRequest")
+    }
+
+    /// An MCP frame with no tenant is stamped with the session's, and nothing
+    /// else in it changes: the original bytes are a prefix of what goes on.
+    #[test]
+    fn an_mcp_frame_with_no_tenant_is_stamped_with_the_session_tenant() {
+        let message = mcp_request(r#"{"jsonrpc":"2.0","id":1}"#, "");
+        let stamped = stamp_mcp_tenant(&message, "acme0001").expect("stamped");
+        assert!(stamped.starts_with(&message), "the client's bytes go on as they were");
+        let request = decoded(&stamped);
+        assert_eq!(request.tenant, "acme0001");
+        assert_eq!(request.payload, r#"{"jsonrpc":"2.0","id":1}"#);
+
+        // An explicitly encoded empty tenant is no tenant: the stamp, appended
+        // after it, is the value that wins.
+        let mut explicit = mcp_request("{}", "");
+        explicit.extend([0x12, 0x00]);
+        let request = decoded(&stamp_mcp_tenant(&explicit, "acme0001").expect("stamped"));
+        assert_eq!(request.tenant, "acme0001");
+    }
+
+    #[test]
+    fn an_mcp_frame_naming_the_session_tenant_goes_on_unchanged() {
+        let message = mcp_request("{}", "acme0001");
+        assert_eq!(stamp_mcp_tenant(&message, "acme0001").expect("forwarded"), message);
+    }
+
+    /// Another tenant is refused, also when it is the last of two values (the
+    /// one protobuf keeps) behind the session's own.
+    #[test]
+    fn an_mcp_frame_naming_another_tenant_is_refused() {
+        let status = stamp_mcp_tenant(&mcp_request("{}", "beta0002"), "acme0001")
+            .expect_err("another tenant");
+        assert_eq!(status.code(), tonic::Code::PermissionDenied);
+        assert!(
+            !status.message().contains("beta0002"),
+            "the client's value is not echoed: {}",
+            status.message()
+        );
+
+        let mut smuggled = mcp_request("{}", "acme0001");
+        smuggled.extend(mcp_request("", "beta0002"));
+        assert_eq!(
+            stamp_mcp_tenant(&smuggled, "acme0001").expect_err("last value wins").code(),
+            tonic::Code::PermissionDenied
+        );
+    }
+
+    #[test]
+    fn a_frame_that_is_not_an_mcp_request_is_refused() {
+        assert_eq!(
+            stamp_mcp_tenant(&[0xff, 0xff], "acme0001").expect_err("malformed").code(),
+            tonic::Code::InvalidArgument
         );
     }
 }
