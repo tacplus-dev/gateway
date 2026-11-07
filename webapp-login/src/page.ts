@@ -5,6 +5,7 @@
 // the flow into it under the consumer's brand. A consumer that wants its own
 // markup uses SignIn (flow.ts) directly and never calls this.
 import { SignIn, ConfirmNeeded, StepUpNeeded, isCallback, type Identity, type Provider } from './flow.js';
+import type { FleetApp } from './apps.js';
 
 export interface Brand {
   /** The heading, e.g. the product name. */
@@ -22,12 +23,15 @@ export interface Brand {
   providerPendingLabel?: (p: Provider) => string;
   /** The mark shown on a provider's button; defaults to providerIcon(p.name). */
   providerIconHtml?: (p: Provider) => string;
+  /** The apps the signed-in page links to, e.g. `fleetApps` (the fleet's
+   * contributed modules); none when unset or when it fails. */
+  apps?: () => Promise<FleetApp[]>;
   /** Rendered under the providers (terms, help). */
   footerHtml?: string;
   /** Called once someone is signed in; defaults to showing the identity, the
    * tenants the session vouches for with a switch to each, the sign-ins it
    * holds with a sign-out of each provider, buttons to add a provider it does
-   * not hold, and sign out of all. */
+   * not hold, the brand's apps, and sign out of all. */
   onSignedIn?: (identity: Identity, signOut: () => Promise<void>) => void;
 }
 
@@ -65,6 +69,10 @@ const STYLE = `
 .tp-login ul.tp-tenants { list-style: none; padding: 0; margin: 0; }
 .tp-login ul.tp-tenants li { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.35rem 0; word-break: break-all; }
 .tp-login ul.tp-tenants button { display: inline-block; width: auto; margin: 0; padding: 0.35rem 0.75rem; }
+.tp-login ul.tp-apps { list-style: none; padding: 0; margin: 0; }
+.tp-login ul.tp-apps li { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding: 0.35rem 0; }
+.tp-login ul.tp-apps a { color: var(--tp-accent, #333); }
+.tp-login ul.tp-apps .tp-version { opacity: 0.7; font-size: 0.85rem; }
 .tp-login .tp-error { color: #b00020; }
 .tp-login .tp-error:empty { display: none; }
 .tp-login dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
@@ -142,11 +150,15 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
         : '';
       return `<li><span class="tp-icon">${providerIcon(idpId)}</span><span class="tp-who">${escape(who.join(', '))}</span>${out}</li>`;
     }).join('');
+    // The apps are a convenience: one that cannot be read leaves them out.
+    const apps = (await (brand.apps?.() ?? Promise.resolve([])).catch(() => [] as FleetApp[]))
+      .map((a) => `<li><a href="${escape(a.path)}">${escape(a.title)}</a><span class="tp-version">${escape(a.version)}</span></li>`).join('');
     const addable = states.filter((p) => !p.held).map((p) => p.provider);
     const adding = signIn.canAdd() && addable.length > 0
       ? `<h2>Add another sign-in</h2>${providerButtons(addable, (p) => `Add ${p.name}`, 'add')}`
       : '';
     render(`<dl><dt>Subject</dt><dd>${escape(me.subject)}</dd><dt>Email</dt><dd>${escape(me.email ?? '')}</dd><dt>Tenant</dt><dd>${escape(me.tenant)}</dd></dl>
+      ${apps ? `<h2>Apps</h2><ul class="tp-apps">${apps}</ul>` : ''}
       ${tenants ? `<h2>Tenants</h2><ul class="tp-tenants">${tenants}</ul>` : ''}
       ${signins ? `<h2>Signed in with</h2><ul class="tp-signins">${signins}</ul>` : ''}
       ${adding}${adding ? errorLine : ''}

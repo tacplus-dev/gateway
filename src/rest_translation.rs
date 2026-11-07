@@ -148,7 +148,7 @@ pub fn router(state: Arc<RestState>) -> Router {
 /// One exact route per generated `http_path`. A `rest_path` alias is its own
 /// ROUTES entry, so it is registered here too. Empty paths are RPCs with no
 /// REST surface.
-fn rest_routes<S: Clone + Send + Sync + 'static>(
+pub(crate) fn rest_routes<S: Clone + Send + Sync + 'static>(
     router: Router<S>,
     handler: MethodRouter<S>,
 ) -> Router<S> {

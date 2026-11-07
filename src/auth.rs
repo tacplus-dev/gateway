@@ -562,14 +562,14 @@ fn dedupe_preserving_order(input: Vec<String>) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use gateway_jwk::jwk::{ImmutableJwk, Jwk};
     use gateway_key::{base64_utils, keys};
     use gateway_model::s2sm::rest_dispatch::AuthPolicy;
 
     /// Publish a throwaway signing key as the JWK the cache verifies against.
-    fn jwk_for(key: &keys::ImmutableKey) -> ImmutableJwk {
+    pub(crate) fn jwk_for(key: &keys::ImmutableKey) -> ImmutableJwk {
         let keys::PublicKey::EcP256(ec) = key.public_key() else {
             panic!("these tests sign with P-256");
         };
@@ -611,6 +611,29 @@ mod tests {
         token
             .set_service_entitlements(entitlements.clone())
             .expect("service_entitlements");
+        token.sign(key).expect("sign");
+        format!("Bearer {}", token.base64().expect("base64"))
+    }
+
+    /// A signed user token audienced at `audience`, with no entitlements:
+    /// what an AnyUser route asks for.
+    pub(crate) fn user_header(key: &keys::ImmutableKey, audience: &str) -> String {
+        let mut token = Token::new();
+        token.set_kid(key.id()).expect("kid");
+        token.set_alg(key.alg()).expect("alg");
+        token.set_issuer("unit-test").expect("iss");
+        token.set_subject("alice@example.com").expect("sub");
+        token.set_audience(audience).expect("aud");
+        token.set_namespace("acme").expect("ns");
+        token
+            .set_expiration(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("clock")
+                    .as_secs() as i64
+                    + 3600,
+            )
+            .expect("exp");
         token.sign(key).expect("sign");
         format!("Bearer {}", token.base64().expect("base64"))
     }

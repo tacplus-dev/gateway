@@ -24,8 +24,10 @@ Sign-in for a tacplus fleet's web app, as a library. Two layers:
   (title, subtitle, logo, accent, labels, footer, and what to do once signed in). A clicked
   provider button says "Signing in with <provider>…" (`providerPendingLabel`), or "Adding
   <provider>…", until the browser leaves for the provider, and its fellow buttons are disabled;
-  a redirect that fails puts them back, with the error. An app that wants its own markup uses
-  `SignIn` and skips this.
+  a redirect that fails puts them back, with the error. Signed in, it links to the brand's
+  `apps`: the gateway's console passes `fleetApps`, the modules the fleet's services contribute
+  (read from `/-/apps.json`, each at its own `/-/apps/<service>/`). An app that wants its own
+  markup uses `SignIn` and skips this.
 
 The gateway's own console (`../webapp`) is the first consumer, with the default brand;
 a company's web app brings its own `Brand` and its own clients.

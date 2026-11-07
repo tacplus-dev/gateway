@@ -10,6 +10,7 @@ compile_error!(
 mod auth;
 mod blob_proxy;
 mod client_download;
+mod contributions;
 mod idp_proxy;
 mod limits;
 mod proxy_grpc;
@@ -141,7 +142,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         None => tracing::info!("SPA: serving from embedded assets"),
     }
 
-    // Initialize bootstrap config for SPA — webapp reads window.__SCHEMATIC__ for gateway URL.
+    // Initialize bootstrap config for SPA — webapp reads window.__TACPLUS__ for gateway URL.
     // Empty string = same origin (webapp is served by the gateway itself).
     spa::init_bootstrap("");
 
@@ -324,7 +325,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .route("/healthz", get(healthz))
         .route("/readyz", get(healthz))
         .route("/registry/{file}", get(spa::registry_handler))
-        .route("/client/{os}/{arch}", get(move |path, req| client_download::handler(path, req, client_auth.clone())));
+        .route("/client/{os}/{arch}", get(move |path, req| client_download::handler(path, req, client_auth.clone())))
+        // What the fleet's services contribute, under /-/ (#21): their webapp
+        // modules, the modules' index and their clients.
+        .merge(contributions::router(Arc::new(contributions::Contributions {
+            web_root: spa::web_root().clone(),
+            client_dir: client_download::CLIENT_DIR.into(),
+            auth: Arc::clone(&gateway_auth),
+        })));
 
     // Intercept gRPC requests before they reach REST/SPA routing.
     // Native gRPC clients (operator, service-to-service) send content-type: application/grpc.

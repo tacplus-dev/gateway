@@ -1,6 +1,6 @@
 # Gateway
 
-Gateway is the edge proxy for the Schematic control plane. All external traffic
+Gateway is the edge proxy of a tacplus fleet. All external traffic
 enters the cluster through gateway, which routes REST and gRPC requests to
 backend services, serves OIDC discovery and JWKS endpoints, handles token
 minting delegation to kernel, and provides SPIFFE-based workload routing.
@@ -51,6 +51,24 @@ leading `/` and uses the remaining path as a SPIFFE service path for endpoint
 resolution. Exact match only — no hierarchical fallback. Paths that match no
 SPIFFE service either serve the SPA (`GET`/`HEAD`) or return a JSON 404.
 
+**Fleet contributions (`/-/`)**: what the fleet's services contribute to their
+gateway (tacplus `docs/USER.md`, "Contributing to the gateway"), written by the
+fleet builder beside the gateway's own webapp. No proto route can be under `/-/`
+(no proto identifier starts with `-`), and any other path under it is a 404,
+never the SPA.
+
+| Path | Serves | From |
+|---|---|---|
+| `/-/apps/<service>/` | the service's webapp module; an unknown path under it is that module's `index.html` | `WEB_ROOT/-/apps/<service>/` |
+| `/-/apps.json` | the index, `[{service, title, version, path}]` sorted by service (`[]` when absent); the signed-in page lists the modules from it | `WEB_ROOT/-/apps.json` |
+| `/-/clients/<service>/<client>/<os>/<arch>` | a client binary, to any signed-in user (AnyUser), like `/client/<os>/<arch>` | `/opt/tacplus/clients/<service>/<client>/<client>-<os>-<arch>[.exe]` |
+
+Targets are linux/amd64, linux/arm64, windows/amd64 and darwin/arm64. Every
+`index.html` the gateway serves, its own and each module's, carries the
+bootstrap object `window.__TACPLUS__` (`{gatewayUrl}`); a module shares the
+session through the origin. The gateway's own client is served at
+`/client/<os>/<arch>` from `/opt/tacplus/clients/gateway-<os>-<arch>[.exe]`.
+
 ## RPCs
 
 ### gateway.Mint
@@ -81,6 +99,8 @@ SPIFFE service either serve the SPA (`GET`/`HEAD`) or return a JSON 404.
 - `src/health.rs` — HealthWatcher (kernel WatchInstances stream consumer)
 - `src/resolver.rs` — Service endpoint resolution and channel dialing
 - `src/spa.rs` — Single-page application static file serving
+- `src/contributions.rs` — The fleet's contributed modules, their index and clients under `/-/`
+- `src/client_download.rs` — Authenticated client downloads
 - `src/registry.rs` — Registry.json serving
 
 ## Build
@@ -89,6 +109,7 @@ SPIFFE service either serve the SPA (`GET`/`HEAD`) or return a JSON 404.
 just        # generate + compile
 just gates  # generate (checks it writes only target/), build (debug and release), test
 just clean  # remove build artifacts
+just image  # the release image, built twice reproducibly (SOURCE_DATE_EPOCH, rewrite-timestamp), digests compared
 ```
 
 ## Proto

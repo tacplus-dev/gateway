@@ -183,3 +183,28 @@ test('coming back to the page from the cache shows it afresh, not still signing 
   assert.deepEqual(labels(c, 'p'), ['Continue with Google', 'Continue with Apple']);
   assert.deepEqual(disabled(c, 'p'), [false, false]);
 });
+
+const ME = { subject: '/users/x1', email: 'p@example.com', tenant: '/tenants/people' };
+
+test('the signed-in page lists the fleet\'s modules', async () => {
+  const c = await mount(stub(new Redirect(), ME), {
+    title: 'Seatrials',
+    apps: async () => [
+      { service: 'pager', title: 'Pager <beta>', version: '0.3.1', path: '/-/apps/pager/' },
+      { service: 'tenantecho', title: 'Echo', version: '1.2.0', path: '/-/apps/tenantecho/' },
+    ],
+  });
+  assert.match(c.innerHTML, /<h2>Apps<\/h2>/);
+  const links = [...c.innerHTML.matchAll(/<a href="([^"]*)"[^>]*>(.*?)<\/a>/g)].map(([, href, text]) => [href, text]);
+  assert.deepEqual(links, [['/-/apps/pager/', 'Pager &lt;beta&gt;'], ['/-/apps/tenantecho/', 'Echo']]);
+  assert.match(c.innerHTML, /Subject/);
+});
+
+test('without modules, or when they cannot be read, the page has no apps list', async () => {
+  for (const apps of [undefined, async () => [], async () => { throw new Error('502'); }]) {
+    const c = await mount(stub(new Redirect(), ME), { title: 'Seatrials', apps });
+    assert.doesNotMatch(c.innerHTML, /Apps/);
+    assert.match(c.innerHTML, /Subject/);
+    assert.match(c.innerHTML, /Sign out of all/);
+  }
+});

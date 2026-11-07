@@ -1,9 +1,9 @@
 # State: gateway
 
-Overwritten to stay current (loopers and agents). Last updated: 2026-11-03 by the looper (#25).
+Overwritten to stay current (loopers and agents). Last updated: 2026-11-07 by the looper (#21).
 
 - **Version / line:** unreleased (Cargo 1.2.0); tacplus floor 2.5
-- **Works:** REST and gRPC routing to backends, OIDC discovery and JWKS, Mint proxied to kernel, SPIFFE path fallback, the sign-in webapp. External TLS is the config's `cert_chain` only (letsencrypt mode and the ACME challenge proxy are retired, #25): hot-swapped on every config change with no restart or dropped connection, and an expired certificate or a key that is not its own is refused at startup and on reload, keeping the current one.
-- **Released / deployed:** not released; a gateway config still naming `EXTERNAL_TLS_MODE_LETSENCRYPT` (or relying on `acme_backend`) no longer starts: deployments supply the pipeline's certificate as `external_cert_pem`/`external_key_pem` (tacplus-dev/roadmap:decisions/certificates-by-pipeline-2026-11-03.md).
+- **Works:** REST and gRPC routing to backends, OIDC discovery and JWKS, Mint proxied to kernel, SPIFFE path fallback, the sign-in webapp. External TLS is the config's `cert_chain` only (letsencrypt mode and the ACME challenge proxy are retired, #25): hot-swapped on every config change with no restart or dropped connection, and an expired certificate or a key that is not its own is refused at startup and on reload, keeping the current one. The fleet's contributions under `/-/` (#21): each service's webapp module at `/-/apps/<service>/` with its own SPA fallback, their index `/-/apps.json` (listed on the signed-in page), and contributed clients at `/-/clients/<service>/<client>/<os>/<arch>` to any signed-in user. The bootstrap object is `window.__TACPLUS__` and the image's paths `/opt/tacplus/...` (the legacy `schematic` names are gone; the gateway's own client is `gateway-<os>-<arch>`). The image's inputs are pinned by digest and it builds with `SOURCE_DATE_EPOCH` and `rewrite-timestamp=true` (`just image`).
+- **Released / deployed:** not released; a gateway config still naming `EXTERNAL_TLS_MODE_LETSENCRYPT` (or relying on `acme_backend`) no longer starts: deployments supply the pipeline's certificate as `external_cert_pem`/`external_key_pem` (tacplus-dev/roadmap:decisions/certificates-by-pipeline-2026-11-03.md). A config whose `web_bundles` name `/opt/schematic/web` must name `/opt/tacplus/web` (#21).
 - **Known gaps:** see ROADMAP.md Next and PROPOSALS.md.
-- **Blocked on:** nothing for TLS.
+- **Blocked on:** generation on main fails with the 2.5 floor since kernel's latest needs tacplus 2.6 (#27, #28); #21 was verified with `TACPLUS_MINOR=2.6`.

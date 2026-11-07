@@ -4,3 +4,5 @@ export { SignIn, ConfirmNeeded, StepUpNeeded, identityFromToken, isCallback, pro
 export type { LoginAuth, CallbackTokens, SessionTokens, Identity, Provider, AccountMerger, SignedInWith, ProofRevoker, RemainingSession, ProviderState } from './flow.js';
 export { mountSignIn, providerIcon } from './page.js';
 export type { Brand } from './page.js';
+export { fleetApps } from './apps.js';
+export type { FleetApp } from './apps.js';
