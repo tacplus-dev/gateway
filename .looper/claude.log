@@ -1,0 +1,110 @@
+= init
+> Bash cd /builds/looper/gateway/issues/28; git status --short; git log --oneline -3; gh issue view 28 --repo tacplus-dev/gateway --comments | tail -20; /usr/local/bin/repo-looper --help 2>&1 | head -40
+< cfe4600 Pin the build: tacplus floor 2.6 and a committed tacplus.lock (#28) ffcb0da ROADMAP: approved by Jody 2026-11-06 (#26,#21,#15) c980f6f PROPOSALS.md: the nightly scan's proposals (looper) author:	tacplus-looper association:	none edited:	false status:	none -- The run ended before finishing (ex...
+Working tree clean, HEAD is main at cfe4600. Let me try reading the old pipeline, then rebuild.
+> Bash cd /tmp; (glab api projects/tacplus-dev%2Fbuild/pipelines/3043227852 2>&1 | head -5); curl -s -m 20 https://gitlab.com/api/v4/projects/tacplus-dev%2Fbuild/pipelines/3043227852 | head -c 500; echo; git -C /builds/looper/gateway/issues/28 ls-remote --tags origin | grep v0.1
+< {"message":"404 Project Not Found"}glab: 404 Project Not Found (HTTP 404) {"message":"404 Project Not Found"} 1d5ece70c170f4669d2744230f0cefdf6fca152f	refs/tags/v0.1.0 ffcb0daa2ceda2aa2317abb589b27e13e418f0c3	refs/tags/v0.1.0^{} fbb015730429119135f27cdd77e3dcbda622050c	refs/tags/v0.1.1 cfe46001c9594...
+Not readable from here. Start a new build of HEAD (cfe4600) detached.
+> Bash cd /builds/looper/gateway/issues/28; nohup /usr/local/bin/repo-looper --repo gateway --issue 28 --build > /tmp/build28.log 2>&1 & echo $!
+< 773
+> ToolSearch {"query":"select:Monitor","max_results":1}
+< 
+> Bash sleep 60; cat /tmp/build28.log
+< <tool_use_error>Blocked: sleep 60 followed by: cat /tmp/build28.log. To wait for a condition, use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`). To wait for a command you started, use run_in_background: true. Do not chain shorter sleeps to work around this block.</tool_use_erro...
+> Read /tmp/build28.log
+< 1	[2026-11-09T09:21:37Z] checkpoint of #28 (a build) pushed to looper/gateway-28:  2 files changed, 271 insertions(+) 2	[2026-11-09T09:21:37Z] build requested: gateway cfe4600, the gates full (no gates.yaml) 3	
+= thinking_tokens
+= thinking_tokens
+> Monitor tail -n +3 -f /tmp/build28.log --pid=773 | grep --line-buffered -v '^$'; echo "PROCESS EXITED"
+= permission_denied
+< This Bash command contains multiple operations. The following parts require approval: tail -n +3 -f /tmp/build28.log --pid=773, grep --line-buffered -v '^$'; echo "PROCESS EXITED"
+> Bash while kill -0 773 2>/dev/null; do sleep 20; done; cat /tmp/build28.log
+= background_tasks_changed
+= task_started
+< Command running in background with ID: bv4q0qiyw. Output is being written to: /builds/looper/gateway/homes/looper-28/tmp/claude-61000/-builds-looper-gateway-issues-28/0a04d1be-8a80-41ff-8bdf-c58eae6a6367/tasks/bv4q0qiyw.output. You will be notified when it completes. To check interim output, use Rea...
+= thinking_tokens
+= thinking_tokens
+I've started a new tacplus-dev/build job for `cfe4600` and I'm waiting for its verdict. While it runs, I'll save a checkpoint.
+> Bash cd /builds/looper/gateway/issues/28; git status --short; /usr/local/bin/repo-looper --repo gateway --issue 28 --checkpoint "cfe4600 landed, v0.1.1 tagged. Old build pipeline 3043227852 unreadable (404); new build of cfe4600 requested 09:21Z. Left: its verdict, handle security findings, comment, clos...
+< [2026-11-09T09:21:48Z] checkpoint of #28 (a step) pushed to looper/gateway-28:  2 files changed, 290 insertions(+)
+> Read /builds/looper/gateway/homes/looper-28/tmp/claude-61000/-builds-looper-gateway-issues-28/0a04d1be-8a80-41ff-8bdf-c58eae6a6367/tasks/bv4q0qiyw.output
+< <system-reminder>Warning: the file exists but the contents are empty.</system-reminder>
+> Bash for i in $(seq 1 29); do kill -0 773 2>/dev/null || break; sleep 20; done; tail -5 /tmp/build28.log
+= task_started
+= task_notification
+< [2026-11-09T09:21:37Z] checkpoint of #28 (a build) pushed to looper/gateway-28:  2 files changed, 271 insertions(+) [2026-11-09T09:21:37Z] build requested: gateway cfe4600, the gates full (no gates.yaml) the build job https://gitlab.com/tacplus-dev/build/-/pipelines/3044144564 of gateway cfe4600, th...
+> Bash for i in $(seq 1 29); do kill -0 773 2>/dev/null || break; sleep 20; done; tail -5 /tmp/build28.log
+= task_started
+= task_notification
+< [2026-11-09T09:21:37Z] checkpoint of #28 (a build) pushed to looper/gateway-28:  2 files changed, 271 insertions(+) [2026-11-09T09:21:37Z] build requested: gateway cfe4600, the gates full (no gates.yaml) the build job https://gitlab.com/tacplus-dev/build/-/pipelines/3044144564 of gateway cfe4600, th...
+= thinking_tokens
+= thinking_tokens
+> Bash for i in $(seq 1 29); do kill -0 773 2>/dev/null || break; sleep 20; done; tail -3 /tmp/build28.log; date -u
+= task_started
+= task_notification
+< [2026-11-09T09:21:37Z] checkpoint of #28 (a build) pushed to looper/gateway-28:  2 files changed, 271 insertions(+) [2026-11-09T09:21:37Z] build requested: gateway cfe4600, the gates full (no gates.yaml) the build job https://gitlab.com/tacplus-dev/build/-/pipelines/3044144564 of gateway cfe4600, th...
+> Bash env | cut -d= -f1 | grep -iE 'gitlab|token|ci_' ; glab auth status 2>&1 | head -5
+< CI_DEFAULT_BRANCH_SLUG CI_PROJECT_NAMESPACE GITLAB_USER_ID CI_RUNNER_VERSION CI_SERVER_NAME CI_RUNNER_DESCRIPTION GITLAB_USER_EMAIL CI_SERVER_REVISION CI_PIPELINE_NAME CI_RUNNER_EXECUTABLE_ARCH CI_REGISTRY_USER CI_PROJECT_TOPICS CI_API_V4_URL CI_RUNNER_SHORT_TOKEN CI_JOB_NAME GITLAB_USER_LOGIN CI_PR...
+The build (pipeline 3044144564) is still running and I have no credential to read it directly, so I'll keep waiting for repo-looper to print its verdict.
+> Bash for i in $(seq 1 29); do kill -0 773 2>/dev/null || break; sleep 20; done; tail -3 /tmp/build28.log; date -u
+> Bash for i in $(seq 1 29); do kill -0 773 2>/dev/null || break; sleep 20; done; tail -3 /tmp/build28.log; date -u
+= task_started
+= task_notification
+< [2026-11-09T09:21:37Z] checkpoint of #28 (a build) pushed to looper/gateway-28:  2 files changed, 271 insertions(+) [2026-11-09T09:21:37Z] build requested: gateway cfe4600, the gates full (no gates.yaml) the build job https://gitlab.com/tacplus-dev/build/-/pipelines/3044144564 of gateway cfe4600, th...
+= task_started
+= task_notification
+< [2026-11-09T09:21:37Z] checkpoint of #28 (a build) pushed to looper/gateway-28:  2 files changed, 271 insertions(+) [2026-11-09T09:21:37Z] build requested: gateway cfe4600, the gates full (no gates.yaml) the build job https://gitlab.com/tacplus-dev/build/-/pipelines/3044144564 of gateway cfe4600, th...
+= thinking_tokens
+= thinking_tokens
+Same pattern as last run so far. Let me look at how `--build` gets its verdict, to see what it is waiting on.
+> Bash file /usr/local/bin/repo-looper; grep -n -iE 'build job|verdict|pipelines/|poll|wait' /usr/local/bin/repo-looper 2>/dev/null | grep -iE 'build' | head -40
+< /usr/local/bin/repo-looper: Bourne-Again shell script, ASCII text executable 28:#   repo-looper --repo NAME --issue N --build   a build job of the report's committed HEAD, in the build 68:# Build jobs (looper#71; tacplus-dev/roadmap 73:# a build job's verdict on the rebased commit (gitlab.com/tacplu...
+> Read /usr/local/bin/repo-looper
+< 1022	# --- build jobs (looper#71) ----------------------------------------------------- 1023	 1024	# A build is a pipeline of gitlab.com/tacplus-dev/build (ci/build.gitlab-ci.yml, 1025	# looper-build), started with its trigger token, BUILD_TRIGGER_TOKEN, which the 1026	# report's and the manager's j...
+The verdict is a GitHub commit status. Let me read the statuses on cfe4600 directly, including any for the old pipeline.
+> Bash gh api "repos/tacplus-dev/gateway/commits/cfe46001c95949755938a35f1f325b193a18c630/statuses?per_page=100" --jq '.[] | [.created_at,.context,.creator.login,.state,.target_url,.description] | @tsv'
+< (Bash completed with no output)
+= thinking_tokens
+= thinking_tokens
+No status at all, not even "pending". Let me compare with a repository that is already pinned (kernel, after kernel#46).
+> Bash for r in kernel stratum eventbus; do echo "== $r"; sha=$(gh api repos/tacplus-dev/$r/commits/main --jq .sha); echo $sha; gh api "repos/tacplus-dev/$r/commits/$sha/statuses?per_page=100" --jq '.[] | [.created_at,.context,.creator.login,.state,.description] | @tsv' | head -5; done
+< == kernel 80a8dd9a6aac517cb0f30821a309ffc9b5f84d90 == stratum 2e78be2a65d1f5b1e6920302920b7b772a86c04b == eventbus 2f3ce132110ed0909ca1f7c0c70c6bbae7b3684c
+> Bash for r in kernel stratum eventbus gateway; do echo "== $r"; gh api "repos/tacplus-dev/$r/commits?per_page=30" --jq '.[].sha' | while read s; do gh api "repos/tacplus-dev/$r/commits/$s/statuses?per_page=100" --jq '.[] | select(.context=="tacplus-dev/build") | [.created_at,.creator.login,.state,.descri...
+= task_started
+= task_notification
+< == kernel == stratum == eventbus == gateway
+= thinking_tokens
+= thinking_tokens
+No `tacplus-dev/build` status has been posted on any recent main commit of kernel, stratum, eventbus or gateway. Let me check whether this is a known platform problem.
+> Bash gh search issues --owner tacplus-dev "build verdict" --limit 15 --json repository,number,title,state,updatedAt --jq '.[] | [.repository.nameWithOwner,.number,.state,.updatedAt,.title]|@tsv'; echo ---; gh search issues --owner tacplus-dev "tacplus-reader" --limit 15 --json repository,number,title,sta...
+< tacplus-dev/cluster	14	open	2026-11-09T09:46:00Z	Pin the build: a committed build.lock naming this repository's build image by digest --- tacplus-dev/cloud	30	open	ci: the tacplus-reader App's signing key and fleet-seatrials-reader move to tacplus-ci (import-only KMS key, as #19 did for the manager ...
+Found it: tacplus-dev/looper#113 describes exactly this.
+> Bash gh issue view 113 --repo tacplus-dev/looper --comments --json title,state,author,body,comments,labels --jq '.title, .state, .author.login, ([.labels[].name]|join(",")), .body, (.comments[] | "--- \(.author.login) (\(.authorAssociation)) \(.createdAt)\n\(.body)")' | head -80
+< specify only one of --comments or --json  Display the title, body, and other information about an issue.  When `--comments` is used, terminal output includes the issue details and comments. When output is piped or redirected, only the comments are printed.  With `--web` flag, open the issue in a web...
+> Bash gh issue view 113 --repo tacplus-dev/looper --json title,state,author,body,comments,labels,createdAt --jq '.title, .state, .createdAt, .author.login, ([.labels[].name]|join(",")), .body, (.comments[] | "--- \(.author.login) (\(.authorAssociation)) \(.createdAt)\n\(.body)")' | head -100
+< Triggered tacplus-dev/build pipelines never report: no commit status, not even pending, and --build waits 3h for nothing (website 325305c, launcher 88cfeae) OPEN 2026-11-09T06:37:07Z app/tacplus-looper bug,approved,priority:high ## Actual (2026-11-09) `repo-looper --repo website --issue 2 --build` t...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash kill 773; sleep 1; kill -0 773 2>/dev/null && echo still || echo stopped; cat /tmp/build28.log; date -u
+< stopped [2026-11-09T09:21:37Z] checkpoint of #28 (a build) pushed to looper/gateway-28:  2 files changed, 271 insertions(+) [2026-11-09T09:21:37Z] build requested: gateway cfe4600, the gates full (no gates.yaml) the build job https://gitlab.com/tacplus-dev/build/-/pipelines/3044144564 of gateway cfe...
+> Bash cat > /tmp/c28.md <<'EOF' Status from this run. Everything in this repository is done. The issue stays open only because acceptance 2 can't be checked until tacplus-dev/looper#113 is fixed.  **Done (no new commits in this run):** - `cfe4600` is on main (ffcb0da..cfe4600). The full gates (`just gates...
+= task_updated
+= task_notification
+= background_tasks_changed
+< https://github.com/tacplus-dev/gateway/issues/28#issuecomment-6737457640
+> Bash cd /builds/looper/gateway/issues/28; /usr/local/bin/repo-looper --repo gateway --issue 28 --checkpoint "Repo work done: cfe4600 landed (full gates green), v0.1.1 tagged. Acceptance 2 blocked by tacplus-dev/looper#113 (build pipelines post no commit status; pipelines 3043227852, 3044144564 gave none)...
