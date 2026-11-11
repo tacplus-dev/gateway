@@ -283,13 +283,18 @@ async fn channel(gateway_uri: &str) -> tonic::transport::Channel {
 }
 
 fn proxy_state(kernel: ServiceEndpoint, jwk: ImmutableJwk) -> Arc<ProxyState> {
+    proxy_state_over(kernel_endpoints(kernel), jwk)
+}
+
+fn kernel_endpoints(kernel: ServiceEndpoint) -> HealthWatcher {
     let mut endpoints = HashMap::new();
     endpoints.insert(KERNEL_SERVICE.to_string(), vec![kernel]);
+    HealthWatcher::seeded(endpoints)
+}
+
+fn proxy_state_over(health: HealthWatcher, jwk: ImmutableJwk) -> Arc<ProxyState> {
     Arc::new(ProxyState {
-        resolver: Arc::new(Resolver::plaintext_backends(
-            HealthWatcher::seeded(endpoints),
-            unused_verifier(),
-        )),
+        resolver: Arc::new(Resolver::plaintext_backends(health, unused_verifier())),
         auth: Arc::new(GatewayAuth::new(Arc::new(JwkCache::seeded(vec![jwk])), false)),
         tenant_owned: Arc::new(Default::default()),
         trace_publisher: Arc::new(|_| {}),
@@ -543,5 +548,81 @@ async fn rest_unary_translation_carries_the_trace_id_to_the_backend() {
         *backend.trace_ids.lock().expect("trace_ids"),
         vec![TRACE_ID.to_string()],
         "kernel must receive the trace_id of the REST body"
+    );
+}
+
+/// The REST fallback's SPIFFE-path branch (`fallback` →
+/// `get_endpoints_by_spiffe_path` → `dispatch_via_proxy` →
+/// `proxy_grpc::handle`): a path no REST route claims, but which the endpoint
+/// table knows as a SPIFFE service path, carries the JSON body's `traceId` to
+/// the backend.
+///
+/// The path is the RPC's gRPC path (`/kernel.UserMint/...`, not the
+/// `/kernel/UserMint/...` REST route): the branch hands the request path to
+/// `dispatch_via_proxy` as the gRPC method, so that is the one form of path it
+/// can deliver. The control first proves the request reaches the backend only
+/// through that branch.
+#[tokio::test]
+async fn a_spiffe_path_request_carries_the_trace_id_to_the_backend() {
+    use tower::ServiceExt;
+
+    const SPIFFE_PATH: &str = "kernel.UserMint/MintDelegateOfflineToken";
+
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
+    let signing_key = keys::generate_ec_p256_key().expect("signing key");
+    let backend = Arc::new(KernelStandIn::default());
+    let kernel = spawn_kernel(backend.clone()).await;
+    let request = || {
+        axum::http::Request::post(format!("/{SPIFFE_PATH}"))
+            .header(axum::http::header::CONTENT_TYPE, "application/json")
+            .header(axum::http::header::AUTHORIZATION, user_token(&signing_key))
+            .body(axum::body::Body::from(
+                serde_json::json!({
+                    "delegateName": "ticketbot",
+                    "delegateNamespace": "/acme",
+                    "traceId": TRACE_ID,
+                })
+                .to_string(),
+            ))
+            .expect("request")
+    };
+
+    // The control: with no instance at that SPIFFE path, the fallback has
+    // nothing to route to and the POST is an unknown route.
+    let unrouted = rest_router(proxy_state(kernel.clone(), jwk_for(&signing_key)))
+        .oneshot(request())
+        .await
+        .expect("router answers");
+    assert_eq!(
+        unrouted.status(),
+        axum::http::StatusCode::NOT_FOUND,
+        "a path no REST route claims must reach kernel only through the SPIFFE branch"
+    );
+    assert!(
+        backend.trace_ids.lock().expect("trace_ids").is_empty(),
+        "the unrouted request must never have reached kernel"
+    );
+
+    let health = kernel_endpoints(kernel.clone()).with_spiffe_path(SPIFFE_PATH, vec![kernel]);
+    let response = rest_router(proxy_state_over(health, jwk_for(&signing_key)))
+        .oneshot(request())
+        .await
+        .expect("router answers");
+
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), 1 << 20)
+        .await
+        .expect("body");
+    assert_eq!(
+        status,
+        axum::http::StatusCode::OK,
+        "the SPIFFE-path request must reach kernel: {}",
+        String::from_utf8_lossy(&body)
+    );
+    assert_eq!(
+        *backend.trace_ids.lock().expect("trace_ids"),
+        vec![TRACE_ID.to_string()],
+        "kernel must receive the trace_id of the SPIFFE-path request's body"
     );
 }
