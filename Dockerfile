@@ -38,4 +38,11 @@ COPY clients/ /opt/schematic/clients/
 ARG TARGETARCH
 COPY launcher-linux-${TARGETARCH} /usr/local/bin/launcher
 ENV LAUNCH_CMD="gateway" HEALTH_PORT=8443
+# The gateway needs no root: it binds 8443 and 8080 and only reads from disk.
+# It runs as a fixed UID/GID, not a useradd default, so the operator's
+# securityContext (runAsUser/runAsGroup 65532) can name it (#29).
+RUN groupadd --system --gid 65532 gateway \
+ && useradd --system --no-create-home --uid 65532 --gid 65532 --home-dir /nonexistent --shell /usr/sbin/nologin gateway
+
+USER 65532:65532
 ENTRYPOINT ["launcher"]

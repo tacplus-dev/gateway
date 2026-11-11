@@ -20,6 +20,11 @@ verify:
 gates:
   #!/usr/bin/env bash
   set -euo pipefail
+  # The release images run as the fixed non-root UID/GID the operator's securityContext names (#29).
+  for f in Dockerfile Dockerfile.cross; do
+    user="$(grep -E '^USER ' "$f" | tail -n1 | awk '{print $2}' || true)"
+    test "$user" = "65532:65532" || { echo "$f: the last USER must be 65532:65532, not '${user:-root}'" >&2; exit 1; }
+  done
   before="$(git status --porcelain)"
   {{TACPLUS}} build --tag latest
   if [[ "$(git status --porcelain)" != "$before" ]]; then
