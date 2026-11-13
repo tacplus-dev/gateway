@@ -1,0 +1,107 @@
+= init
+> Bash cd /builds/looper/gateway/issues/34; gh issue view 34 --repo tacplus-dev/gateway --comments | tail -60; git log --oneline -5; git diff --stat; git log origin/looper/gateway-34 --oneline -5 2>/dev/null
+< author:	tacplus-looper association:	none edited:	false status:	none -- The looper of gateway starts this issue with its limit 4h capped at 4h by this job (https://gitlab.com/tacplus-dev/looper/-/jobs/17994079845), which ends sooner: the run stops by itself before then, its work checkpointed, and the...
+= thinking_tokens
+= thinking_tokens
+> Bash cd /builds/looper/gateway/issues/34; date -u; gh issue view 18 --repo tacplus-dev/cluster --json state,title,updatedAt; gh issue view 35 --repo tacplus-dev/gateway --json state,title; gh issue view 113 --repo tacplus-dev/looper --json state,title; git diff | head -150; /usr/local/bin/repo-looper --h...
+< Fri Nov 13 13:16:13 UTC 2026 {"state":"OPEN","title":"Hub: register and apply the in-cluster runners and cluster's own pipeline (README, What the hub does 1–7)","updatedAt":"2026-11-10T10:40:27Z"} {"state":"OPEN","title":"Security checks: clippy fails on main (clippy::redundant_locals at src/rest_tr...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash gh issue view 113 --repo tacplus-dev/looper --comments | tail -30; gh issue view 18 --repo tacplus-dev/cluster --comments | tail -15
+< edited:	false status:	none -- Status at 12:10Z, 2026-11-11. This run ends; the land stays queued, and the issue now waits on tacplus-dev/cluster#18.  - **Committed:** c4360aa on `looper/looper-113` (rebased on main 5301129). This is the previous run's 0b727ad (a build with no `tacplus-dev/build` sta...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash cd /builds/looper/gateway/issues/34/webapp-login && node --version && (npm test 2>&1 | tail -12)
+< v24.22.2  > @tacplus-dev/webapp-login@0.1.0 test > tsc && node --test test/*.test.ts  sh: 1: tsc: not found
+> Bash npm ci 2>&1 | tail -3 && npm test 2>&1 | tail -10; git -C .. status --short
+= task_started
+= task_notification
+< added 3 packages, and audited 4 packages in 1s  found 0 vulnerabilities ✔ adding a provider shows it adding and disables the add buttons (5.221ms) ✔ coming back to the page from the cache shows it afresh, not still signing in (6.164719ms) ℹ tests 23 ℹ suites 0 ℹ pass 23 ℹ fail 0 ℹ cancelled 0 ℹ skip...
+Tests pass locally (23/23). I'm committing the fix and STATE.md as two commits, as the earlier run did, then queueing the land.
+> Bash cd /builds/looper/gateway/issues/34 && git add webapp-login && git commit -q -F - <<'EOF' webapp-login: tests run on the build image's node, no flag (#34)  just gates failed in the pinned build image (tacplus 2.6.1): its node 26 no longer has --experimental-transform-types, so `npm test` died with "...
+< 8bc28f5 STATE.md: gates run on the pinned image; v0.1.2 (#34) 4fbecf3 webapp-login: tests run on the build image's node, no flag (#34) 600215d PROPOSALS.md: the nightly scan's proposals (looper) [2026-11-13T13:16:37Z] checkpoint of #34 (a step) pushed to looper/gateway-34:  9 files changed, 230 inse...
+= thinking_tokens
+= thinking_tokens
+> Bash git status --short | head; nohup /usr/local/bin/repo-looper --repo gateway --issue 34 --land > /tmp/land34.log 2>&1 & echo $!
+< 949
+> Monitor sleep 120; cat /tmp/land34.log
+< <tool_use_error>InputValidationError: Monitor failed due to the following issue: The required parameter `description` is missing  This tool's schema was not sent to the API — it was not in the discovered-tool set derived from message history. Without the schema in your prompt, typed parameters (arra...
+> Bash timeout 100 bash -c 'until grep -qiE "queued|verdict|wait" /tmp/land34.log; do sleep 5; done'; cat /tmp/land34.log
+< [2026-11-13T13:16:41Z] checkpoint of #34 (land queued) pushed to looper/gateway-34:  10 files changed, 239 insertions(+), 18 deletions(-)
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash sleep 240; cat /tmp/land34.log; gh api repos/tacplus-dev/gateway/branches --jq '.[].name' | grep build
+< <tool_use_error>Blocked: sleep 240 followed by: cat /tmp/land34.log gh api repos/tacplus-dev/gateway/branches --jq '.[].name' grep build. To wait for a condition, use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`). To wait for a command you started, use run_in_background: true. ...
+> ToolSearch {"query":"select:Monitor","max_results":1}
+< 
+The land is queued. Next I'll watch it for about 10 minutes to see whether a runner picks up its build.
+> Monitor prev=""; while true; do cur=$(tail -3 /tmp/land34.log); if [ "$cur" != "$prev" ]; then echo "$cur" | tail -1; prev=$cur; fi; kill -0 949 2>/dev/null || { echo "land process exited"; exit 0; }; sleep 30; done
+= permission_denied
+< Contains brace with quote character (expansion obfuscation)
+> Bash timeout 590 bash -c 'n=$(wc -l < /tmp/land34.log); while kill -0 949 2>/dev/null && [ "$(wc -l < /tmp/land34.log)" = "$n" ]; do sleep 20; done'; cat /tmp/land34.log; gh api "repos/tacplus-dev/gateway/commits/looper/build-gateway-34/status" --jq '.state, (.statuses[]|.context+" "+.state+" "+.updated_...
+= task_started
+= task_notification
+< [2026-11-13T13:16:41Z] checkpoint of #34 (land queued) pushed to looper/gateway-34:  10 files changed, 239 insertions(+), 18 deletions(-) [2026-11-13T13:16:43Z] queued: the manager of gateway merges looper/gateway-34 after the lands queued before it, one at a time, and says on the issue what came of...
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+= thinking_tokens
+> Bash gh issue comment 34 --repo tacplus-dev/gateway --body-file - <<'EOF' Status at 13:30Z, 2026-11-13. The fix is committed and queued to land. It waits on build runners, so this issue stays open.  - **Commits** on `looper/gateway-34`, rebased on main 600215d:   - 4fbecf3: webapp-login uses only erasabl...
+< https://github.com/tacplus-dev/gateway/issues/34#issuecomment-6854292613 Blocked-by: tacplus-dev/cluster#18 Blocked-by: #35
+Issue #34 isn't finished: the fix is committed and queued to land, but nothing has merged and no `v0.1.2` tag exists yet. I've marked the issue as blocked.
+
+**The fix:** the build image's node 26 removed `--experimental-transform-types`. So the flag wasn't too new for the pinned image, as the issue guessed; it was already gone. webapp-login now uses only TypeScript that node can run by stripping the types: constructor parameter properties are written as ordinary fields, and `tsconfig.json` sets `erasableSyntaxOnly` so `tsc` rejects anything else. `npm test` is now `tsc && node --test test/*.test.ts`, with no flag.
+
+- **Commits** on `looper/gateway-34`, rebased on main 600215d: `4fbecf3` (the fix) and `8bc28f5` (STATE.md).
+- **Tested:** only `npm test` here on node 24, where all 23 tests pass. I have no container runtime, so `just gates` has not run in the build image.
+- **Land:** queued at 13:16Z. No runner has picked up its build: the status has been `pending` since 12:53Z. The previous two lands ended the same way, with "no verdict within 3h", not a test failure.
+
+**Why it waits:**
+- tacplus-dev/cluster#18: there are no runners for build jobs.
+- gateway#35: clippy fails on main, so a full gates run would be red even with a runner.
+
+I wrote both as `Blocked-by` lines to the outcome file and posted this status on the issue.
+
+The failure on unchanged main in the build image is still not confirmed, because its build also got no verdict. Once the land goes green, the next run tags `v0.1.2`, comments and closes the issue. There are no release branches, so nothing needs backporting. No service handlers were touched, so the trace check didn't apply.
+= success: Issue #34 isn't finished: the fix is committed and queued to land, but nothing has merged and no `v0.1.2` tag exists yet. I've marked the issue as blocked.
+
+**The fix:** the build image's node 26 removed `--experimental-transform-types`. So the flag wasn't too new for the pinned image, as the issue guessed; it was already gone. webapp-login now uses only TypeScript that node can run by stripping the types: constructor parameter properties are written as ordinary fields, and `tsconfig.json` sets `erasableSyntaxOnly` so `tsc` rejects anything else. `npm test` is now `tsc && node --test test/*.test.ts`, with no flag.
+
+- **Commits** on `looper/gateway-34`, rebased on main 600215d: `4fbecf3` (the fix) and `8bc28f5` (STATE.md).
+- **Tested:** only `npm test` here on node 24, where all 23 tests pass. I have no container runtime, so `just gates` has not run in the build image.
+- **Land:** queued at 13:16Z. No runner has picked up its build: the status has been `pending` since 12:53Z. The previous two lands ended the same way, with "no verdict within 3h", not a test failure.
+
+**Why it waits:**
+- tacplus-dev/cluster#18: there are no runners for build jobs.
+- gateway#35: clippy fails on main, so a full gates run would be red even with a runner.
+
+I wrote both as `Blocked-by` lines to the outcome file and posted this status on the issue.
+
+The failure on unchanged main in the build image is still not confirmed, because its build also got no verdict. Once the land goes green, the next run tags `v0.1.2`, comments and closes the issue. There are no release branches, so nothing needs backporting. No service handlers were touched, so the trace check didn't apply.
