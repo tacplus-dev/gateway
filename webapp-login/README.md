@@ -30,7 +30,9 @@ Sign-in for a tacplus fleet's web app, as a library. Two layers:
 The gateway's own console (`../webapp`) is the first consumer, with the default brand;
 a company's web app brings its own `Brand` and its own clients.
 
-`npm test` type-checks and runs the tests (node's runner, no browser).
+`npm test` type-checks and runs the tests (node's runner, no browser). The sources are
+erasable TypeScript (`erasableSyntaxOnly`: no parameter properties, enums or namespaces), so
+node runs them by stripping the types, with no flag.
 
 Anyone the fleet's providers vouch for can sign in; what they may then do is their
 entitlements, which the fleet decides by tenant membership. Signing in grants nothing.

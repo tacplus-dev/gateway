@@ -91,8 +91,10 @@ export class ConfirmNeeded extends Error {}
 /** Kernel refused a tenant no live proof vouches for: sign in with that tenant's
  * identity provider (startAdding with the tenant) and the switch completes. */
 export class StepUpNeeded extends Error {
-  constructor(readonly tenant: string, message: string) {
+  readonly tenant: string;
+  constructor(tenant: string, message: string) {
     super(message);
+    this.tenant = tenant;
   }
 }
 
@@ -181,17 +183,29 @@ export function isCallback(search: string): boolean {
 }
 
 export class SignIn {
+  private readonly auth: LoginAuth;
+  private readonly tokens: SessionTokens;
+  /** This page's URL, which the provider returns to; must be one the fleet's
+   * oauth config allows (allowed_redirect_uri_prefixes). */
+  private readonly callbackUrl: string;
+  /** Present when the app lets a person add sign-ins to their session. */
+  private readonly merger?: AccountMerger;
+  /** Present when the app lets a person sign out of one provider. */
+  private readonly revoker?: ProofRevoker;
+
   constructor(
-    private readonly auth: LoginAuth,
-    private readonly tokens: SessionTokens,
-    /** This page's URL, which the provider returns to; must be one the fleet's
-     * oauth config allows (allowed_redirect_uri_prefixes). */
-    private readonly callbackUrl: string,
-    /** Present when the app lets a person add sign-ins to their session. */
-    private readonly merger?: AccountMerger,
-    /** Present when the app lets a person sign out of one provider. */
-    private readonly revoker?: ProofRevoker,
-  ) {}
+    auth: LoginAuth,
+    tokens: SessionTokens,
+    callbackUrl: string,
+    merger?: AccountMerger,
+    revoker?: ProofRevoker,
+  ) {
+    this.auth = auth;
+    this.tokens = tokens;
+    this.callbackUrl = callbackUrl;
+    this.merger = merger;
+    this.revoker = revoker;
+  }
 
   /** A fresh sign-in waiting for the person to confirm the merge. */
   private pendingAdded: string | null = null;
