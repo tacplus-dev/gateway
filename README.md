@@ -91,6 +91,40 @@ just gates  # generate (checks it writes only target/), build (debug and release
 just clean  # remove build artifacts
 ```
 
+## Releasing
+
+Releases are tags `vMAJOR.MINOR.PATCH` on main (on a `release/MAJOR.MINOR` branch for a patch to an older
+line). The project stays on `0.x` until SeaBeam's launch; on `0.x` a minor may break and a patch never does.
+A fix merged to main is released as a patch, a feature as a minor. Fleets pin the release line
+`MAJOR.MINOR` (tacplus-dev/tacplus#180).
+
+To cut a release, push an annotated tag on a green commit:
+
+```bash
+git tag -a v0.1.2 -m "gateway 0.1.2: <what changed>" <commit>
+git push origin v0.1.2
+```
+
+The tag starts `.github/workflows/release.yml`, which:
+
+1. runs `just gates` on the tag, in the build image `tacplus.lock` pins (`ci/build-image.sh`);
+2. builds the image from the `Dockerfile` (`ci/release-image.sh`): the gates' release binary, the web
+   console (`webapp/`, generated from the registry's contracts), the launcher, and empty `web-dist/` and
+   `clients/`. A customer app and client binaries belong to a fleet, not to this image;
+3. pushes `ghcr.io/tacplus-dev/gateway:X.Y.Z`, and moves the line tag `X.Y` only when this is the line's
+   highest release (`ci/release-tags.sh`), so a line never moves backwards and a patch never moves another
+   line. The image is built for linux/arm64. amd64 is off, as it is in the fleets: set `PLATFORMS` in the
+   workflow to `arm64 amd64` to build both;
+4. creates the GitHub release, with the commits since the previous release as its notes
+   (`ci/release-notes.sh`). The release is marked Latest only when it is the highest release
+   (`ci/release-latest.sh`).
+
+A tag pushed without the workflow (v0.1.0, say) is built by running the workflow by hand on `main`:
+`gh workflow run release.yml -f version=v0.1.0 -f publish=true`. Without `publish` it is a dry run: it runs
+the gates and builds the image, prints the tags and notes the release would get, and publishes nothing. Neither
+mode makes or moves a tag. A tag that predates `tacplus.lock` builds with main's lock. The rules are tested
+by `tests/release.rs`.
+
 ## Proto
 
 [`services/gateway.proto`](../../proto/services/gateway.proto)
