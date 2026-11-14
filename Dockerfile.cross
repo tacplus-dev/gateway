@@ -50,4 +50,11 @@ RUN chmod +x /usr/local/bin/gateway
 # /opt/schematic/web.
 COPY web-dist/ /opt/schematic/web/
 
+# The gateway needs no root: it binds 8443 and 8080 and only reads from disk.
+# It runs as a fixed UID/GID, not a useradd default, so the operator's
+# securityContext (runAsUser/runAsGroup 65532) can name it (#29).
+RUN groupadd --system --gid 65532 gateway \
+ && useradd --system --no-create-home --uid 65532 --gid 65532 --home-dir /nonexistent --shell /usr/sbin/nologin gateway
+
+USER 65532:65532
 ENTRYPOINT ["gateway"]
