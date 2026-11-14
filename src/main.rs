@@ -58,7 +58,6 @@ use axum::http::StatusCode;
 use axum::routing::get;
 use tokio::time::{timeout, Duration};
 use tokio_stream::StreamExt;
-use tracing_subscriber::EnvFilter;
 
 use gateway_model::s2sm::ServiceManager;
 use gateway_model::types::sys::host::host::Host;

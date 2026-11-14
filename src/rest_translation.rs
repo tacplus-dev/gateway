@@ -262,7 +262,6 @@ async fn rest_handler(
     if route.client_streaming {
         if let Ok(ws) = WebSocketUpgrade::from_request_parts(&mut parts, &state).await {
             let state = Arc::clone(&state);
-            let route = route;
             let auth_header = auth_header_value.clone();
             return ws
                 .on_upgrade(move |socket| {
