@@ -5,6 +5,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "isolatedModules": true,
+    "erasableSyntaxOnly": true,
     "moduleDetection": "force",
     "noEmit": true,
     "allowImportingTsExtensions": true,
