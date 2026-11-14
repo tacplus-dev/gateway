@@ -1,0 +1,24 @@
+# Findings the build's security checks accept (tacplus-dev/looper README,
+# "Security checks"). Each still shows in the report as excepted; from the day
+# after its expiry the build fails until it is renewed or fixed.
+exceptions:
+  - id: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket
+    reason: "src/e2e_stream_trace.rs: a #[cfg(test)] end-to-end test's plaintext ws:// to the router it serves itself on 127.0.0.1; no shipped code opens a ws:// connection (#31)"
+    decided_by: jodydadescott
+    expires: 2027-02-11
+  - id: RUSTSEC-2025-0134
+    reason: "rustls-pemfile, unmaintained, no fix: the gateway's own code no longer uses it (#31), but axum-server 0.7 and the generated chassis still lock it (tacplus-dev/tacplus#308)"
+    decided_by: jodydadescott
+    expires: 2027-02-11
+  - id: RUSTSEC-2025-0012
+    reason: "backoff, unmaintained, no fix: only via the generated httpclient chassis (tacplus-dev/tacplus#319, #31)"
+    decided_by: jodydadescott
+    expires: 2027-02-11
+  - id: RUSTSEC-2024-0384
+    reason: "instant, unmaintained, no fix: only via backoff in the generated httpclient chassis (tacplus-dev/tacplus#319, #31)"
+    decided_by: jodydadescott
+    expires: 2027-02-11
+  - id: RUSTSEC-2024-0449
+    reason: "unsafe-libyaml, unmaintained, no fix: only via serde_yaml 0.9 in the generated model and chassis (tacplus-dev/tacplus#320, #31)"
+    decided_by: jodydadescott
+    expires: 2027-02-11

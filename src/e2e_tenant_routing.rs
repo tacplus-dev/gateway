@@ -27,6 +27,8 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use http::Request;
+use rustls::pki_types::pem::PemObject;
+use rustls::pki_types::CertificateDer;
 use tokio::net::TcpListener;
 
 use gateway_grpcserver::authorizer::JwkCache;
@@ -160,7 +162,7 @@ fn unused_verifier() -> Arc<SpiffeServerCertVerifier> {
         .self_sign("unused", unix_now() + 3600, X509KeyUsage::CertSign, &[])
         .expect("throwaway cert");
     let mut roots = rustls::RootCertStore::empty();
-    for der in rustls_pemfile::certs(&mut cert.pem_bytes()) {
+    for der in CertificateDer::pem_slice_iter(cert.pem_bytes()) {
         roots.add(der.expect("der")).expect("add root");
     }
     SpiffeServerCertVerifier::new(TRUST_DOMAIN, roots).expect("verifier")

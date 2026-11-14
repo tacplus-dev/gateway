@@ -8,6 +8,7 @@ use http_body_util::BodyExt;
 use hyper_util::rt::TokioIo;
 use rustls::RootCertStore;
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{CertificateError, DigitallySignedStruct, Error as TlsError, SignatureScheme};
 use tokio::net::TcpStream;
@@ -223,7 +224,7 @@ impl ServerCertVerifier for KernelCaVerifier {
 /// Build a TlsConnector from a PEM CA bundle (kernel root chain).
 fn build_tls_connector(ca_pem_bundle: &str) -> Result<TlsConnector, Box<dyn std::error::Error>> {
     let mut root_store = RootCertStore::empty();
-    for cert in rustls_pemfile::certs(&mut ca_pem_bundle.as_bytes()) {
+    for cert in CertificateDer::pem_slice_iter(ca_pem_bundle.as_bytes()) {
         root_store.add(cert?)?;
     }
     let inner = rustls::client::WebPkiServerVerifier::builder(Arc::new(root_store))
