@@ -34,7 +34,8 @@ class FakeTokens implements SessionTokens {
   /** tenant_namespace of every refresh → access mint, '' for none. */
   readonly requests: string[] = [];
   private tenant: string | null = null;
-  constructor(private readonly storage: MemoryStorage) {}
+  private readonly storage: MemoryStorage;
+  constructor(storage: MemoryStorage) { this.storage = storage; }
   getRefreshToken() { return this.storage.getItem('w2sm.refresh_token'); }
   setRefreshToken(t: string) { this.storage.setItem('w2sm.refresh_token', t); }
   clear() { this.storage.removeItem('w2sm.refresh_token'); }

@@ -23,7 +23,9 @@ class FakeElement {
   innerHTML: string;
   readonly dataset: Record<string, string> = {};
   private readonly listeners: (() => void)[] = [];
-  constructor(readonly tag: string, attrs: string, inner: string) {
+  readonly tag: string;
+  constructor(tag: string, attrs: string, inner: string) {
+    this.tag = tag;
     this.innerHTML = inner;
     this.disabled = /\sdisabled(\s|=|$)/.test(attrs);
     for (const [, k, v] of attrs.matchAll(/data-([a-z]+)="([^"]*)"/g)) this.dataset[k] = v;
