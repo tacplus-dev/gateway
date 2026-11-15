@@ -178,7 +178,6 @@ async fn proxy_with_oauth() -> (ProxyState, AuthStandIn) {
             unused_verifier(),
         )),
         auth: Arc::new(GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false)),
-        tenant_owned: Arc::new(Default::default()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
     };

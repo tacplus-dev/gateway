@@ -171,7 +171,6 @@ fn rest_router(minter: Arc<dyn KernelMinter>) -> axum::Router {
             unused_verifier(),
         )),
         auth: Arc::clone(&auth),
-        tenant_owned: Arc::new(Default::default()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
     });

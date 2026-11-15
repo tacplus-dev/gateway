@@ -72,15 +72,31 @@ impl Resolver {
         &self.health
     }
 
+    /// The health entry a call to `service_id` is dialed by: the one place a
+    /// call's target is resolved, for the gRPC proxy and the REST translation
+    /// (which goes through it) alike. `tenant` is the call's target tenant, a
+    /// tid already read off the request's route field and checked, or empty
+    /// for a platform service, which routes by name. A tenant-owned service is
+    /// deployed once per tenant and its instance indexed as `<svc>-<tid>` from
+    /// its SPIFFE identity (`HealthWatcher`). A placement resolver (which
+    /// cluster a tenant is active on) slots in here.
+    pub fn resolve_target(&self, service_id: &str, tenant: &str) -> String {
+        if tenant.is_empty() {
+            service_id.to_string()
+        } else {
+            crate::health::tenant_route_key(service_id, tenant)
+        }
+    }
+
     /// Create a tonic Channel to the given service_id.
     /// Connects eagerly to a healthy backend endpoint via TLS.
     ///
     /// `route_key` selects the health entry and `service_label` is the
     /// location-agnostic SPIFFE service the backend's certificate must present.
     /// They are the same string for a shared service. For a tenant-owned one
-    /// they differ: the instance is registered as `<svc>-<tenant>` (the name the
-    /// operator deploys, item 4 §2.3) while its certificate carries
-    /// `spiffe://<td>/tenants/<tenant>/services/<svc>`, whose location-agnostic
+    /// they differ: the instance is indexed as `<svc>-<tid>` (see
+    /// `resolve_target`) while its certificate carries
+    /// `spiffe://<td>/tenants/<tid>/services/<svc>`, whose location-agnostic
     /// service label is the bare `<svc>`.
     pub async fn dial(&self, route_key: &str, service_label: &str) -> Channel {
         let endpoints = self.health.get_endpoints(route_key);

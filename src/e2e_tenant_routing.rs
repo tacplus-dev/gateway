@@ -1,25 +1,28 @@
-// End-to-end proof, over real sockets, that the gateway sends a caller to THEIR
-// tenant's instance of a tenant-owned service — and that nothing else changes.
+// End-to-end proof, over real sockets, that the gateway sends a call to a
+// tenant-owned service to the instance of the tenant its request NAMES (the
+// rpc's `(spec.rpc).route_field`, a tid), whatever tenant the caller's token is
+// in; that a call naming no tenant is refused before anything is dialled; and
+// that a platform service routes by name as before (#3, tacplus#170,
+// tacplus-dev/roadmap decisions/tenant-routing-2026-10-26.md).
 //
 // What is real here:
 //
 //   * the real `proxy_grpc::handle`, entered with a real gRPC-framed request;
+//   * the real generated `ROUTES` table: the route under test is tenantecho's
+//     `Ping`, whose route field is `PingRequest.tenant`, and its MCP session
+//     carrier, whose route field is `McpRequest.tenant`;
 //   * the real `GatewayAuth` over a real `JwkCache`, verifying real
-//     ECDSA-signed JWTs — the namespace this routes on is read off the SAME
-//     `VerifiedClaims` the entitlement check uses, so an unverified token can
-//     never reach the routing decision;
+//     ECDSA-signed JWTs;
 //   * the real `Resolver` and the real `HealthWatcher` endpoint table;
 //   * real TCP listeners, one per tenant instance, each counting the
 //     connections it receives.
 //
 // The observable is the DIAL, not a response body: each listener accepts and
 // immediately drops the socket, so the call ends in Unavailable either way and
-// the only thing that distinguishes acme from beta is which listener the
-// gateway connected to. That is precisely the decision under test.
-//
-// The registry fixture is the `tenant_owned` set handed to `ProxyState`, so the
-// tenant-owned path is exercised against a fixture whatever the live registry
-// declares (tenantecho declares it in the proof fleet; registry.rs checks that).
+// the only thing that distinguishes one tenant from the other is which listener
+// the gateway connected to. That is precisely the decision under test. Whether
+// the caller may reach that tenant is the target's policy (its tenant door),
+// not the gateway's routing, so it is not asserted here.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -28,21 +31,32 @@ use std::sync::Arc;
 use axum::body::Body;
 use http::Request;
 use tokio::net::TcpListener;
+use tower::ServiceExt;
 
 use gateway_grpcserver::authorizer::JwkCache;
 use gateway_jwk::jwk::{ImmutableJwk, Jwk};
 use gateway_key::{base64_utils, keys};
-use gateway_model::s2sm::rest_dispatch::{AuthPolicy, RouteInfo};
+use gateway_model::s2sm::rest_dispatch::{AuthPolicy, RouteInfo, ROUTES};
+use gateway_model::types::services::tenantecho::tenantecho::PingRequest;
+use gateway_model::types::sys::mcp::mcp::McpRequest;
+use gateway_model::types::sys::tokenrequest::{TokenMintRequest, TokenMintResponse, X509MintRequest};
+use gateway_model::types::sys::x509::x509::X509CertChain;
 use gateway_servicemanager::SpiffeServerCertVerifier;
 use gateway_token::token::Token;
 use gateway_x509::x509::{ImmutableCertChain, X509KeyUsage};
 
 use crate::auth::GatewayAuth;
 use crate::health::{HealthWatcher, ServiceEndpoint};
+use crate::mint::KernelMinter;
 use crate::proxy_grpc::{self, ProxyState};
 use crate::resolver::Resolver;
+use crate::rest_translation::{self, RestState};
 
 const TRUST_DOMAIN: &str = "tenant-routing.test";
+
+/// Two tenants' tids: exactly 8 characters of `[0-9a-z]`.
+const ACME: &str = "acme0001";
+const BETA: &str = "beta0002";
 
 // ── a backend that only records that it was dialed ──────────────────────────
 
@@ -166,25 +180,54 @@ fn unused_verifier() -> Arc<SpiffeServerCertVerifier> {
     SpiffeServerCertVerifier::new(TRUST_DOMAIN, roots).expect("verifier")
 }
 
-/// The first unary `Entitled` route in the generated table with no target
-/// namespace field, picked from ROUTES so the test follows regeneration rather
-/// than pinning a path that a proto change can move.
-fn route_under_test() -> &'static RouteInfo {
-    gateway_model::s2sm::rest_dispatch::ROUTES
+/// tenantecho's `Ping`: the fleet's tenant-routed proof rpc, routed by
+/// `PingRequest.tenant` (field 2). Asserted off the generated table, so a
+/// regeneration that drops or moves its route field fails here first.
+fn routed_route() -> &'static RouteInfo {
+    let route = ROUTES
+        .iter()
+        .find(|r| r.grpc_path == "/tenantecho.TenantEcho/Ping")
+        .expect("the generated ROUTES table must carry tenantecho's Ping");
+    assert_eq!(route.service_id, "tenantecho");
+    assert_eq!(route.route_field, Some("tenant"), "Ping is routed by PingRequest.tenant");
+    assert_eq!(route.route_field_number, 2, "PingRequest.tenant is field 2");
+    assert!(!route.client_streaming && !route.server_streaming, "Ping is unary");
+    route
+}
+
+/// tenantecho's MCP session carrier: a client-streaming route of a
+/// tenant-owned service, routed by `McpRequest.tenant` (field 2).
+fn routed_stream_route() -> &'static RouteInfo {
+    let route = ROUTES
+        .iter()
+        .find(|r| r.service_id == "tenantecho" && r.client_streaming)
+        .expect("the generated ROUTES table must carry tenantecho's MCP session carrier");
+    assert_eq!(route.route_field, Some("tenant"), "the carrier is routed by McpRequest.tenant");
+    assert_eq!(route.route_field_number, 2, "McpRequest.tenant is field 2");
+    route
+}
+
+/// The first unary user-authenticated route of a platform service (no route
+/// field) whose request an empty message satisfies, picked from ROUTES so the
+/// test follows regeneration rather than pinning a path that a proto change
+/// can move.
+fn platform_route() -> &'static RouteInfo {
+    ROUTES
         .iter()
         .find(|r| {
-            !r.server_streaming
+            r.route_field.is_none()
+                && !r.server_streaming
                 && !r.client_streaming
                 && matches!(r.auth_policy, AuthPolicy::Entitled | AuthPolicy::AnyUser)
                 && r.target_namespace_field.is_none()
                 && !r.grpc_path.starts_with("/gateway.")
+                && gateway_model::s2sm::proxy_dispatch::validate_request(r.grpc_path, &[]).is_ok()
         })
-        .expect("the generated ROUTES table must contain a unary user-authenticated route")
+        .expect("the generated ROUTES table must contain a unary user-authenticated platform route")
 }
 
 fn proxy_state(
     endpoints: HashMap<String, Vec<ServiceEndpoint>>,
-    tenant_owned: &[&str],
     signing_key: &keys::ImmutableKey,
 ) -> ProxyState {
     ProxyState {
@@ -196,26 +239,75 @@ fn proxy_state(
             Arc::new(JwkCache::seeded(vec![jwk_for(signing_key)])),
             false,
         )),
-        tenant_owned: Arc::new(tenant_owned.iter().map(|s| s.to_string()).collect()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
     }
 }
 
-/// An empty protobuf message in a well-formed gRPC frame. Every request message
-/// on the route under test has no required field, so an empty body reaches the
-/// routing decision — which is where this test looks.
-fn empty_grpc_body() -> Body {
-    Body::from(proxy_grpc::frame_grpc(&[]))
+/// A `Ping` naming `tenant` as its target, in a well-formed gRPC frame.
+fn ping(tenant: &str) -> Vec<u8> {
+    let request = PingRequest {
+        message: "hello".to_string(),
+        tenant: tenant.to_string(),
+        ..Default::default()
+    };
+    proxy_grpc::frame_grpc(&prost::Message::encode_to_vec(&request))
 }
 
-async fn call(proxy: &ProxyState, bearer: &str) -> axum::response::Response {
+/// One MCP session frame naming `tenant`, in a well-formed gRPC frame.
+fn mcp_frame(tenant: &str) -> Vec<u8> {
+    let request = McpRequest {
+        payload: r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#.to_string(),
+        tenant: tenant.to_string(),
+        ..Default::default()
+    };
+    proxy_grpc::frame_grpc(&prost::Message::encode_to_vec(&request))
+}
+
+/// The REST router in front of `proxy`. Ping is not a gateway.Mint route, so
+/// the minter is never consulted.
+fn rest_router(proxy: ProxyState) -> axum::Router {
+    struct NoMinter;
+
+    #[tonic::async_trait]
+    impl KernelMinter for NoMinter {
+        async fn mint_token(
+            &self,
+            _: tonic::Request<TokenMintRequest>,
+        ) -> Result<tonic::Response<TokenMintResponse>, tonic::Status> {
+            Err(tonic::Status::unimplemented("not part of this test"))
+        }
+
+        async fn mint_x509_cert(
+            &self,
+            _: tonic::Request<X509MintRequest>,
+        ) -> Result<tonic::Response<X509CertChain>, tonic::Status> {
+            Err(tonic::Status::unimplemented("not part of this test"))
+        }
+    }
+
+    let auth = Arc::clone(&proxy.auth);
+    rest_translation::router(Arc::new(RestState {
+        proxy: Arc::new(proxy),
+        minter: Arc::new(NoMinter),
+        auth,
+        root_ca: vec![],
+        issuer_url: "https://gateway.example".to_string(),
+    }))
+}
+
+async fn call(
+    proxy: &ProxyState,
+    route: &RouteInfo,
+    bearer: &str,
+    body: Vec<u8>,
+) -> axum::response::Response {
     let request = Request::builder()
         .method("POST")
-        .uri(route_under_test().grpc_path)
+        .uri(route.grpc_path)
         .header("content-type", "application/grpc+proto")
         .header("authorization", bearer)
-        .body(empty_grpc_body())
+        .body(Body::from(body))
         .expect("request");
     proxy_grpc::handle(proxy, request).await
 }
@@ -235,154 +327,244 @@ fn grpc_message(response: &axum::response::Response) -> &str {
         .unwrap_or("")
 }
 
-// ── the runs ────────────────────────────────────────────────────────────────
-
-/// (a) and (b) in one run, on one set of sockets, so neither can be quietly
-/// true alone: the same method, the same gateway, two callers, two tenants,
-/// two different backends.
-#[tokio::test]
-async fn a_tenant_owned_service_routes_each_caller_to_their_own_instance() {
-    let _ = rustls::crypto::ring::default_provider().install_default();
-    let route = route_under_test();
-    let service = route.service_id;
-
-    let acme = DialCounter::spawn().await;
-    let beta = DialCounter::spawn().await;
-    let shared = DialCounter::spawn().await;
-
-    let mut endpoints = HashMap::new();
-    endpoints.insert(format!("{service}-acme"), vec![acme.endpoint.clone()]);
-    endpoints.insert(format!("{service}-beta"), vec![beta.endpoint.clone()]);
-    // The bare name is registered too, and must stay untouched: a tenant-owned
-    // service has no shared instance, so dialing it would be a routing bug that
-    // an "endpoints exist" assertion alone would miss.
-    endpoints.insert(service.to_string(), vec![shared.endpoint.clone()]);
-
-    let signing_key = keys::generate_ec_p256_key().expect("signing key");
-    let proxy = proxy_state(endpoints, &[service], &signing_key);
-
-    // (a) /tenants/acme
-    call(&proxy, &user_token(&signing_key, service, "/tenants/acme")).await;
-    assert_eq!(
-        (acme.dialed(), beta.dialed(), shared.dialed()),
-        (true, false, false),
-        "an /tenants/acme caller must reach {service}-acme alone"
-    );
-
-    // (b) /tenants/beta, same service, same gateway
-    acme.reset();
-    call(&proxy, &user_token(&signing_key, service, "/tenants/beta")).await;
-    assert_eq!(
-        (acme.dialed(), beta.dialed(), shared.dialed()),
-        (false, true, false),
-        "a /tenants/beta caller must reach {service}-beta, and acme must not be dialed at all"
-    );
+/// One listener per tenant instance, registered under its route key, plus one
+/// under the bare service name that a tenant-routed call must never reach: a
+/// tenant-owned service has no shared instance, so dialing it would be a
+/// routing bug an "endpoints exist" assertion alone would miss.
+struct Instances {
+    acme: DialCounter,
+    beta: DialCounter,
+    shared: DialCounter,
 }
 
-/// (c) A service the registry does NOT mark tenant-owned routes by name, and the
-/// caller's namespace is not consulted at all — the same two tokens that split
-/// in the test above land on the same backend here.
-#[tokio::test]
-async fn a_shared_service_ignores_the_caller_namespace_entirely() {
-    let _ = rustls::crypto::ring::default_provider().install_default();
-    let route = route_under_test();
-    let service = route.service_id;
-
-    let shared = DialCounter::spawn().await;
-    let acme = DialCounter::spawn().await;
-
-    let mut endpoints = HashMap::new();
-    endpoints.insert(service.to_string(), vec![shared.endpoint.clone()]);
-    // Present, and must never be chosen: nothing may route to `<svc>-acme` for a
-    // service the registry does not mark.
-    endpoints.insert(format!("{service}-acme"), vec![acme.endpoint.clone()]);
-
-    let signing_key = keys::generate_ec_p256_key().expect("signing key");
-    let proxy = proxy_state(endpoints, &[], &signing_key);
-
-    for namespace in ["/tenants/acme", "/tenants/beta", "/system/us-east"] {
-        shared.reset();
-        call(&proxy, &user_token(&signing_key, service, namespace)).await;
-        assert!(
-            shared.dialed(),
-            "a {namespace} caller must still reach the shared instance"
-        );
+impl Instances {
+    async fn spawn(service: &str) -> (Self, HashMap<String, Vec<ServiceEndpoint>>) {
+        let instances = Self {
+            acme: DialCounter::spawn().await,
+            beta: DialCounter::spawn().await,
+            shared: DialCounter::spawn().await,
+        };
+        let mut endpoints = HashMap::new();
+        endpoints.insert(format!("{service}-{ACME}"), vec![instances.acme.endpoint.clone()]);
+        endpoints.insert(format!("{service}-{BETA}"), vec![instances.beta.endpoint.clone()]);
+        endpoints.insert(service.to_string(), vec![instances.shared.endpoint.clone()]);
+        (instances, endpoints)
     }
 
-    assert_eq!(
-        (shared.dialed(), acme.dialed()),
-        (true, false),
-        "every caller must reach the one shared instance, whatever their namespace"
-    );
+    fn dialed(&self) -> (bool, bool, bool) {
+        (self.acme.dialed(), self.beta.dialed(), self.shared.dialed())
+    }
+
+    fn reset(&self) {
+        self.acme.reset();
+        self.beta.reset();
+        self.shared.reset();
+    }
 }
 
-/// (d) The case item 4's doc called "the failure mode nobody has decided yet":
-/// a /system caller against a tenant-owned service. There is no tenant to route
-/// to, so the gateway rejects rather than picking one — and dials nothing.
-/// See the decision doc's Open question 2.
+// ── the runs ────────────────────────────────────────────────────────────────
+
+/// Two tenants' calls to the same method reach their own instances by the
+/// field, whatever tenant the caller's token names: the same acme caller
+/// reaches beta's instance when it names beta, and a beta caller reaches
+/// acme's when it names acme. One run, one set of sockets, so neither half
+/// can be quietly true alone.
 #[tokio::test]
-async fn a_system_caller_is_rejected_by_a_tenant_owned_service() {
+async fn a_tenant_owned_call_routes_by_its_target_tenant_field_not_the_token() {
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let route = route_under_test();
+    let route = routed_route();
     let service = route.service_id;
-
-    let acme = DialCounter::spawn().await;
-    let shared = DialCounter::spawn().await;
-
-    let mut endpoints = HashMap::new();
-    endpoints.insert(format!("{service}-acme"), vec![acme.endpoint.clone()]);
-    endpoints.insert(service.to_string(), vec![shared.endpoint.clone()]);
-
+    let (instances, endpoints) = Instances::spawn(service).await;
     let signing_key = keys::generate_ec_p256_key().expect("signing key");
-    let proxy = proxy_state(endpoints, &[service], &signing_key);
+    let proxy = proxy_state(endpoints, &signing_key);
+
+    for (caller, target, expected) in [
+        ("/tenants/acme", ACME, (true, false, false)),
+        ("/tenants/acme", BETA, (false, true, false)),
+        ("/tenants/beta", ACME, (true, false, false)),
+        ("/tenants/beta", BETA, (false, true, false)),
+        ("/system/us-east", BETA, (false, true, false)),
+    ] {
+        instances.reset();
+        call(&proxy, route, &user_token(&signing_key, service, caller), ping(target)).await;
+        assert_eq!(
+            instances.dialed(),
+            expected,
+            "a {caller} caller naming tenant {target} must reach {service}-{target} alone"
+        );
+    }
+}
+
+/// A call naming no valid target tenant is refused, INVALID_ARGUMENT, before
+/// anything is dialled: the tenant is never filled in from the caller's token,
+/// and there is no shared instance to fall back to.
+#[tokio::test]
+async fn a_call_with_no_valid_target_tenant_is_refused_and_dials_nothing() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let route = routed_route();
+    let service = route.service_id;
+    let (instances, endpoints) = Instances::spawn(service).await;
+    let signing_key = keys::generate_ec_p256_key().expect("signing key");
+    let proxy = proxy_state(endpoints, &signing_key);
+
+    // "acme" is the tenant's NAME, which is what its token's namespace says:
+    // a name is not a tid, and must not route.
+    for target in ["", "acme", "ACME0001", "acme00011"] {
+        let response = call(
+            &proxy,
+            route,
+            &user_token(&signing_key, service, "/tenants/acme"),
+            ping(target),
+        )
+        .await;
+        assert_eq!(
+            grpc_status(&response),
+            Some("3"),
+            "a target tenant of {target:?} must be InvalidArgument (3), got message {:?}",
+            grpc_message(&response)
+        );
+        assert!(
+            grpc_message(&response).contains("\"tenant\""),
+            "the refusal must name the route field, got {:?}",
+            grpc_message(&response)
+        );
+        assert_eq!(
+            instances.dialed(),
+            (false, false, false),
+            "a refused call ({target:?}) must not reach any backend"
+        );
+    }
+}
+
+/// A tenant with no healthy instance is Unavailable, never another tenant's
+/// instance nor the bare service name.
+#[tokio::test]
+async fn a_tenant_with_no_instance_is_unavailable_and_reaches_no_other() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let route = routed_route();
+    let service = route.service_id;
+    let (instances, endpoints) = Instances::spawn(service).await;
+    let signing_key = keys::generate_ec_p256_key().expect("signing key");
+    let proxy = proxy_state(endpoints, &signing_key);
 
     let response = call(
         &proxy,
-        &user_token(&signing_key, service, "/system/us-east"),
+        route,
+        &user_token(&signing_key, service, "/tenants/acme"),
+        ping("gone0003"),
     )
     .await;
 
     assert_eq!(
         grpc_status(&response),
-        Some("7"),
-        "a non-tenant caller must be PermissionDenied (7), got message {:?}",
+        Some("14"),
+        "a tenant with no instance must be Unavailable (14), got message {:?}",
         grpc_message(&response)
     );
-    assert!(
-        grpc_message(&response).contains("not tenant-scoped"),
-        "the rejection must say why, got {:?}",
-        grpc_message(&response)
-    );
-    assert_eq!(
-        (acme.dialed(), shared.dialed()),
-        (false, false),
-        "a rejected caller must not reach any backend"
-    );
+    assert_eq!(instances.dialed(), (false, false, false));
 }
 
-/// A caller whose namespace names a workspace inside a tenant still belongs to
-/// that tenant, and routes there. Nothing deploys per workspace.
+/// A stream is opened for the tenant its first message names, whatever tenant
+/// the caller's token is in; a stream whose first message names none is
+/// refused before anything is dialled.
 #[tokio::test]
-async fn a_workspace_scoped_caller_routes_to_its_tenant() {
+async fn a_tenant_owned_stream_routes_by_its_first_message() {
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let route = route_under_test();
+    let route = routed_stream_route();
     let service = route.service_id;
-
-    let acme = DialCounter::spawn().await;
-    let mut endpoints = HashMap::new();
-    endpoints.insert(format!("{service}-acme"), vec![acme.endpoint.clone()]);
-
+    let (instances, endpoints) = Instances::spawn(service).await;
     let signing_key = keys::generate_ec_p256_key().expect("signing key");
-    let proxy = proxy_state(endpoints, &[service], &signing_key);
+    let proxy = proxy_state(endpoints, &signing_key);
+    let bearer = user_token(&signing_key, service, "/tenants/acme");
 
-    call(
-        &proxy,
-        &user_token(&signing_key, service, "/tenants/acme/workspaces/eu"),
-    )
-    .await;
-
-    assert!(
-        acme.dialed(),
-        "a /tenants/acme/workspaces/eu caller belongs to tenant acme"
+    call(&proxy, route, &bearer, mcp_frame(BETA)).await;
+    assert_eq!(
+        instances.dialed(),
+        (false, true, false),
+        "a stream opened for {BETA} must reach {service}-{BETA} alone"
     );
+
+    instances.reset();
+    let response = call(&proxy, route, &bearer, mcp_frame("")).await;
+    assert_eq!(
+        grpc_status(&response),
+        Some("3"),
+        "a stream naming no tenant must be InvalidArgument (3), got message {:?}",
+        grpc_message(&response)
+    );
+    assert_eq!(instances.dialed(), (false, false, false), "a refused stream must dial nothing");
+}
+
+/// A platform service routes by name, as before: no route field is read, and
+/// the caller's namespace is not consulted at all, so every caller lands on
+/// the one shared instance and `<svc>-<tid>` is never chosen.
+#[tokio::test]
+async fn a_platform_service_routes_by_name_whatever_the_caller() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let route = platform_route();
+    let service = route.service_id;
+    let (instances, endpoints) = Instances::spawn(service).await;
+    let signing_key = keys::generate_ec_p256_key().expect("signing key");
+    let proxy = proxy_state(endpoints, &signing_key);
+
+    for namespace in ["/tenants/acme", "/tenants/beta", "/system/us-east"] {
+        instances.reset();
+        call(
+            &proxy,
+            route,
+            &user_token(&signing_key, service, namespace),
+            proxy_grpc::frame_grpc(&[]),
+        )
+        .await;
+        assert_eq!(
+            instances.dialed(),
+            (false, false, true),
+            "a {namespace} caller must reach the shared {service} instance alone"
+        );
+    }
+}
+
+/// The REST translation routes the same way: its JSON body's route field
+/// (`tenant`) picks the instance whatever tenant the token names, and a body
+/// naming none is refused with 400 before anything is dialled.
+#[tokio::test]
+async fn the_rest_translation_routes_by_the_same_field() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let route = routed_route();
+    let service = route.service_id;
+    let (instances, endpoints) = Instances::spawn(service).await;
+    let signing_key = keys::generate_ec_p256_key().expect("signing key");
+    let router = rest_router(proxy_state(endpoints, &signing_key));
+    let bearer = user_token(&signing_key, service, "/tenants/acme");
+
+    let post = |body: serde_json::Value| {
+        axum::http::Request::post(route.http_path)
+            .header(axum::http::header::CONTENT_TYPE, "application/json")
+            .header(axum::http::header::AUTHORIZATION, bearer.as_str())
+            .body(Body::from(body.to_string()))
+            .expect("request")
+    };
+
+    router
+        .clone()
+        .oneshot(post(serde_json::json!({"message": "hello", "tenant": BETA})))
+        .await
+        .expect("router answers");
+    assert_eq!(
+        instances.dialed(),
+        (false, true, false),
+        "a REST call naming {BETA} must reach {service}-{BETA} alone"
+    );
+
+    instances.reset();
+    let response = router
+        .oneshot(post(serde_json::json!({"message": "hello"})))
+        .await
+        .expect("router answers");
+    assert_eq!(
+        response.status(),
+        axum::http::StatusCode::BAD_REQUEST,
+        "a REST call naming no tenant must be 400"
+    );
+    assert_eq!(instances.dialed(), (false, false, false), "a refused call must dial nothing");
 }

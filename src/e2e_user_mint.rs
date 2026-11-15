@@ -291,7 +291,6 @@ fn proxy_state(kernel: ServiceEndpoint, jwk: ImmutableJwk) -> Arc<ProxyState> {
             unused_verifier(),
         )),
         auth: Arc::new(GatewayAuth::new(Arc::new(JwkCache::seeded(vec![jwk])), false)),
-        tenant_owned: Arc::new(Default::default()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
     })
