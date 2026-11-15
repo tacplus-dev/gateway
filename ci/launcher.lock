@@ -1,0 +1,6 @@
+# The launcher every release image runs under (Dockerfile; ci/launcher.sh): a tacplus-dev/launcher release
+# and the sha256 of each binary, its release's checksums.txt. Move it in a commit; a build never resolves
+# "newest" (tacplus-dev/roadmap decisions/deterministic-builds-2026-10-27.md).
+version: v0.1.0
+launcher-linux-amd64: 903693ab56879b5a5b54779c3e20efa3ddd5f1269fb0c2274882befb7df69e0f
+launcher-linux-arm64: f07933da11e08812afa87d814ecbd187087f20c2af7f62d0c1d356754643ec16

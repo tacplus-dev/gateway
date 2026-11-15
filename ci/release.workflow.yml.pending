@@ -1,0 +1,175 @@
+name: release
+
+# On a version tag vX.Y.Z: run the gates on the tag, publish ghcr.io/tacplus-dev/gateway:X.Y.Z, move the line
+# tag X.Y when this is the line's highest release (ci/release-tags.sh), and create the GitHub release with the
+# commits since the previous release (ci/release-notes.sh), marked Latest only when it is the highest release
+# (ci/release-latest.sh). A pre-release (vX.Y.Z-rc.N) publishes only its own tag. Fleets pin X.Y
+# (tacplus-dev/tacplus#180); tacplus-dev/roadmap decisions/ci-on-gitlab-2026-10-27.md, the 2026-11-07 addendum.
+# Modelled on tacplus-dev/llmproxy's release.yml; how to cut a release: README.md, Releasing.
+#
+# Each architecture builds on a runner of its own (no emulation): the gates in the build image tacplus.lock
+# pins (ci/build-image.sh), then the image (ci/release-image.sh), pushed by digest; publish points the tags at
+# them. The image is built from the registry's contracts, with no customer app and no client binaries, and runs
+# under the launcher release ci/launcher.lock pins (ci/launcher.sh).
+#
+# workflow_dispatch builds a tag that already exists, from this workflow's commit (a tag that predates it,
+# v0.1.0, has no workflow; one that predates tacplus.lock builds with this commit's lock). With publish unset
+# it is a dry run: it runs the gates, builds the image and prints the image tags and notes the release would
+# get, and publishes nothing. It never makes or moves a tag.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The existing tag to build, e.g. v0.1.0"
+        required: true
+      publish:
+        description: "Publish its image and GitHub release (unset: a dry run)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One release at a time, so of two tags on one line the later run sees the other before it moves X.Y.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
+  # The platforms the image is built for: arm64, what the fleets run on. amd64 is off to save the cost of a
+  # second build, as in the fleets (fleet-seatrials images/pins.yaml `platforms`); "arm64 amd64" builds both,
+  # one multi-arch image.
+  PLATFORMS: arm64
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      tags: ${{ steps.plan.outputs.tags }}
+      flag: ${{ steps.plan.outputs.flag }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Every tag: the line tag, Latest and the notes depend on the releases already made.
+          fetch-depth: 0
+      - name: Tags and notes
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          tags="$(ci/release-tags.sh "$VERSION")"
+          flag="$(ci/release-latest.sh "$VERSION")"
+          ci/release-notes.sh "$VERSION" > "$RUNNER_TEMP/notes.md"
+          matrix="$(for p in $PLATFORMS; do
+            case "$p" in
+              arm64) echo "{\"arch\":\"arm64\",\"runner\":\"ubuntu-24.04-arm\"}" ;;
+              amd64) echo "{\"arch\":\"amd64\",\"runner\":\"ubuntu-24.04\"}" ;;
+              *) echo "PLATFORMS: unknown platform $p (amd64, arm64)" >&2; exit 1 ;;
+            esac
+          done | jq -sc '{include: .}')"
+          { echo "tags=$tags"; echo "flag=$flag"; echo "matrix=$matrix"; } >> "$GITHUB_OUTPUT"
+          echo "dry run: $DRY_RUN"
+          echo "$VERSION at $(git rev-parse "refs/tags/$VERSION^{commit}"), platforms: $PLATFORMS"
+          echo "image tags: $(for t in $tags; do printf '%s:%s ' "$IMAGE" "$t"; done)"
+          echo "release: $flag"
+          cat "$RUNNER_TEMP/notes.md"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notes
+          path: ${{ runner.temp }}/notes.md
+
+  build:
+    needs: plan
+    strategy:
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # The runner's preinstalled toolsets, which the build image, the gateway's target/ and the generated
+      # crates need the room of.
+      - name: Disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache /usr/local/share/boost
+          df -h /
+      # This workflow's scripts, tacplus.lock and launcher.lock; the tag's tree is src/.
+      - uses: actions/checkout@v4
+        with:
+          path: release
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.VERSION }}
+          path: src
+      - name: Gates
+        env:
+          # Read-only (this job's token): tacplus reads its releases and the registry's contracts from GitHub.
+          GH_TOKEN: ${{ github.token }}
+        run: release/ci/build-image.sh src just gates
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: env.DRY_RUN != 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image
+        run: |
+          image=""
+          [[ $DRY_RUN == true ]] || image="$IMAGE"
+          # shellcheck disable=SC2086 # no image: the dry run, no argument
+          release/ci/release-image.sh src ${{ matrix.arch }} "${VERSION#v}" $image
+      - uses: actions/upload-artifact@v4
+        if: env.DRY_RUN != 'true'
+        with:
+          name: digest-${{ matrix.arch }}
+          path: src/target/image/${{ matrix.arch }}.digest
+          if-no-files-found: error
+
+  publish:
+    needs: [plan, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/artifacts
+      - name: Plan
+        run: |
+          echo "dry run: $DRY_RUN"
+          echo "image tags: $(for t in ${{ needs.plan.outputs.tags }}; do printf '%s:%s ' "$IMAGE" "$t"; done)"
+          echo "release: ${{ needs.plan.outputs.flag }}"
+          cat "$RUNNER_TEMP/artifacts/notes/notes.md"
+      - uses: docker/setup-buildx-action@v3
+        if: env.DRY_RUN != 'true'
+      - uses: docker/login-action@v3
+        if: env.DRY_RUN != 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image
+        if: env.DRY_RUN != 'true'
+        run: |
+          refs=()
+          for tag in ${{ needs.plan.outputs.tags }}; do refs+=(-t "$IMAGE:$tag"); done
+          # shellcheck disable=SC2046 # one digest per architecture
+          docker buildx imagetools create "${refs[@]}" $(cat "$RUNNER_TEMP"/artifacts/digest-*/*.digest)
+          docker buildx imagetools inspect "$IMAGE:${VERSION#v}"
+      - name: GitHub release
+        if: env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$VERSION" \
+            --notes-file "$RUNNER_TEMP/artifacts/notes/notes.md" ${{ needs.plan.outputs.flag }}
