@@ -294,6 +294,7 @@ fn proxy_state(kernel: ServiceEndpoint, jwk: ImmutableJwk) -> Arc<ProxyState> {
         tenant_owned: Arc::new(Default::default()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
+        sessions: Default::default(),
     })
 }
 

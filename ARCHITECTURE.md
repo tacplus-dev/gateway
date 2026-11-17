@@ -137,6 +137,14 @@ gRPC sends auth metadata in the initial HEADERS frame only. There is no mechanis
 - When the token expires, the gateway closes the stream with `UNAUTHENTICATED` (gRPC status code 16).
 - The client obtains a fresh token and reconnects. This is standard gRPC client behavior — `CallCredentials` / per-RPC credentials handle this automatically.
 
+A stream that must outlive its token rotates instead (make-before-break, tacplus#322; #26). Each streaming method `/<pkg>.<Svc>/<M>` has a sibling `/<pkg>.<Svc>Rotating/<M>` that the generated server serves, every method bidi of `rotation.Envelope{payload, last, session_id, cursor, fin}` (`sys/rotation.proto`). A logical stream is a session carried by one leg at a time. Each leg opens with a fresh token, and its first envelope names the session (or none, to open one). The sibling has no ROUTES entry: `src/rotation.rs` proxies it on the plain method's route.
+
+- **The token** is checked on the headers by the plain method's policy, before anything is read. A missing, bad or expired token ends the leg at once with `UNAUTHENTICATED`, and so does the token's `exp`, even on an idle leg. Every later envelope re-checks the token, and its payload is validated as the plain method's request type. The payload bytes, which carry the message's `trace_id`, are forwarded unchanged.
+- **An opening leg** is routed like any call. The gateway reads the session id off the backend's first envelope and records it, bound to the instance it dialed and to the opening token's subject (kind, service or user, namespace, `tid`, delegate), before the client sees it.
+- **A rotation** goes to the instance that issued its session, never to a fresh pick, and only when its token names the same subject. The id alone authorizes nothing: another subject's token is refused with `PERMISSION_DENIED`, an unknown or ended session with `UNAUTHENTICATED`, both with no description. An auth-disabled method has no subject, so nothing rotates onto it.
+- **Pass-through:** both directions are proxied unchanged, including `UNIMPLEMENTED` from a backend without the sibling: the client then falls back to the plain method.
+- **The session table** is in-process: a rotation opens on the same connection as the leg it replaces, so it reaches the same gateway. A session is forgotten when its last leg ends.
+
 W2S WebSocket streams are message-tokened instead of header-tokened:
 
 - The WebSocket channel may stay open across token rotations.
@@ -220,6 +228,7 @@ Provides tonic `Channel` objects to healthy backends. Uses round-robin selection
 | `src/proxy_grpc.rs` | gRPC proxy: frame extraction, typed deserialization, validation, auth, forwarding |
 | `src/rest_translation.rs` | REST-to-gRPC conversion, delegates to proxy_grpc |
 | `src/auth.rs` | Token verification, entitlement checks (used by proxy_grpc) |
+| `src/rotation.rs` | Rotating streams (`<Svc>Rotating`): session-to-instance routing, same-subject admission |
 | `src/health.rs` | HealthWatcher (kernel WatchInstances stream) |
 | `src/resolver.rs` | Service endpoint resolution, channel dialing |
 | `src/mint.rs` | gateway.Mint native tonic service |

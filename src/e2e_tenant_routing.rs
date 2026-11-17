@@ -199,6 +199,7 @@ fn proxy_state(
         tenant_owned: Arc::new(tenant_owned.iter().map(|s| s.to_string()).collect()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
+        sessions: Default::default(),
     }
 }
 

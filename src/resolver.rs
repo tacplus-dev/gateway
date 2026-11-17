@@ -131,6 +131,52 @@ impl Resolver {
         self.dial(route_key, service_label).await
     }
 
+    /// Dial the first reachable instance of `route_key` (else of its SPIFFE
+    /// path) and return the address it dialed with the channel, so a rotating
+    /// stream's later legs can go back to that one instance (#26). `None` when
+    /// no instance answers: there is no instance to bind a session to.
+    pub async fn dial_ready_instance(
+        &self,
+        route_key: &str,
+        service_label: &str,
+    ) -> Option<(String, Channel)> {
+        let mut endpoints = self.health.get_endpoints(route_key);
+        if endpoints.is_empty() {
+            endpoints = self.health.get_endpoints_by_spiffe_path(route_key);
+        }
+        let mut seen = std::collections::HashSet::new();
+        for ep in endpoints.iter().filter(|ep| seen.insert(ep.as_str())) {
+            match self.dial_instance(ep, service_label).await {
+                Ok(ch) => return Some((ep.clone(), ch)),
+                Err(e) => {
+                    tracing::debug!(service = %route_key, endpoint = %ep, error = %e, "dial_ready_instance: trying next");
+                }
+            }
+        }
+        tracing::warn!(service = %route_key, endpoints = endpoints.len(), "dial_ready_instance: no live endpoint found");
+        None
+    }
+
+    /// Dial one instance by its address (`host:port`), as
+    /// `dial_ready_instance` returned it.
+    pub async fn dial_instance(
+        &self,
+        endpoint: &str,
+        service_label: &str,
+    ) -> Result<Channel, String> {
+        let uri = format!("{}://{}", self.scheme(), endpoint);
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            Self::connect_eager(&uri, self.tls_verifier(service_label)),
+        )
+        .await
+        {
+            Ok(Ok(ch)) => Ok(ch),
+            Ok(Err(e)) => Err(e.to_string()),
+            Err(_) => Err("connect timed out".to_string()),
+        }
+    }
+
     /// Create a tonic Channel to a service identified by its SPIFFE path.
     pub async fn dial_spiffe(&self, spiffe_path: &str, service_label: &str) -> Channel {
         let endpoints = self.health.get_endpoints_by_spiffe_path(spiffe_path);

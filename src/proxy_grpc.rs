@@ -15,13 +15,13 @@ use crate::resolver::Resolver;
 
 use gateway_model::types::sys::trace::{TraceEvent, TraceEventKind, TraceRound};
 
-const MAX_GRPC_MESSAGE_BYTES: usize = 10 * 1024 * 1024;
+pub(crate) const MAX_GRPC_MESSAGE_BYTES: usize = 10 * 1024 * 1024;
 
 /// Body wrapper that overrides `is_end_stream()` to always return `false`.
 /// This prevents `tonic::body::Body::new()` from short-circuiting to an empty
 /// body when the underlying HTTP/2 stream has received all data + END_STREAM
 /// but the data hasn't been polled/consumed yet.
-struct StreamingBody(Body);
+pub(crate) struct StreamingBody(pub(crate) Body);
 
 impl http_body::Body for StreamingBody {
     type Data = bytes::Bytes;
@@ -81,6 +81,9 @@ pub struct ProxyState {
     pub tenant_owned: Arc<std::collections::HashSet<String>>,
     pub trace_publisher: Arc<dyn Fn(TraceEvent) + Send + Sync>,
     pub trace_round: Box<dyn Fn() -> TraceRound + Send + Sync>,
+    /// The rotating streams' sessions this gateway carries, each bound to the
+    /// backend instance that issued it and its opening token's subject (#26).
+    pub sessions: Arc<crate::rotation::Sessions>,
 }
 
 /// Frame proto bytes as a gRPC message: [0u8 (no compression), 4-byte BE length, payload].
@@ -120,7 +123,7 @@ fn unframe_grpc(grpc_bytes: &[u8]) -> Result<&[u8], tonic::Status> {
     Ok(&grpc_bytes[5..proto_end])
 }
 
-fn status_code_to_tonic(code: StatusCode) -> tonic::Code {
+pub(crate) fn status_code_to_tonic(code: StatusCode) -> tonic::Code {
     match code {
         StatusCode::FORBIDDEN => tonic::Code::PermissionDenied,
         StatusCode::BAD_REQUEST => tonic::Code::InvalidArgument,
@@ -352,6 +355,15 @@ async fn handle_inner(
         .find(|r| r.grpc_path == path)
     {
         Some(r) => r,
+        // `/<pkg>.<Svc>Rotating/<Method>`, a streaming method's rotating
+        // sibling (tacplus#322), carries no ROUTES entry of its own: it is
+        // the plain method's route, its frames rotation Envelopes.
+        None if streaming_validation == StreamingValidation::RequestHeader
+            && crate::rotation::plain_route(&path).is_some() =>
+        {
+            let (plain_path, route) = crate::rotation::plain_route(&path).expect("matched");
+            return crate::rotation::handle(proxy, req, route, plain_path).await;
+        }
         None => {
             tracing::warn!(path = %path, "gRPC path not in generated ROUTES table; rejected");
             return tonic_status_to_response(tonic::Status::not_found(
@@ -537,23 +549,9 @@ async fn handle_inner(
     // health entry to dial depends on WHOSE token this is. Every other service —
     // the majority — keeps routing by name and never looks at the namespace
     // claim, so `route_key` is `service_id` and nothing below changes.
-    let route_key = if proxy.tenant_owned.contains(service_id) {
-        match proxy.auth.caller_tenant(
-            auth_policy,
-            service_id,
-            entitlement_service,
-            &path,
-            auth_header.as_deref(),
-        ) {
-            Ok(tenant) => std::borrow::Cow::Owned(crate::health::tenant_route_key(service_id, &tenant)),
-            Err((code, msg)) => {
-                tracing::warn!(path = %path, service = service_id, error = %msg, "tenant-owned routing rejected");
-                let grpc_code = status_code_to_tonic(code);
-                return tonic_status_to_response(tonic::Status::new(grpc_code, msg));
-            }
-        }
-    } else {
-        std::borrow::Cow::Borrowed(service_id)
+    let route_key = match route_key(proxy, route_info, &path, auth_header.as_deref()) {
+        Ok(key) => key,
+        Err(status) => return tonic_status_to_response(status),
     };
 
     // Forward to backend service.
@@ -619,6 +617,33 @@ async fn handle_inner(
                 "backend unavailable: {}",
                 e
             )))
+        }
+    }
+}
+
+/// The health entry a call to `route_info`'s service dials: the service's
+/// name, or for a tenant-owned service the caller's tenant's instance.
+pub(crate) fn route_key(
+    proxy: &ProxyState,
+    route_info: &'static gateway_model::s2sm::rest_dispatch::RouteInfo,
+    path: &str,
+    auth_header: Option<&str>,
+) -> Result<std::borrow::Cow<'static, str>, tonic::Status> {
+    let (service_id, entitlement_service) = route_identity(route_info);
+    if !proxy.tenant_owned.contains(service_id) {
+        return Ok(std::borrow::Cow::Borrowed(service_id));
+    }
+    match proxy.auth.caller_tenant(
+        route_info.auth_policy,
+        service_id,
+        entitlement_service,
+        path,
+        auth_header,
+    ) {
+        Ok(tenant) => Ok(std::borrow::Cow::Owned(crate::health::tenant_route_key(service_id, &tenant))),
+        Err((code, msg)) => {
+            tracing::warn!(path = %path, service = service_id, error = %msg, "tenant-owned routing rejected");
+            Err(tonic::Status::new(status_code_to_tonic(code), msg))
         }
     }
 }
@@ -739,6 +764,7 @@ mod tests {
             tenant_owned: Arc::new(Default::default()),
             trace_publisher: Arc::new(|_| {}),
             trace_round: Box::new(Default::default),
+            sessions: Default::default(),
         };
 
         let polls = Arc::new(AtomicUsize::new(0));

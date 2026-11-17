@@ -75,6 +75,16 @@ impl HealthWatcher {
         }
     }
 
+    /// Replaces one service's endpoints. Test-only: stands in for the kernel
+    /// watch reporting a change.
+    #[cfg(test)]
+    pub fn set_endpoints(&self, service_id: &str, endpoints: Vec<ServiceEndpoint>) {
+        self.services
+            .write()
+            .unwrap()
+            .insert(service_id.to_string(), endpoints);
+    }
+
     /// Returns gRPC endpoints (host:port) for healthy instances of a service.
     pub fn get_endpoints(&self, service_id: &str) -> Vec<String> {
         let map = self.services.read().unwrap();
