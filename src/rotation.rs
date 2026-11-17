@@ -129,7 +129,7 @@ static STAND_IN_ROUTES: Mutex<Vec<&'static RouteInfo>> = Mutex::new(Vec::new());
 pub(crate) fn stand_in(route: RouteInfo) -> &'static RouteInfo {
     let mut routes = STAND_IN_ROUTES.lock().unwrap();
     if let Some(existing) = routes.iter().find(|r| r.grpc_path == route.grpc_path) {
-        return existing;
+        return *existing;
     }
     let route: &'static RouteInfo = Box::leak(Box::new(route));
     routes.push(route);
