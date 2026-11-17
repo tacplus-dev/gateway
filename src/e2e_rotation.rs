@@ -67,7 +67,9 @@ const BROKER_SESSION_ID: &str = "00112233445566778899aabbccddeeff001122334455667
 /// the backend must receive (looper#51).
 fn payload(n: usize) -> Vec<u8> {
     oauth_pb::SessionRequest {
-        session_id: BROKER_SESSION_ID.to_string(),
+        msg: Some(oauth_pb::session_request::Msg::SessionId(
+            BROKER_SESSION_ID.to_string(),
+        )),
         trace_id: format!("{:032x}", n + 1),
         ..Default::default()
     }
