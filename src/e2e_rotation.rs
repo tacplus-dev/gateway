@@ -7,9 +7,12 @@
 // What is real here:
 //
 //   * the real `proxy_grpc::handle`, resolving the sibling path
-//     `/<pkg>.<Svc>Rotating/<Method>` against a streaming route of the real
-//     generated `ROUTES` table, and validating each payload as that route's
-//     request type;
+//     `/oauth.SessionRotating/BrokerSession` to the generated route of
+//     `oauth.Session/BrokerSession`, and validating each payload as its
+//     request type with the generated validators. The one thing changed is
+//     the route's policy: the generated route is auth-disabled (as every C2S
+//     stream of the fleet is today), and nothing rotates onto one of those,
+//     so the test makes it AnyUser;
 //   * the real `GatewayAuth` over a real `JwkCache`, verifying real
 //     ECDSA-signed JWTs that expire within seconds;
 //   * the real `Resolver` and `HealthWatcher`, with two instances of the
@@ -42,6 +45,7 @@ use gateway_grpcserver::authorizer::JwkCache;
 use gateway_jwk::jwk::{ImmutableJwk, Jwk};
 use gateway_key::{base64_utils, keys};
 use gateway_model::s2sm::rest_dispatch::{AuthPolicy, RouteInfo};
+use gateway_model::types::services::oauth::oauth as oauth_pb;
 use gateway_servicemanager::SpiffeServerCertVerifier;
 use gateway_token::token::Token;
 use gateway_x509::x509::{ImmutableCertChain, X509KeyUsage};
@@ -54,38 +58,40 @@ use crate::rotation::{Envelope, Frames};
 
 const TRUST_DOMAIN: &str = "rotation-e2e.test";
 
-/// A message carrying only `trace_id` (field 200): the payloads, so each is
-/// distinct and its trace_id is what the backend must receive (looper#51).
-#[derive(Clone, PartialEq, prost::Message)]
-struct Traced {
-    #[prost(string, tag = "200")]
-    trace_id: String,
-}
+/// oauth's `Session.BrokerSession`, the fleet's client-streaming C2S method.
+const PLAIN_PATH: &str = "/oauth.Session/BrokerSession";
+/// `SessionRequest.session_id`: 32 random bytes, hex-encoded.
+const BROKER_SESSION_ID: &str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
 
+/// The n-th message of the stream: distinct by its trace_id, which is what
+/// the backend must receive (looper#51).
 fn payload(n: usize) -> Vec<u8> {
-    Traced {
+    oauth_pb::SessionRequest {
+        session_id: BROKER_SESSION_ID.to_string(),
         trace_id: format!("{:032x}", n + 1),
+        ..Default::default()
     }
     .encode_to_vec()
 }
 
 // ── the route ───────────────────────────────────────────────────────────────
 
-/// A user-authenticated streaming route of the generated table, with no target
-/// namespace field, whose request validates carrying just a trace_id. Picked
-/// from ROUTES so the test follows regeneration.
+/// `BrokerSession`'s generated route, as an authenticated method: the
+/// generated one is auth-disabled, and nothing rotates onto those (no token,
+/// no subject). Everything else, the payload's validation included, is the
+/// generated route's.
 fn route_under_test() -> &'static RouteInfo {
-    gateway_model::s2sm::rest_dispatch::ROUTES
+    let generated = gateway_model::s2sm::rest_dispatch::ROUTES
         .iter()
-        .find(|r| {
-            (r.server_streaming || r.client_streaming)
-                && matches!(r.auth_policy, AuthPolicy::Entitled | AuthPolicy::AnyUser)
-                && r.target_namespace_field.is_none()
-                && !r.grpc_path.starts_with("/gateway.")
-                && gateway_model::s2sm::proxy_dispatch::validate_request(r.grpc_path, &payload(0))
-                    .is_ok()
-        })
-        .expect("the generated ROUTES table must contain a user-authenticated streaming route")
+        .find(|r| r.grpc_path == PLAIN_PATH)
+        .expect("the generated ROUTES table must route oauth.Session/BrokerSession");
+    assert!(generated.client_streaming, "BrokerSession is a client stream");
+    gateway_model::s2sm::proxy_dispatch::validate_request(PLAIN_PATH, &payload(0))
+        .expect("the test's payloads are valid SessionRequests");
+    crate::rotation::stand_in(RouteInfo {
+        auth_policy: AuthPolicy::AnyUser,
+        ..*generated
+    })
 }
 
 fn sibling_path(route: &RouteInfo) -> String {
@@ -123,8 +129,7 @@ fn unix_now() -> i64 {
 }
 
 /// A user token for `audience` naming `sub`, expiring `lifetime` seconds from
-/// now, entitled to everything (the admin bypass takes the catalog out of the
-/// picture: what is under test is the session binding).
+/// now.
 fn user_token(key: &keys::ImmutableKey, audience: &str, sub: &str, lifetime: i64) -> String {
     let mut token = Token::new();
     token.set_kid(key.id()).expect("kid");
@@ -138,9 +143,6 @@ fn user_token(key: &keys::ImmutableKey, audience: &str, sub: &str, lifetime: i64
         .set_custom_field("tid", serde_json::json!("t-acme"))
         .expect("tid");
     token.set_expiration(unix_now() + lifetime).expect("exp");
-    token
-        .set_service_entitlements(serde_json::json!({ "all": true }))
-        .expect("service_entitlements");
     token.sign(key).expect("sign");
     format!("Bearer {}", token.base64().expect("base64"))
 }

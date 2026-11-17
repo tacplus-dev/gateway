@@ -109,10 +109,46 @@ pub(crate) fn plain_route(path: &str) -> Option<(String, &'static RouteInfo)> {
         return None;
     }
     let plain_path = format!("/{plain}/{method}");
-    let route = gateway_model::s2sm::rest_dispatch::ROUTES
-        .iter()
-        .find(|r| r.grpc_path == plain_path)?;
+    let route = stand_in_route(&plain_path).or_else(|| {
+        gateway_model::s2sm::rest_dispatch::ROUTES
+            .iter()
+            .find(|r| r.grpc_path == plain_path)
+    })?;
     (route.client_streaming || route.server_streaming).then_some((plain_path, route))
+}
+
+/// Test-only: routes that stand in for generated ones of the same path. The
+/// fleet's C2S streaming methods are all auth-disabled today, and nothing
+/// rotates onto one of those, so the end-to-end test rotates an
+/// authenticated copy of a real streaming route (its payloads still validate
+/// as that route's request type).
+#[cfg(test)]
+static STAND_IN_ROUTES: Mutex<Vec<&'static RouteInfo>> = Mutex::new(Vec::new());
+
+#[cfg(test)]
+pub(crate) fn stand_in(route: RouteInfo) -> &'static RouteInfo {
+    let mut routes = STAND_IN_ROUTES.lock().unwrap();
+    if let Some(existing) = routes.iter().find(|r| r.grpc_path == route.grpc_path) {
+        return existing;
+    }
+    let route: &'static RouteInfo = Box::leak(Box::new(route));
+    routes.push(route);
+    route
+}
+
+#[cfg(test)]
+fn stand_in_route(path: &str) -> Option<&'static RouteInfo> {
+    STAND_IN_ROUTES
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|r| r.grpc_path == path)
+        .copied()
+}
+
+#[cfg(not(test))]
+fn stand_in_route(_path: &str) -> Option<&'static RouteInfo> {
+    None
 }
 
 /// The rotating sessions this gateway carries.
