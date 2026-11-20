@@ -323,7 +323,7 @@ async fn proxy_streaming(
 /// them is how a proxy ends up advertising a framing or a keep-alive the next hop
 /// did not agree to. `Content-Length` is deliberately NOT in this list — it is
 /// end-to-end and an upload's length has to reach blobstore.
-fn forwardable(headers: &HeaderMap) -> impl Iterator<Item = (&http::HeaderName, &http::HeaderValue)> {
+pub(crate) fn forwardable(headers: &HeaderMap) -> impl Iterator<Item = (&http::HeaderName, &http::HeaderValue)> {
     headers.iter().filter(|(name, _)| {
         !matches!(
             name.as_str(),
