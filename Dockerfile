@@ -16,7 +16,7 @@ LABEL org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.title="Gateway" \
       org.opencontainers.image.description="API gateway for Schematic control plane services"
 
-COPY --from=ghcr.io/grpc-ecosystem/grpc-health-probe:v0.4.60 /ko-app/grpc-health-probe /usr/local/bin/grpc_health_probe
+COPY --from=ghcr.io/grpc-ecosystem/grpc-health-probe:v0.4.63@sha256:1d6cc5716f1c80cbcf97d5bc7eef3cd5bd4c7a7b942c0dc4f533dea70dcb5173 /ko-app/grpc-health-probe /usr/local/bin/grpc_health_probe
 RUN chmod +x /usr/local/bin/grpc_health_probe
 COPY target/release/gateway /usr/local/bin/gateway
 RUN chmod +x /usr/local/bin/gateway
