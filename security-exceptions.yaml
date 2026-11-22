@@ -14,8 +14,8 @@
 # launcher (PID 1, HEALTH_PORT=8443, kills a deadlocked child) are the health check.
 # Decided by Jody on #42, 2026-11-17; it expires on 2027-05-17. The base image's
 # unfixed Debian advisories of the same report get no exception (same decision): they
-# are non-blocking by policy, the FROM is pinned by digest (#38), and the digest moves
-# when Debian ships their fixes.
+# are non-blocking by policy, the FROM is to be pinned by digest (#38), and the
+# digest moves when Debian ships their fixes.
 exceptions:
   - id: DS-0026
     reason: "#42, the Dockerfiles have no HEALTHCHECK by design: Kubernetes ignores it, and the pod's probes and the launcher's gRPC health watch on 8443 are the health check"
