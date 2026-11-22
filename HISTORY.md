@@ -14,3 +14,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-22 looper release v0.1.2 (https://github.com/tacplus-dev/gateway/releases/tag/v0.1.2)
 - 2026-11-22 looper issue Pinned images behind their lines: relock (tacplus.lock: tacplus 2.6.1 → 2.6.13, and 1 more) (#45)
 - 2026-11-22 looper issue Pin the build: floor 2.6 and a committed tacplus.lock, so the build pipeline and its security checks run on this repository (#28)
+- 2026-11-22 looper release v0.1.3 (https://github.com/tacplus-dev/gateway/releases/tag/v0.1.3)
