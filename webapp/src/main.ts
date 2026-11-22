@@ -8,7 +8,7 @@
 // hands them to the library through its two small interfaces; the library
 // itself imports no generated code.
 import { create } from '@bufbuild/protobuf';
-import { ConfirmNeeded, SignIn, mountSignIn, type AccountMerger, type LoginAuth, type ProofRevoker } from '@tacplus-dev/webapp-login';
+import { ConfirmNeeded, SignIn, fleetApps, mountSignIn, type AccountMerger, type LoginAuth, type ProofRevoker } from '@tacplus-dev/webapp-login';
 import { MintTokenProvider, ServiceManager, W2SError } from '../model/w2sm/index.js';
 import { MergePeopleRequestSchema, RevokeCredentialProofRequestSchema } from '../model/types/services/kernel/services/index.js';
 import {
@@ -75,4 +75,6 @@ const revoker: ProofRevoker = {
 };
 
 const signIn = new SignIn(auth, tokens, `${window.location.origin}/`, merger, revoker);
-mountSignIn(document.getElementById('app') as HTMLElement, signIn, { title: 'Sign in' });
+// Signed in, the page links to the modules the fleet's services contribute
+// (/-/apps/<service>/, listed in /-/apps.json): same origin, same session.
+mountSignIn(document.getElementById('app') as HTMLElement, signIn, { title: 'Sign in', apps: () => fleetApps() });

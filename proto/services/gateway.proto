@@ -119,7 +119,7 @@ message Config {
 }
 
 // WebBundle is one hostname's static bundle, a directory baked into the
-// gateway image (e.g. /opt/schematic/web).
+// gateway image (e.g. /opt/tacplus/web).
 message WebBundle {
   string hostname = 1 [(spec.assert_required) = true, (spec.assert_max_size) = 253];
   string dir = 2 [(spec.assert_required) = true, (spec.assert_max_size) = 1024];

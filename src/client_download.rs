@@ -1,15 +1,19 @@
+use std::path::Path as FsPath;
 use std::sync::Arc;
 
 use axum::extract::Path;
-use axum::http::{StatusCode, header};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 
 use crate::auth::GatewayAuth;
 
-/// Directory containing schematic client binaries (baked into the container).
-const CLIENT_DIR: &str = "/opt/schematic/clients";
+/// Directory containing client binaries (baked into the container): the
+/// gateway's own at its root, each contributed client under
+/// `<service>/<client>/` (see `contributions`).
+pub const CLIENT_DIR: &str = "/opt/tacplus/clients";
 
-/// Valid os/arch combinations.
+/// Valid os/arch combinations. macOS means Apple silicon: there is no
+/// darwin/amd64 build (tacplus docs/USER.md, "Contributing to the gateway").
 const VALID_TARGETS: &[(&str, &str)] = &[
     ("linux", "arm64"),
     ("linux", "amd64"),
@@ -17,7 +21,7 @@ const VALID_TARGETS: &[(&str, &str)] = &[
     ("windows", "amd64"),
 ];
 
-/// Serve schematic client binary downloads.
+/// Serve the gateway's own client binary downloads.
 /// Route: GET /client/:os/:arch
 /// Auth: AnyUser (valid token required, no entitlement check).
 pub async fn handler(
@@ -25,8 +29,21 @@ pub async fn handler(
     req: axum::extract::Request,
     auth: Arc<GatewayAuth>,
 ) -> Response {
-    let auth_header = req
-        .headers()
+    serve_client(&auth, req.headers(), FsPath::new(CLIENT_DIR), "gateway", &os, &arch).await
+}
+
+/// The one download rule, for the gateway's own client and every contributed
+/// one: a signed-in user (AnyUser) of any of the fixed targets gets
+/// `<dir>/<stem>-<os>-<arch>[.exe]`, under that name.
+pub(crate) async fn serve_client(
+    auth: &GatewayAuth,
+    headers: &HeaderMap,
+    dir: &FsPath,
+    stem: &str,
+    os: &str,
+    arch: &str,
+) -> Response {
+    let auth_header = headers
         .get("authorization")
         .and_then(|v| v.to_str().ok());
 
@@ -48,19 +65,18 @@ pub async fn handler(
     }
 
     let filename = if os == "windows" {
-        format!("schematic-{os}-{arch}.exe")
+        format!("{stem}-{os}-{arch}.exe")
     } else {
-        format!("schematic-{os}-{arch}")
+        format!("{stem}-{os}-{arch}")
     };
-    let file_path = format!("{CLIENT_DIR}/{filename}");
 
-    match tokio::fs::read(&file_path).await {
+    match tokio::fs::read(dir.join(&filename)).await {
         Ok(data) => (
             StatusCode::OK,
             [
                 (header::CONTENT_TYPE, "application/octet-stream".to_string()),
                 (header::CONTENT_DISPOSITION, format!("attachment; filename=\"{filename}\"")),
-                (header::CACHE_CONTROL, "public, max-age=86400".to_string()),
+                (header::CACHE_CONTROL, "private, max-age=86400".to_string()),
             ],
             data,
         ).into_response(),

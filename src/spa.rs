@@ -10,7 +10,9 @@ use gateway_model::types::services::gateway::gateway::WebBundle;
 
 use crate::registry::Registry;
 
-/// Bootstrap config injected into index.html as `window.__SCHEMATIC__`.
+/// Bootstrap config injected into index.html as `window.__TACPLUS__`, the
+/// gateway's own webapp's and every contributed module's alike (#21): a module
+/// shares the session by sharing the origin, the refresh token and this object.
 /// Web clients (w2sm) read this to discover the gateway URL for gRPC-over-REST.
 static BOOTSTRAP_SCRIPT: OnceLock<String> = OnceLock::new();
 
@@ -22,7 +24,7 @@ pub fn init_bootstrap(gateway_url: &str) {
         "gatewayUrl": gateway_url,
     });
     let script = format!(
-        "<script>window.__SCHEMATIC__={}</script>",
+        "<script>window.__TACPLUS__={}</script>",
         serde_json::to_string(&json).unwrap()
     );
     BOOTSTRAP_SCRIPT.set(script).ok();
@@ -160,35 +162,49 @@ async fn resolve_under_root(root: &Path, path: &str) -> Resolved {
     }
 }
 
-async fn serve_from_disk(root: &PathBuf, path: &str) -> Response {
+async fn serve_from_disk(root: &Path, path: &str) -> Response {
+    match serve_dir(root, path).await {
+        Some(response) => response,
+        None => placeholder_response(),
+    }
+}
+
+/// Serve `path` from `root`, falling back to `root`'s own index.html (with the
+/// bootstrap config injected) for SPA client-side routing. `None` when there is
+/// neither: the caller decides what an empty root means, the gateway's webapp a
+/// placeholder, a contributed module a 404 (never the gateway's index.html).
+pub(crate) async fn serve_dir(root: &Path, path: &str) -> Option<Response> {
     // Try exact file from disk
     let file_path = match resolve_under_root(root, path).await {
         Resolved::UnderRoot(file_path) => Some(file_path),
         Resolved::Missing => None,
         Resolved::Escaped => {
-            tracing::warn!(path = %path, "static file request outside WEB_ROOT rejected");
-            return (StatusCode::BAD_REQUEST, "invalid path").into_response();
+            tracing::warn!(path = %path, root = %root.display(), "static file request outside its root rejected");
+            return Some((StatusCode::BAD_REQUEST, "invalid path").into_response());
         }
     };
     if let Some(file_path) = file_path {
         if let Ok(data) = tokio::fs::read(&file_path).await {
             let mime = mime_guess::from_path(path).first_or_octet_stream();
-            return (
-                StatusCode::OK,
-                [
-                    (header::CONTENT_TYPE, mime.as_ref().to_string()),
-                    (header::CACHE_CONTROL, "no-cache".to_string()),
-                ],
-                data,
-            )
-                .into_response();
+            return Some(
+                (
+                    StatusCode::OK,
+                    [
+                        (header::CONTENT_TYPE, mime.as_ref().to_string()),
+                        (header::CACHE_CONTROL, "no-cache".to_string()),
+                    ],
+                    data,
+                )
+                    .into_response(),
+            );
         }
     }
 
     // SPA fallback: serve index.html with injected bootstrap config
     let index_path = root.join("index.html");
-    if let Ok(data) = tokio::fs::read(&index_path).await {
-        return (
+    let data = tokio::fs::read(&index_path).await.ok()?;
+    Some(
+        (
             StatusCode::OK,
             [
                 (header::CONTENT_TYPE, "text/html; charset=utf-8".to_string()),
@@ -196,10 +212,8 @@ async fn serve_from_disk(root: &PathBuf, path: &str) -> Response {
             ],
             inject_bootstrap(&data),
         )
-            .into_response();
-    }
-
-    placeholder_response()
+            .into_response(),
+    )
 }
 
 fn serve_from_embedded(path: &str) -> Response {
