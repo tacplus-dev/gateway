@@ -34,7 +34,8 @@ impl GatewayAuth {
         Self {
             jwk_cache,
             // The C2S bypass exists only in `dev-bypass` builds. The shipped
-            // image is a plain `cargo build --release` (Dockerfile.cross), where
+            // image's binary is the `cargo build --release` of `just gates`
+            // (target/release/gateway, which the Dockerfile copies), where
             // this is a compile-time `false`: no env var, config value or
             // caller can turn auth off in a production binary.
             passthrough: cfg!(feature = "dev-bypass") && passthrough,
