@@ -91,6 +91,33 @@ just gates  # generate (checks it writes only target/), build (debug and release
 just clean  # remove build artifacts
 ```
 
+## Releasing
+
+Releases are tags `vMAJOR.MINOR.PATCH` on main (on a `release/MAJOR.MINOR` branch for a patch to an older
+line). The project stays on `0.x` until SeaBeam's launch; on `0.x` a minor may break and a patch never does.
+A fix merged to main is released as a patch, a feature as a minor. Fleets pin the release line
+`MAJOR.MINOR` (tacplus-dev/tacplus#180).
+
+To cut a release, push an annotated tag:
+
+```bash
+git tag -a v0.1.3 -m "gateway 0.1.3: <what changed>" <commit>
+git push origin v0.1.3
+```
+
+The tag goes on a commit whose build is green (the build pipeline: a merge train's green main, or
+`repo-looper --build` of it), and the tag's message says what changed and names that build. The tag starts
+`.github/workflows/release.yml`, which creates the GitHub release: the commits since the previous release are
+its notes (`ci/release-notes.sh`), and it is marked Latest only when it is the highest release
+(`ci/release-latest.sh`), so a patch on an older line never takes Latest. It publishes no image: the gateway's
+image is built per fleet, by the fleet builder, from the tag, against the fleet's own contracts and webapp
+(tacplus-dev/roadmap decisions/gateway-per-fleet-2026-10-27.md).
+
+A tag pushed without the workflow (v0.1.0, say) is released by running the workflow by hand on `main`:
+`gh workflow run release.yml -f version=v0.1.0 -f publish=true`. Without `publish` it is a dry run: it prints
+the notes and the Latest flag the release would get, and creates nothing. Neither mode makes or moves a tag.
+The rules are tested by `tests/release.rs`.
+
 ## Proto
 
 [`services/gateway.proto`](../../proto/services/gateway.proto)
