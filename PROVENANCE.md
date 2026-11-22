@@ -26,3 +26,5 @@ still `gateway-model`). Removed: `.gitlab-ci.yml` (SeaBeam's GitLab pipeline and
 #6) and the GitLab package `registry:` block of `proto/dependencies.yaml`. The proto header, image labels
 and the privacy-page contact now name Jody Scott and tacplus.dev; tests use example.com hostnames and
 neutral names instead of SeaBeam's hosts and products.
+
+Ported through `d0b7ad44e70879ebd8af4fa6ae398915cb213892`.

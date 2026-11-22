@@ -166,9 +166,11 @@ fn unused_verifier() -> Arc<SpiffeServerCertVerifier> {
     SpiffeServerCertVerifier::new(TRUST_DOMAIN, roots).expect("verifier")
 }
 
-/// The first unary `Entitled` route in the generated table with no target
-/// namespace field, picked from ROUTES so the test follows regeneration rather
-/// than pinning a path that a proto change can move.
+/// The first unary user-authenticated route in the generated table with no
+/// target namespace field whose empty request passes generated validation,
+/// picked from ROUTES so the test follows regeneration rather than pinning a
+/// path that a proto change can move. Validation runs before routing, so a
+/// route whose empty request fails it never reaches the decision under test.
 fn route_under_test() -> &'static RouteInfo {
     gateway_model::s2sm::rest_dispatch::ROUTES
         .iter()
@@ -178,8 +180,12 @@ fn route_under_test() -> &'static RouteInfo {
                 && matches!(r.auth_policy, AuthPolicy::Entitled | AuthPolicy::AnyUser)
                 && r.target_namespace_field.is_none()
                 && !r.grpc_path.starts_with("/gateway.")
+                && gateway_model::s2sm::proxy_dispatch::validate_request(r.grpc_path, &[]).is_ok()
         })
-        .expect("the generated ROUTES table must contain a unary user-authenticated route")
+        .expect(
+            "the generated ROUTES table must contain a unary user-authenticated route \
+             whose empty request is valid",
+        )
 }
 
 fn proxy_state(
@@ -203,9 +209,9 @@ fn proxy_state(
     }
 }
 
-/// An empty protobuf message in a well-formed gRPC frame. Every request message
-/// on the route under test has no required field, so an empty body reaches the
-/// routing decision — which is where this test looks.
+/// An empty protobuf message in a well-formed gRPC frame. `route_under_test`
+/// picks a route whose empty request passes validation, so an empty body
+/// reaches the routing decision — which is where this test looks.
 fn empty_grpc_body() -> Body {
     Body::from(proxy_grpc::frame_grpc(&[]))
 }

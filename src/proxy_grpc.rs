@@ -901,7 +901,7 @@ mod tests {
             route_for("/kernel.Mint/CreatePersonalPrincipal").is_none(),
             "kernel.Mint.CreatePersonalPrincipal is externally routable again — a no-auth flag \
              was re-added to it in kernel.proto. Registration must only be reachable through \
-             the personalauth broker (decision-goalB-q1-broker-service-design.md §6)."
+             a device-broker delegate (decision-goalB-q1-broker-service-design.md §6)."
         );
     }
 }
