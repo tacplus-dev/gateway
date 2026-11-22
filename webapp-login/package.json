@@ -13,6 +13,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
+    "happy-dom": "21.0.4",
     "typescript": "^5.9.3"
   }
 }

@@ -1,12 +1,13 @@
 // Copyright (c) 2026 Jody Scott
 // SPDX-License-Identifier: Apache-2.0
 
-// The page against a fake DOM: just enough of one for mountSignIn's markup
-// (elements carrying data-tp, their attributes and inner HTML) and a SignIn
-// stub whose redirect the test resolves or fails.
+// The page in a DOM (happy-dom's: parsed markup, selectors, events, a
+// disabled button taking no click, as a browser's) and a SignIn stub whose
+// redirect the test resolves or fails.
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
-import { beforeEach, test } from 'node:test';
+import { afterEach, beforeEach, test } from 'node:test';
+import { Window } from 'happy-dom';
 import type { Brand } from '../src/page.ts';
 import type { Identity, Provider, ProviderState, SignIn, SignedInWith } from '../src/flow.ts';
 
@@ -18,56 +19,18 @@ registerHooks({
 });
 const { mountSignIn } = await import('../src/page.ts');
 
-class FakeElement {
-  disabled = false;
-  innerHTML: string;
-  readonly dataset: Record<string, string> = {};
-  private readonly listeners: (() => void)[] = [];
-  readonly tag: string;
-  constructor(tag: string, attrs: string, inner: string) {
-    this.tag = tag;
-    this.innerHTML = inner;
-    this.disabled = /\sdisabled(\s|=|$)/.test(attrs);
-    for (const [, k, v] of attrs.matchAll(/data-([a-z]+)="([^"]*)"/g)) this.dataset[k] = v;
-  }
-  get textContent() { return this.innerHTML.replace(/<[^>]*>/g, ''); }
-  set textContent(s: string) { this.innerHTML = s; }
-  addEventListener(_: string, f: () => void) { this.listeners.push(f); }
-  click() { if (!this.disabled) for (const f of this.listeners) f(); }
-}
-
-class FakeContainer {
-  readonly classList = { add() {} };
-  readonly style = { setProperty() {} };
-  private html = '';
-  private elements: FakeElement[] = [];
-  get innerHTML() { return this.html; }
-  set innerHTML(html: string) {
-    this.html = html;
-    this.elements = [...html.matchAll(/<(button|p)(\s[^>]*data-tp="[^"]*"[^>]*)>(.*?)<\/\1>/gs)]
-      .map(([, tag, attrs, inner]) => new FakeElement(tag, attrs, inner));
-  }
-  querySelectorAll(sel: string): FakeElement[] {
-    const m = /^(\w+)?\[data-tp="([^"]*)"\]$/.exec(sel);
-    if (!m) throw new Error(`fake DOM: unsupported selector ${sel}`);
-    return this.elements.filter((e) => (!m[1] || e.tag === m[1]) && e.dataset.tp === m[2]);
-  }
-  querySelector(sel: string): FakeElement | null {
-    return this.querySelectorAll(sel)[0] ?? null;
-  }
-}
-
+// A window of its own per test, its document, window and history the globals
+// page.ts uses.
+let win: Window;
 const g = globalThis as Record<string, unknown>;
-const pageListeners = new Map<string, ((e: { persisted: boolean }) => void)[]>();
 beforeEach(() => {
-  pageListeners.clear();
-  g.document = { getElementById: () => ({}), head: { appendChild() {} }, createElement: () => ({}) };
-  g.window = {
-    location: { host: 'app.example.com', search: '', pathname: '/' },
-    addEventListener: (type: string, f: (e: { persisted: boolean }) => void) =>
-      pageListeners.set(type, [...(pageListeners.get(type) ?? []), f]),
-  };
-  g.history = { replaceState() {} };
+  win = new Window({ url: 'https://app.example.com/' });
+  g.document = win.document;
+  g.window = win;
+  g.history = win.history;
+});
+afterEach(async () => {
+  await win.happyDOM.close();
 });
 
 const GOOGLE: Provider = { name: 'Google', providerIndex: 0 };
@@ -100,15 +63,16 @@ const stub = (redirect: Redirect, me: Identity | null = null, held: SignedInWith
 const settled = () => new Promise((r) => setTimeout(r, 0));
 
 const mount = async (signIn: SignIn, brand: Brand = { title: 'Seatrials' }) => {
-  const c = new FakeContainer();
-  mountSignIn(c as unknown as HTMLElement, signIn, brand);
+  const c = win.document.body.appendChild(win.document.createElement('div')) as unknown as HTMLElement;
+  mountSignIn(c, signIn, brand);
   await settled();
   return c;
 };
 
-const labels = (c: FakeContainer, kind: string) => c.querySelectorAll(`button[data-tp="${kind}"]`).map((b) => b.textContent);
-const disabled = (c: FakeContainer, kind: string) => c.querySelectorAll(`button[data-tp="${kind}"]`).map((b) => b.disabled);
-const error = (c: FakeContainer) => c.querySelector('[data-tp="error"]')?.textContent ?? '';
+const buttons = (c: HTMLElement, kind: string) => [...c.querySelectorAll<HTMLButtonElement>(`button[data-tp="${kind}"]`)];
+const labels = (c: HTMLElement, kind: string) => buttons(c, kind).map((b) => b.textContent);
+const disabled = (c: HTMLElement, kind: string) => buttons(c, kind).map((b) => b.disabled);
+const error = (c: HTMLElement) => c.querySelector('[data-tp="error"]')?.textContent ?? '';
 
 test('clicking a provider shows it signing in and disables every provider button', async () => {
   const redirect = new Redirect();
@@ -116,19 +80,19 @@ test('clicking a provider shows it signing in and disables every provider button
   assert.deepEqual(labels(c, 'p'), ['Continue with Google', 'Continue with Apple']);
   assert.deepEqual(disabled(c, 'p'), [false, false]);
 
-  c.querySelectorAll('button[data-tp="p"]')[0].click();
+  buttons(c, 'p')[0].click();
   assert.deepEqual(labels(c, 'p'), ['Signing in with Google…', 'Continue with Apple']);
   assert.deepEqual(disabled(c, 'p'), [true, true]);
 
   // A second click starts no second flow.
-  for (const b of c.querySelectorAll('button[data-tp="p"]')) b.click();
+  for (const b of buttons(c, 'p')) b.click();
   assert.deepEqual(redirect.calls, [0]);
 });
 
 test('a failed redirect returns the providers to normal, with the error', async () => {
   const redirect = new Redirect();
   const c = await mount(stub(redirect));
-  c.querySelectorAll('button[data-tp="p"]')[1].click();
+  buttons(c, 'p')[1].click();
   redirect.fail('oauth unavailable');
   await settled();
   assert.deepEqual(labels(c, 'p'), ['Continue with Google', 'Continue with Apple']);
@@ -136,7 +100,7 @@ test('a failed redirect returns the providers to normal, with the error', async 
   assert.equal(error(c), 'oauth unavailable');
 
   // And a provider can be tried again, which clears the error.
-  c.querySelectorAll('button[data-tp="p"]')[0].click();
+  buttons(c, 'p')[0].click();
   assert.deepEqual(redirect.calls, [1, 0]);
   assert.equal(error(c), '');
 });
@@ -149,14 +113,14 @@ test('the brand labels both the idle and the pending button', async () => {
     providerPendingLabel: (p) => `Opening ${p.name}…`,
   });
   assert.deepEqual(labels(c, 'p'), ['Sign in with Google', 'Sign in with Apple']);
-  c.querySelectorAll('button[data-tp="p"]')[0].click();
+  buttons(c, 'p')[0].click();
   assert.deepEqual(labels(c, 'p'), ['Opening Google…', 'Sign in with Apple']);
 });
 
 test('the brand idle label alone keeps the default pending label', async () => {
   const redirect = new Redirect();
   const c = await mount(stub(redirect), { title: 'Seatrials', providerLabel: (p) => `Sign in with ${p.name}` });
-  c.querySelectorAll('button[data-tp="p"]')[0].click();
+  buttons(c, 'p')[0].click();
   assert.deepEqual(labels(c, 'p'), ['Signing in with Google…', 'Sign in with Apple']);
 });
 
@@ -165,7 +129,7 @@ test('adding a provider shows it adding and disables the add buttons', async () 
   const me = { subject: '/users/x1', email: 'p@example.com', tenant: '/tenants/people' };
   const c = await mount(stub(redirect, me, [{ idpId: 'microsoft', email: 'p@example.com' }]));
   assert.deepEqual(labels(c, 'add'), ['Add Google', 'Add Apple']);
-  c.querySelectorAll('button[data-tp="add"]')[1].click();
+  buttons(c, 'add')[1].click();
   assert.deepEqual(labels(c, 'add'), ['Add Google', 'Adding Apple…']);
   assert.deepEqual(disabled(c, 'add'), [true, true]);
 
@@ -179,8 +143,8 @@ test('adding a provider shows it adding and disables the add buttons', async () 
 test('coming back to the page from the cache shows it afresh, not still signing in', async () => {
   const redirect = new Redirect();
   const c = await mount(stub(redirect));
-  c.querySelectorAll('button[data-tp="p"]')[0].click();
-  for (const f of pageListeners.get('pageshow') ?? []) f({ persisted: true });
+  buttons(c, 'p')[0].click();
+  win.dispatchEvent(Object.assign(new win.Event('pageshow'), { persisted: true }));
   await settled();
   assert.deepEqual(labels(c, 'p'), ['Continue with Google', 'Continue with Apple']);
   assert.deepEqual(disabled(c, 'p'), [false, false]);
