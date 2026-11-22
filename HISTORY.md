@@ -24,3 +24,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-22 looper issue Port SeaBeam gateway f3002b7..d0b7ad44 (#7)
 - 2026-11-22 looper issue MCP carrier: stamp McpRequest.tenant from the caller token, never pass a client value through (#15)
 - 2026-11-22 looper issue Trace: the REST SPIFFE-path fallback (rest_translation::fallback) has no test that the caller's trace_id reaches the backend (#32)
+- 2026-11-22 looper issue Serve fleet-contributed webapp modules and clients under /-/ (tacplus#195) (#21)
