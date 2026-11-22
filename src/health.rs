@@ -75,6 +75,18 @@ impl HealthWatcher {
         }
     }
 
+    /// Also indexes `endpoints` under the SPIFFE service path `path`, as
+    /// `process_entries` does for an instance whose SPIFFE id names it.
+    /// Test-only, beside `seeded`.
+    #[cfg(test)]
+    pub fn with_spiffe_path(self, path: &str, endpoints: Vec<ServiceEndpoint>) -> Self {
+        self.spiffe_services
+            .write()
+            .unwrap()
+            .insert(path.to_string(), endpoints);
+        self
+    }
+
     /// Replaces one service's endpoints. Test-only: stands in for the kernel
     /// watch reporting a change.
     #[cfg(test)]
