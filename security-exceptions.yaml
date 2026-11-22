@@ -9,6 +9,10 @@
 # land that moves tacplus.lock to the 2.6 patch carrying #368 (#36 stays open until
 # then). Decided by Jody on #36, 2026-11-15; they expire on 2026-12-31.
 #
+# #31: the test-only ws:// semgrep finding and the unmaintained crates only the
+# generated chassis and axum-server still lock. Decided by Jody on #31,
+# 2026-11-11; they expire on 2027-02-11.
+#
 # #42: trivy's DS-0026 (no HEALTHCHECK) in this repository's Dockerfiles. Kubernetes
 # ignores a Docker HEALTHCHECK: the pod's probes, which the operator renders, and the
 # launcher (PID 1, HEALTH_PORT=8443, kills a deadlocked child) are the health check.
@@ -17,6 +21,21 @@
 # are non-blocking by policy, the FROM is pinned by digest (#38), and the digest moves
 # when Debian ships their fixes.
 exceptions:
+  - id: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket
+    where: src/e2e_stream_trace.rs
+    reason: "src/e2e_stream_trace.rs: a #[cfg(test)] end-to-end test's plaintext ws:// to the router it serves itself on 127.0.0.1; no shipped code opens a ws:// connection (#31)"
+    decided_by: jodydadescott
+    expires: 2027-02-11
+  - id: RUSTSEC-2025-0134
+    where: Cargo.lock
+    reason: "rustls-pemfile, unmaintained, no fix: the gateway's own code no longer uses it (#31), but axum-server 0.7 and the generated chassis still lock it (tacplus-dev/tacplus#308)"
+    decided_by: jodydadescott
+    expires: 2027-02-11
+  - id: RUSTSEC-2024-0449
+    where: Cargo.lock
+    reason: "unsafe-libyaml, unmaintained, no fix: only via serde_yaml 0.9 in the generated model and chassis (tacplus-dev/tacplus#320, #31)"
+    decided_by: jodydadescott
+    expires: 2027-02-11
   - id: DS-0026
     reason: "#42, the Dockerfiles have no HEALTHCHECK by design: Kubernetes ignores it, and the pod's probes and the launcher's gRPC health watch on 8443 are the health check"
     decided_by: "jodydadescott (hub on #42, 2026-11-17)"
