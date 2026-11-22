@@ -156,7 +156,6 @@ async fn spawn_backends(backend: Arc<StandIn>) -> Arc<ProxyState> {
         )),
         // Both routes are NoAuth: the JWK cache is empty.
         auth: Arc::new(GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false)),
-        tenant_owned: Arc::new(Default::default()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
         sessions: Default::default(),

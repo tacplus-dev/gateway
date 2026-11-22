@@ -443,7 +443,6 @@ async fn fixture(serves_sibling: bool) -> Fixture {
             Arc::new(JwkCache::seeded(vec![jwk_for(&key)])),
             false,
         )),
-        tenant_owned: Arc::new(Default::default()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
         sessions: Default::default(),

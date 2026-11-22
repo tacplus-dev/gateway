@@ -5,7 +5,6 @@ use http::StatusCode;
 use gateway_grpcserver::{authorizer::JwkCache, spiffe::is_at_or_below};
 use gateway_model::grants;
 use gateway_model::types::sys::jwk::jwk::Jwk as ProtoJwk;
-use gateway_spiffe as spiffe;
 
 // Generated libs for JWT parsing (no crypto needed — authorizer handles verification)
 use gateway_token::token::Token;
@@ -244,20 +243,20 @@ impl GatewayAuth {
         Ok(())
     }
 
-    /// The tenant a caller's verified namespace claim names, for routing a
-    /// tenant-owned service to `<svc>-<tenant>`.
+    /// The tenant a caller's verified token acts in, as its `tid` claim: the
+    /// tenant of an MCP session of a tenant-owned service, which the gateway
+    /// stamps on the session's frames (#15) and routes by (#3).
     ///
-    /// Runs the same `verify_c2s` every other check runs, so the namespace read
-    /// here comes off a token whose signature, expiry and audience were checked
-    /// — a claim is never parsed and trusted. The namespace itself is normalized
-    /// by the generated `spiffe` chassis, which is also what rejects anything
-    /// that is not rooted at `/system` or `/tenants`.
+    /// Runs the same `verify_c2s` every other check runs, so the claim read
+    /// here comes off a token whose signature, expiry and audience were checked.
+    /// It is the `tid`, not the namespace: a token's namespace names its tenant
+    /// by name (`/tenants/<name>`), and tenant instances are identified by tid
+    /// (roadmap decisions/tenant-routing-2026-10-26.md, addendum 2026-10-28).
     ///
-    /// A `/system/...` caller is REJECTED: a tenant-owned service has no shared
-    /// instance to fall back to, so there is no tenant to route to. So is a
-    /// caller with no verified claims at all (`NoAuth`, or a `dev-bypass`
-    /// passthrough build) — same reason. See the decision doc's Open question 2.
-    pub fn caller_tenant(
+    /// A caller with no verified claims (`NoAuth`, or a `dev-bypass`
+    /// passthrough build), or whose token names no tenant (a `/system`
+    /// caller), is REJECTED: there is no tenant to put the session in.
+    pub fn caller_tid(
         &self,
         auth_policy: gateway_model::s2sm::rest_dispatch::AuthPolicy,
         service_id: &str,
@@ -277,30 +276,19 @@ impl GatewayAuth {
                 (
                     StatusCode::FORBIDDEN,
                     format!(
-                        "tenant-owned service \"{}\" cannot be routed for an unauthenticated caller",
+                        "an MCP session of tenant-owned service \"{}\" has no tenant for an unauthenticated caller",
                         service_id
                     ),
                 )
             })?;
 
-        let namespace = spiffe::normalize_namespace(claims.namespace()).map_err(|e| {
-            (
-                StatusCode::FORBIDDEN,
-                format!("token namespace claim is malformed: {}", e),
-            )
-        })?;
-
-        // normalize_namespace guarantees the path is rooted at /system or
-        // /tenants and that a /tenants root is followed by a tenant name, so the
-        // only case left to reject is the /system one.
-        let mut segments = namespace.trim_start_matches('/').split('/');
-        match (segments.next(), segments.next()) {
-            (Some(spiffe::TENANTS_SEGMENT), Some(tenant)) => Ok(tenant.to_string()),
+        match claims.custom_field("tid").and_then(|v| v.as_str()) {
+            Some(tid) if !tid.is_empty() => Ok(tid.to_string()),
             _ => Err((
                 StatusCode::FORBIDDEN,
                 format!(
-                    "caller namespace \"{}\" is not tenant-scoped; tenant-owned service \"{}\" has no instance to route to",
-                    namespace, service_id
+                    "caller token names no tenant (tid); an MCP session of tenant-owned service \"{}\" is in the caller's tenant",
+                    service_id
                 ),
             )),
         }
@@ -893,30 +881,6 @@ pub(crate) mod tests {
         assert_eq!(code, StatusCode::FORBIDDEN);
     }
 
-    /// A route that requires no token verifies no claims, so there is no tenant
-    /// to route to. A tenant-owned service must refuse rather than invent one.
-    #[test]
-    fn a_tenant_owned_service_refuses_a_caller_with_no_verified_claims() {
-        use gateway_model::s2sm::rest_dispatch::AuthPolicy;
-
-        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false);
-        let (code, msg) = auth
-            .caller_tenant(
-                AuthPolicy::NoAuth,
-                "docmanager",
-                "docmanager",
-                "/x.Y/Z",
-                None,
-            )
-            .expect_err("an unauthenticated caller has no tenant");
-
-        assert_eq!(code, StatusCode::FORBIDDEN);
-        assert!(
-            msg.contains("unauthenticated"),
-            "the rejection must name the reason, got {msg:?}"
-        );
-    }
-
     /// A user token for `aud` naming `sub` in `namespace`, with `tid`.
     fn user_header(key: &keys::ImmutableKey, sub: &str, namespace: &str, tid: &str) -> String {
         let mut token = Token::new();
@@ -941,6 +905,34 @@ pub(crate) mod tests {
             .expect("exp");
         token.sign(key).expect("sign");
         format!("Bearer {}", token.base64().expect("base64"))
+    }
+
+    /// An MCP session's tenant is the token's `tid` claim, never its
+    /// namespace's tenant name; a token naming no tid, or no verified token at
+    /// all, has no tenant and is refused.
+    #[test]
+    fn a_callers_tenant_is_its_tokens_tid() {
+        let key = keys::generate_ec_p256_key().expect("signing key");
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![jwk_for(&key)])), false);
+        let tid = |policy: AuthPolicy, header: Option<&str>| {
+            auth.caller_tid(policy, "echo", "echo", "/echo.Echo/BrokerEchoMcpSession", header)
+        };
+
+        let header = user_header(&key, "alice", "/tenants/acme/workspaces/eu", "acme0001");
+        assert_eq!(tid(AuthPolicy::AnyUser, Some(&header)), Ok("acme0001".to_string()));
+
+        for header in [
+            user_header(&key, "alice", "/system/us-east", ""),
+            user_header(&key, "alice", "/tenants/acme", ""),
+        ] {
+            let (code, msg) = tid(AuthPolicy::AnyUser, Some(&header)).expect_err("no tid");
+            assert_eq!(code, StatusCode::FORBIDDEN);
+            assert!(msg.contains("tid"), "the refusal must name the reason, got {msg:?}");
+        }
+
+        let (code, msg) = tid(AuthPolicy::NoAuth, None).expect_err("an unauthenticated caller has no tenant");
+        assert_eq!(code, StatusCode::FORBIDDEN);
+        assert!(msg.contains("unauthenticated"), "got {msg:?}");
     }
 
     /// A rotation is bound to the opening token's subject: a second token of

@@ -1,10 +1,11 @@
 // End-to-end proof, over real sockets, that the gateway sets the tenant of an
 // MCP session of a tenant-owned service from the caller's token, and never from
-// the client (#15, tacplus-dev/tacplus#170): the session reaches the instance
-// of the token's tenant, every `mcp.McpRequest` frame arrives with `tenant`
-// stamped to that tenant, and a frame naming any other tenant is refused and
-// never forwarded. A caller in no tenant is refused, and a carrier of a service
-// that is not tenant-owned is forwarded as it was.
+// the client (#15, tacplus-dev/tacplus#170): every `mcp.McpRequest` frame
+// arrives with `tenant` stamped to the token's tid, the session reaches that
+// tenant's instance (routed, as any tenant-routed stream, by its stamped first
+// frame: #3), and a frame naming any other tenant is refused and never
+// forwarded. A caller in no tenant is refused. (A platform carrier is never
+// stamped: `proxy_grpc`'s `only_a_tenant_routed_carrier_has_a_session_tenant`.)
 //
 // What is real here:
 //
@@ -19,8 +20,7 @@
 //
 // What is stood in for: tenantecho itself, on plaintext h2c
 // (`Resolver::plaintext_backends`), and for the carrier's rotating sibling
-// (`TenantEchoRotating`) `e2e_rotation`'s stand-in instance. The `tenant_owned` set handed to
-// `ProxyState` is a fixture, as in `e2e_tenant_routing`.
+// (`TenantEchoRotating`) `e2e_rotation`'s stand-in instance.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -195,9 +195,11 @@ fn unix_now() -> i64 {
         .as_secs() as i64
 }
 
-/// A user token for tenantecho in `namespace`, entitled to everything (the
-/// admin bypass), so a refusal here can only be the tenant's.
-fn user_token(key: &keys::ImmutableKey, namespace: &str) -> String {
+/// A user token for tenantecho in `namespace`, acting in tenant `tid` (none
+/// when empty), entitled to everything (the admin bypass), so a refusal here
+/// can only be the tenant's. The namespace names the tenant by name, as
+/// kernel's do; the session's tenant is the `tid`.
+fn user_token(key: &keys::ImmutableKey, namespace: &str, tid: &str) -> String {
     let mut token = Token::new();
     token.set_kid(key.id()).expect("kid");
     token.set_alg(key.alg()).expect("alg");
@@ -205,6 +207,9 @@ fn user_token(key: &keys::ImmutableKey, namespace: &str) -> String {
     token.set_subject("alice@example.com").expect("sub");
     token.set_audience(SERVICE).expect("aud");
     token.set_namespace(namespace).expect("namespace");
+    if !tid.is_empty() {
+        token.set_custom_field("tid", serde_json::json!(tid)).expect("tid");
+    }
     token.set_expiration(unix_now() + 3600).expect("exp");
     token.set_sub_type("user").expect("sub_type");
     token
@@ -232,7 +237,6 @@ fn unused_verifier() -> Arc<SpiffeServerCertVerifier> {
 
 fn proxy_state(
     endpoints: HashMap<String, Vec<ServiceEndpoint>>,
-    tenant_owned: &[&str],
     signing_key: &keys::ImmutableKey,
 ) -> Arc<ProxyState> {
     Arc::new(ProxyState {
@@ -244,7 +248,6 @@ fn proxy_state(
             Arc::new(JwkCache::seeded(vec![jwk_for(signing_key)])),
             false,
         )),
-        tenant_owned: Arc::new(tenant_owned.iter().map(|s| s.to_string()).collect()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
         sessions: Default::default(),
@@ -377,12 +380,12 @@ fn tenants(frames: &[McpRequest]) -> Vec<&str> {
 
 // ── the runs ────────────────────────────────────────────────────────────────
 
-/// The registry contract this rests on: the carrier of every tenant-owned
-/// service declares `route_field: "tenant"`, which is `McpRequest.tenant`
-/// (field 2), and no platform carrier declares one.
+/// The registry contract this rests on: a carrier routed by a target-tenant
+/// field (every route of a tenant-owned service is, and no other: `registry`'s
+/// tests) is routed by `McpRequest.tenant` (field 2), the field the gateway
+/// stamps; tenantecho's is one.
 #[test]
-fn every_tenant_owned_carrier_declares_mcp_request_tenant_as_its_route_field() {
-    let owned = crate::registry::tenant_owned_services();
+fn every_tenant_routed_carrier_is_routed_by_mcp_request_tenant() {
     let carriers: Vec<_> = ROUTES
         .iter()
         .filter(|r| proxy_grpc::is_mcp_carrier(r))
@@ -393,17 +396,11 @@ fn every_tenant_owned_carrier_declares_mcp_request_tenant_as_its_route_field() {
         carriers.iter().map(|r| r.grpc_path).collect::<Vec<_>>()
     );
     for route in carriers {
-        if owned.contains(route.service_id) {
+        if route.route_field.is_some() || route.grpc_path == CARRIER {
             assert_eq!(
                 (route.route_field, route.route_field_number),
                 (Some("tenant"), 2),
                 "{} must route by McpRequest.tenant",
-                route.grpc_path
-            );
-        } else {
-            assert_eq!(
-                route.route_field, None,
-                "{} is a platform carrier and declares no route field",
                 route.grpc_path
             );
         }
@@ -412,14 +409,15 @@ fn every_tenant_owned_carrier_declares_mcp_request_tenant_as_its_route_field() {
 
 /// Two callers, two tenants, the same carrier: each session reaches its own
 /// tenant's instance, and every frame (one sent with no tenant, one naming the
-/// caller's own) arrives stamped with the token's tenant.
+/// caller's own) arrives stamped with the token's tid, not the tenant name its
+/// namespace carries.
 #[tokio::test]
 async fn an_mcp_session_reaches_the_token_tenant_and_every_frame_is_stamped() {
     let fleet = fleet().await;
     let key = keys::generate_ec_p256_key().expect("signing key");
-    let gateway = grpc_gateway(proxy_state(fleet.endpoints.clone(), &[SERVICE], &key)).await;
+    let gateway = grpc_gateway(proxy_state(fleet.endpoints.clone(), &key)).await;
 
-    let mut session = Session::open(gateway, &user_token(&key, &format!("/tenants/{ACME}"))).await;
+    let mut session = Session::open(gateway, &user_token(&key, "/tenants/acme", ACME)).await;
     assert_eq!(session.answer().await, Ok(ACME.to_string()), "the opening frame");
     session.send(ACME).await;
     assert_eq!(session.answer().await, Ok(ACME.to_string()), "a frame naming its own tenant");
@@ -430,7 +428,7 @@ async fn an_mcp_session_reaches_the_token_tenant_and_every_frame_is_stamped() {
     // A caller below a tenant (a workspace) belongs to it.
     let mut session = Session::open(
         gateway,
-        &user_token(&key, &format!("/tenants/{BETA}/workspaces/eu")),
+        &user_token(&key, "/tenants/beta/workspaces/eu", BETA),
     )
     .await;
     assert_eq!(session.answer().await, Ok(BETA.to_string()));
@@ -446,8 +444,8 @@ async fn an_mcp_session_reaches_the_token_tenant_and_every_frame_is_stamped() {
 async fn a_frame_naming_another_tenant_is_refused_and_not_forwarded() {
     let fleet = fleet().await;
     let key = keys::generate_ec_p256_key().expect("signing key");
-    let gateway = grpc_gateway(proxy_state(fleet.endpoints.clone(), &[SERVICE], &key)).await;
-    let bearer = user_token(&key, &format!("/tenants/{ACME}"));
+    let gateway = grpc_gateway(proxy_state(fleet.endpoints.clone(), &key)).await;
+    let bearer = user_token(&key, "/tenants/acme", ACME);
 
     // Mid-session.
     let mut session = Session::open(gateway, &bearer).await;
@@ -495,17 +493,20 @@ async fn a_frame_naming_another_tenant_is_refused_and_not_forwarded() {
     assert!(fleet.shared.frames().is_empty());
 }
 
-/// A caller whose namespace names no tenant has no instance and no tenant to
-/// stamp: PERMISSION_DENIED, and nothing is reached.
+/// A caller whose token names no tenant has no instance and no tenant to
+/// stamp: PERMISSION_DENIED, and nothing is reached. A tenant namespace alone
+/// is no tid.
 #[tokio::test]
 async fn a_caller_in_no_tenant_is_refused() {
     let fleet = fleet().await;
     let key = keys::generate_ec_p256_key().expect("signing key");
-    let gateway = grpc_gateway(proxy_state(fleet.endpoints.clone(), &[SERVICE], &key)).await;
+    let gateway = grpc_gateway(proxy_state(fleet.endpoints.clone(), &key)).await;
 
-    let session = Session::open(gateway, &user_token(&key, "/system/us-east")).await;
-    let status = session.result.expect_err("a /system caller must be refused");
-    assert_eq!(status.code(), tonic::Code::PermissionDenied, "{status:?}");
+    for namespace in ["/system/us-east", "/tenants/acme"] {
+        let session = Session::open(gateway, &user_token(&key, namespace, "")).await;
+        let status = session.result.expect_err("a caller with no tid must be refused");
+        assert_eq!(status.code(), tonic::Code::PermissionDenied, "{namespace}: {status:?}");
+    }
     assert!(
         fleet.acme.frames().is_empty()
             && fleet.beta.frames().is_empty()
@@ -514,36 +515,14 @@ async fn a_caller_in_no_tenant_is_refused() {
     );
 }
 
-/// The carrier of a service that is not tenant-owned routes by name and is
-/// forwarded as it was: no tenant is stamped, and the caller's namespace plays
-/// no part.
-#[tokio::test]
-async fn a_platform_carrier_is_routed_and_forwarded_as_before() {
-    let fleet = fleet().await;
-    let key = keys::generate_ec_p256_key().expect("signing key");
-    let gateway = grpc_gateway(proxy_state(fleet.endpoints.clone(), &[], &key)).await;
-
-    for namespace in [format!("/tenants/{ACME}"), "/system/us-east".to_string()] {
-        let mut session = Session::open(gateway, &user_token(&key, &namespace)).await;
-        assert_eq!(session.answer().await, Ok(String::new()), "{namespace}: not stamped");
-    }
-    assert_eq!(tenants(&fleet.shared.frames()), vec!["", ""]);
-    assert!(fleet.acme.frames().is_empty() && fleet.beta.frames().is_empty());
-}
-
 /// The WebSocket bridge (`handle_websocket_stream` →
 /// `proxy_grpc::handle_prevalidated_stream`) stamps and refuses the same way.
 #[tokio::test]
 async fn the_websocket_bridge_stamps_and_refuses_the_same_way() {
     let fleet = fleet().await;
     let key = keys::generate_ec_p256_key().expect("signing key");
-    let bearer = user_token(&key, &format!("/tenants/{ACME}"));
-    let addr = serve(rest_router(proxy_state(
-        fleet.endpoints.clone(),
-        &[SERVICE],
-        &key,
-    )))
-    .await;
+    let bearer = user_token(&key, "/tenants/acme", ACME);
+    let addr = serve(rest_router(proxy_state(fleet.endpoints.clone(), &key))).await;
 
     let (mut ws, _) = tokio_tungstenite::connect_async(format!(
         "ws://{addr}/tenantecho/TenantEcho/BrokerTenantEchoMcpSession"
@@ -608,7 +587,7 @@ async fn the_rotating_sibling_stamps_and_refuses_the_same_way() {
         vec![RotatingInstance::spawn("shared", true, Arc::clone(&log)).await],
     );
     let key = keys::generate_ec_p256_key().expect("signing key");
-    let gateway = grpc_gateway(proxy_state(endpoints, &[SERVICE], &key)).await;
+    let gateway = grpc_gateway(proxy_state(endpoints, &key)).await;
     let channel = tonic::transport::Endpoint::from_shared(format!("http://{gateway}"))
         .expect("endpoint")
         .connect()
@@ -631,7 +610,7 @@ async fn the_rotating_sibling_stamps_and_refuses_the_same_way() {
             .collect()
     };
 
-    let bearer = user_token(&key, &format!("/tenants/{ACME}"));
+    let bearer = user_token(&key, "/tenants/acme", ACME);
     let mut leg = open_leg(&channel, path, Some(&bearer), "")
         .await
         .expect("the leg is admitted");
@@ -655,7 +634,7 @@ async fn the_rotating_sibling_stamps_and_refuses_the_same_way() {
         "nothing at or after the refused frame reaches an instance"
     );
 
-    let refused = open_leg(&channel, path, Some(&user_token(&key, "/system/us-east")), "").await;
+    let refused = open_leg(&channel, path, Some(&user_token(&key, "/system/us-east", "")), "").await;
     match refused {
         Err(status) => assert_eq!(status.code(), tonic::Code::PermissionDenied, "{status:?}"),
         Ok(_) => panic!("a /system caller must be refused"),

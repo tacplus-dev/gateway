@@ -46,7 +46,7 @@ use gateway_model::s2sm::rest_dispatch::{AuthPolicy, RouteInfo};
 
 use crate::auth::Subject;
 use crate::proxy_grpc::{
-    caller_tenant, frame_grpc, is_mcp_carrier, route_identity, route_key, stamp_mcp_tenant,
+    frame_grpc, is_mcp_carrier, mcp_session_tenant, route_identity, stamp_mcp_tenant,
     status_code_to_tonic, tonic_status_to_response, ProxyState, StreamingBody,
     MAX_GRPC_MESSAGE_BYTES,
 };
@@ -325,6 +325,19 @@ pub(crate) async fn handle(
 ) -> Response {
     let path = req.uri().path().to_string();
     let (service_id, entitlement_service) = route_identity(route);
+
+    // A tenant-owned method is routed by its request's target-tenant field
+    // (#3), but an opening leg is dialled on its first envelope, which carries
+    // no request: there is no tenant to route it to, and the gateway never
+    // takes one from the token. Such a method has no rotating sibling through
+    // the gateway, so the client falls back to the plain method, which is
+    // routed by its first message. The one exception is an MCP session
+    // carrier, whose tenant is the caller token's (#15): its leg is routed
+    // to, and its messages stamped with, that tenant.
+    if route.route_field_number != 0 && !is_mcp_carrier(route) {
+        tracing::warn!(path = %path, "rotation of a tenant-routed method refused");
+        return refuse(tonic::Code::Unimplemented);
+    }
     let auth_header = req
         .headers()
         .get("authorization")
@@ -353,13 +366,9 @@ pub(crate) async fn handle(
     // The rotating sibling of a tenant-owned service's MCP carrier stamps
     // each payload with the caller token's tenant, as the plain carrier does
     // (#15).
-    let mcp_tenant = if is_mcp_carrier(route) {
-        match caller_tenant(proxy, route, &plain_path, auth_header.as_deref()) {
-            Ok(tenant) => tenant,
-            Err(status) => return refuse(status.code()),
-        }
-    } else {
-        None
+    let mcp_tenant = match mcp_session_tenant(proxy, route, &plain_path, auth_header.as_deref()) {
+        Ok(tenant) => tenant,
+        Err(status) => return refuse(status.code()),
     };
 
     let (parts, body) = req.into_parts();
@@ -386,10 +395,10 @@ pub(crate) async fn handle(
     // Where the leg goes: a fresh pick for a new session, the session's own
     // instance for a rotation.
     let (endpoint, mut channel, leg, opening) = if first.session_id.is_empty() {
-        let route_key = match route_key(proxy, route, &plain_path, auth_header.as_deref()) {
-            Ok(key) => key,
-            Err(status) => return refuse(status.code()),
-        };
+        // A platform service is routed by name, as any call to it; an MCP
+        // session of a tenant-owned one to the caller token's tenant.
+        let route_key =
+            proxy.resolver.resolve_target(service_id, mcp_tenant.as_deref().unwrap_or(""));
         match proxy
             .resolver
             .dial_ready_instance(&route_key, service_id)

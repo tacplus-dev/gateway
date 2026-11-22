@@ -211,10 +211,10 @@ impl HealthWatcher {
                     }
 
                     // A tenant-owned instance is also filed under its route key,
-                    // `<svc>-<tenant>`: the proxy routes such a service by WHOSE
-                    // token arrives, and the instance's SPIFFE identity
-                    // (`spiffe://<td>/tenants/<tenant>/services/<svc>`) is the
-                    // only place the instance says which tenant it serves.
+                    // `<svc>-<tid>`: the proxy routes such a service by the tid
+                    // the request names, and the instance's SPIFFE identity
+                    // (`spiffe://<td>/tenants/<tid>/services/<svc>`, kernel#23)
+                    // is the only place the instance says which tenant it serves.
                     if let Some(key) = tenant_route_key_of(&inst.spiffe_id) {
                         grouped.entry(key).or_default().push(endpoint.clone());
                     }
@@ -257,27 +257,26 @@ impl HealthWatcher {
     }
 }
 
-/// The health key a tenant-owned service's instance for `tenant` is dialed by:
-/// `<svc>-<tenant>`, the operator's instance name. The proxy builds the same
-/// key from the caller's token; this indexer builds it from the instance.
-pub fn tenant_route_key(service: &str, tenant: &str) -> String {
-    format!("{}-{}", service, tenant)
+/// The health key a tenant-owned service's instance for tenant `tid` is dialed
+/// by: `<svc>-<tid>`. The resolver builds it from the tid a request's route
+/// field names (`Resolver::resolve_target`); this indexer builds it from the
+/// instance's identity.
+pub fn tenant_route_key(service: &str, tid: &str) -> String {
+    format!("{}-{}", service, tid)
 }
 
-/// The route key of a tenant-owned instance, from its SPIFFE identity; None for
-/// a shared (/system) service or anything that is not a service identity.
+/// The route key of a tenant-owned instance, from its SPIFFE identity
+/// `spiffe://<td>/tenants/<tid>/services/<svc>`; None for a shared (/system)
+/// service, anything that is not a service identity, and an identity whose
+/// tenant segment is not a tid (a name, from before kernel#23): no request can
+/// name one, so it serves no routed call.
 fn tenant_route_key_of(spiffe_id: &str) -> Option<String> {
     let id = gateway_spiffe::parse_spiffe_id(spiffe_id).ok()?;
     if id.subject_kind != gateway_spiffe::SubjectKind::Service {
         return None;
     }
-    let mut segments = id.namespace.trim_start_matches('/').split('/');
-    match (segments.next(), segments.next()) {
-        (Some(gateway_spiffe::TENANTS_SEGMENT), Some(tenant)) if !tenant.is_empty() => {
-            Some(tenant_route_key(&id.subject_path, tenant))
-        }
-        _ => None,
-    }
+    let tid = gateway_servicemanager::tenant_route::tenant_of_spiffe_id(spiffe_id)?;
+    Some(tenant_route_key(&id.subject_path, &tid))
 }
 
 /// Returns true if the instance status is HEALTHY or DEGRADED.
@@ -326,20 +325,21 @@ mod tests {
     }
 
     /// The proof fleet runs tenantecho once per tenant. Each instance reports
-    /// service_id "tenantecho" and a /tenants/<t> SPIFFE identity; the proxy
-    /// dials `tenantecho-<t>` for a /tenants/<t> caller, so the index must
-    /// answer that key with that tenant's endpoint and no other.
+    /// service_id "tenantecho" and a /tenants/<tid> SPIFFE identity (kernel#23);
+    /// the proxy dials `tenantecho-<tid>` for a call whose route field names
+    /// that tid, so the index must answer that key with that tenant's endpoint
+    /// and no other.
     #[test]
     fn a_tenant_owned_instance_is_indexed_under_its_route_key() {
         let hw = HealthWatcher::seeded(HashMap::new());
         let mut resp = InstancesEntriesResponse::default();
         resp.entries.insert(
             "a".into(),
-            instance("tenantecho", "spiffe://local.dev/tenants/alpha/services/tenantecho", "tenantecho-alpha0"),
+            instance("tenantecho", "spiffe://local.dev/tenants/alph0001/services/tenantecho", "tenantecho-alpha0"),
         );
         resp.entries.insert(
             "b".into(),
-            instance("tenantecho", "spiffe://local.dev/tenants/beta/services/tenantecho", "tenantecho-beta0"),
+            instance("tenantecho", "spiffe://local.dev/tenants/beta0002/services/tenantecho", "tenantecho-beta0"),
         );
         resp.entries.insert(
             "k".into(),
@@ -347,9 +347,26 @@ mod tests {
         );
         hw.process_entries(&resp);
 
-        assert_eq!(hw.get_endpoints(&tenant_route_key("tenantecho", "alpha")), vec!["tenantecho-alpha0:8443"]);
-        assert_eq!(hw.get_endpoints(&tenant_route_key("tenantecho", "beta")), vec!["tenantecho-beta0:8443"]);
+        assert_eq!(hw.get_endpoints(&tenant_route_key("tenantecho", "alph0001")), vec!["tenantecho-alpha0:8443"]);
+        assert_eq!(hw.get_endpoints(&tenant_route_key("tenantecho", "beta0002")), vec!["tenantecho-beta0:8443"]);
         assert!(hw.get_endpoints("kernel-seatrials").is_empty(), "a shared service has no tenant route key");
         assert_eq!(hw.get_endpoints("kernel"), vec!["kernel-0:8443"]);
+    }
+
+    /// An instance whose identity names its tenant by name (from before
+    /// kernel#23) is not a tid, so no request can name it: it gets no route key,
+    /// and is never dialed for a tenant-routed call.
+    #[test]
+    fn an_instance_identified_by_tenant_name_gets_no_route_key() {
+        let hw = HealthWatcher::seeded(HashMap::new());
+        let mut resp = InstancesEntriesResponse::default();
+        resp.entries.insert(
+            "a".into(),
+            instance("tenantecho", "spiffe://local.dev/tenants/acme/services/tenantecho", "tenantecho-acme0"),
+        );
+        hw.process_entries(&resp);
+
+        assert!(hw.get_endpoints(&tenant_route_key("tenantecho", "acme")).is_empty());
+        assert_eq!(hw.get_endpoints("tenantecho"), vec!["tenantecho-acme0:8443"]);
     }
 }

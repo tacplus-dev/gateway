@@ -38,63 +38,63 @@ impl Registry {
     }
 }
 
-/// The set of proto packages `registry.json` marks `(spec.service).tenant_owned`.
-///
-/// This is the ONLY answer to "is this service tenant-owned" — there is no
-/// gateway-side allowlist, matching the operator (item 4 §2.2), which reads the
-/// same tacplus-emitted flag off the same file.
-///
-/// Keyed by `ServiceInfo.package`, not by the registry node name: the node name
-/// is what the operator deploys under, while `RouteInfo.service_id` — the value
-/// the whole routing path uses — is the proto package, and the two differ today
-/// for `saml` (package `samlsvc`).
-pub fn tenant_owned_services() -> std::collections::HashSet<String> {
-    parse_tenant_owned(REGISTRY_JSON)
-}
-
-/// The registry walk behind `tenant_owned_services`, split out so it can be run
-/// against a fixture registry as well as the embedded one.
-fn parse_tenant_owned(registry_json: &str) -> std::collections::HashSet<String> {
-    let root: serde_json::Value = match serde_json::from_str(registry_json) {
-        Ok(v) => v,
-        Err(e) => {
-            // The embedded registry is generated and validated at build time, so
-            // this cannot happen for the real input; a fixture typo must not be
-            // silently read as "no service is tenant-owned".
-            tracing::error!(error = %e, "registry.json did not parse; no service treated as tenant-owned");
-            return Default::default();
-        }
-    };
-
-    let mut out = std::collections::HashSet::new();
-    collect_tenant_owned(&root, &mut out);
-    out
-}
-
-/// Walks the registry's `children` tree, collecting the package of every
-/// `services[]` entry carrying `tenant_owned: true`. "Any entry" is deliberate:
-/// the annotation is file-level in the proto, so tacplus stamps it onto every
-/// `ServiceInfo` the package produces (item 4 §2.2).
-fn collect_tenant_owned(node: &serde_json::Value, out: &mut std::collections::HashSet<String>) {
-    if let Some(services) = node.get("services").and_then(|s| s.as_array()) {
-        for svc in services {
-            if svc.get("tenant_owned").and_then(|t| t.as_bool()) == Some(true) {
-                if let Some(pkg) = svc.get("package").and_then(|p| p.as_str()) {
-                    out.insert(pkg.to_string());
-                }
-            }
-        }
-    }
-    if let Some(children) = node.get("children").and_then(|c| c.as_array()) {
-        for child in children {
-            collect_tenant_owned(child, out);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The set of proto packages `registry.json` marks `(spec.service).tenant_owned`.
+    ///
+    /// The gateway does not route by it: a call is routed by its route's
+    /// `RouteInfo.route_field`, which tacplus generates on every rpc of exactly
+    /// these services (`ValidateTenantRouting`). It is read here to check the
+    /// route table against the registry the operator deploys from (item 4 §2.2).
+    ///
+    /// Keyed by `ServiceInfo.package`, not by the registry node name: the node name
+    /// is what the operator deploys under, while `RouteInfo.service_id` is the
+    /// proto package, and the two differ today for `saml` (package `samlsvc`).
+    fn tenant_owned_services() -> std::collections::HashSet<String> {
+        parse_tenant_owned(REGISTRY_JSON)
+    }
+
+    /// The registry walk behind `tenant_owned_services`, split out so it can be run
+    /// against a fixture registry as well as the embedded one.
+    fn parse_tenant_owned(registry_json: &str) -> std::collections::HashSet<String> {
+        let root: serde_json::Value = match serde_json::from_str(registry_json) {
+            Ok(v) => v,
+            Err(e) => {
+                // The embedded registry is generated and validated at build time, so
+                // this cannot happen for the real input; a fixture typo must not be
+                // silently read as "no service is tenant-owned".
+                tracing::error!(error = %e, "registry.json did not parse; no service treated as tenant-owned");
+                return Default::default();
+            }
+        };
+
+        let mut out = std::collections::HashSet::new();
+        collect_tenant_owned(&root, &mut out);
+        out
+    }
+
+    /// Walks the registry's `children` tree, collecting the package of every
+    /// `services[]` entry carrying `tenant_owned: true`. "Any entry" is deliberate:
+    /// the annotation is file-level in the proto, so tacplus stamps it onto every
+    /// `ServiceInfo` the package produces (item 4 §2.2).
+    fn collect_tenant_owned(node: &serde_json::Value, out: &mut std::collections::HashSet<String>) {
+        if let Some(services) = node.get("services").and_then(|s| s.as_array()) {
+            for svc in services {
+                if svc.get("tenant_owned").and_then(|t| t.as_bool()) == Some(true) {
+                    if let Some(pkg) = svc.get("package").and_then(|p| p.as_str()) {
+                        out.insert(pkg.to_string());
+                    }
+                }
+            }
+        }
+        if let Some(children) = node.get("children").and_then(|c| c.as_array()) {
+            for child in children {
+                collect_tenant_owned(child, out);
+            }
+        }
+    }
 
     /// The shape tacplus emits: a `children` tree whose `services[]` entries are
     /// `ServiceInfo`s. `docmanager` declares the annotation, `tasks` does not,
@@ -172,6 +172,36 @@ mod tests {
             ]),
             "the fleet's tenant-owned services: {owned:?}"
         );
+    }
+
+    /// The route table and the registry agree: every route of a tenant-owned
+    /// service is routed by a declared field, a tid's string field with a wire
+    /// number, and no route of any other service is. The gateway routes by the
+    /// table alone, so a service the operator deploys per tenant with a route
+    /// the table routes by name would reach no instance at all.
+    #[test]
+    fn every_route_of_a_tenant_owned_service_and_no_other_is_routed_by_its_field() {
+        let owned = tenant_owned_services();
+        for route in gateway_model::s2sm::rest_dispatch::ROUTES {
+            let routed = route.route_field.is_some();
+            assert_eq!(
+                routed,
+                owned.contains(route.service_id),
+                "{} (service {}): route field {:?}, tenant-owned services {owned:?}",
+                route.grpc_path,
+                route.service_id,
+                route.route_field
+            );
+            assert_eq!(
+                route.route_field_number != 0,
+                routed,
+                "{}: route field {:?} has wire number {}",
+                route.grpc_path,
+                route.route_field,
+                route.route_field_number
+            );
+            assert_eq!(route.route_field_json.is_some(), routed, "{}", route.grpc_path);
+        }
     }
 
     /// A registry that does not parse must fail closed: treating it as "nothing

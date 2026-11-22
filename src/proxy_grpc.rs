@@ -84,11 +84,6 @@ struct TraceProbe {
 pub struct ProxyState {
     pub resolver: Arc<Resolver>,
     pub auth: Arc<GatewayAuth>,
-    /// Proto packages `registry.json` marks `(spec.service).tenant_owned`, read
-    /// once at startup by `registry::tenant_owned_services()`. A service in this
-    /// set is deployed once per tenant and routed per caller; every other
-    /// service routes by name and never consults the caller's namespace.
-    pub tenant_owned: Arc<std::collections::HashSet<String>>,
     pub trace_publisher: Arc<dyn Fn(TraceEvent) + Send + Sync>,
     pub trace_round: Box<dyn Fn() -> TraceRound + Send + Sync>,
     /// The rotating streams' sessions this gateway carries, each bound to the
@@ -131,6 +126,157 @@ fn unframe_grpc(grpc_bytes: &[u8]) -> Result<&[u8], tonic::Status> {
         ));
     }
     Ok(&grpc_bytes[5..proto_end])
+}
+
+/// Splits the next complete gRPC message frame (5-byte header and payload) off
+/// the front of `buffer`. `Ok(None)` when it does not hold one yet; an error
+/// for a frame the gateway will not forward (compressed, or over its limit).
+fn next_grpc_frame(buffer: &mut bytes::BytesMut) -> Result<Option<bytes::Bytes>, &'static str> {
+    if buffer.len() < 5 {
+        return Ok(None);
+    }
+    if buffer[0] != 0 {
+        return Err("compressed gRPC frames are not supported by gateway validation");
+    }
+    let msg_len = u32::from_be_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]) as usize;
+    if msg_len > MAX_GRPC_MESSAGE_BYTES {
+        return Err("gRPC message exceeds gateway validation limit");
+    }
+    let frame_len = 5 + msg_len;
+    if buffer.len() < frame_len {
+        return Ok(None);
+    }
+    Ok(Some(buffer.split_to(frame_len).freeze()))
+}
+
+type StreamOpened = tokio::sync::oneshot::Sender<Result<String, tonic::Status>>;
+
+/// Ends a tenant-routed stream with `status`. Before its first message the
+/// refusal goes to the opener, which answers it without dialling; after it,
+/// down the forwarded body.
+async fn refuse(
+    opened_tx: &mut Option<StreamOpened>,
+    tx: &tokio::sync::mpsc::Sender<Result<bytes::Bytes, std::io::Error>>,
+    status: tonic::Status,
+) {
+    match opened_tx.take() {
+        Some(opened) => {
+            let _ = opened.send(Err(status));
+        }
+        None => {
+            let kind = if status.code() == tonic::Code::PermissionDenied {
+                std::io::ErrorKind::PermissionDenied
+            } else {
+                std::io::ErrorKind::InvalidData
+            };
+            let _ = tx
+                .send(Err(std::io::Error::new(kind, status.to_string())))
+                .await;
+        }
+    }
+}
+
+/// Opens a tenant-routed stream: reads the request body up to its first
+/// message, whose route field (a tid, see `rest_dispatch::route_tenant_from_wire`)
+/// names the tenant the stream is for, and returns that tenant with the body
+/// to forward. Every later message must name the same tenant: the stream is
+/// opened for one tenant, so a message naming another, or none, ends it with
+/// INVALID_ARGUMENT and is not forwarded. A first message naming no valid
+/// tenant (or a stream with no message at all) is refused here, before
+/// anything is dialled.
+///
+/// `stamp` is the tenant of an MCP session of a tenant-owned service, the
+/// caller token's (#15): each message is stamped with it (`stamp_mcp_tenant`)
+/// before its route field is read, so the session is opened for that tenant
+/// and a message naming another is refused, PERMISSION_DENIED.
+async fn route_stream(
+    mut body: Body,
+    route: &'static gateway_model::s2sm::rest_dispatch::RouteInfo,
+    stamp: Option<String>,
+) -> Result<(String, Body), tonic::Status> {
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(16);
+    let (opened_tx, opened_rx) = tokio::sync::oneshot::channel();
+
+    tokio::spawn(async move {
+        let mut opened_tx = Some(opened_tx);
+        let mut tenant: Option<String> = None;
+        let mut buffer = bytes::BytesMut::new();
+
+        loop {
+            loop {
+                let frame = match next_grpc_frame(&mut buffer) {
+                    Ok(Some(frame)) => frame,
+                    Ok(None) => break,
+                    Err(why) => {
+                        let status = tonic::Status::invalid_argument(why);
+                        return refuse(&mut opened_tx, &tx, status).await;
+                    }
+                };
+                let frame = match &stamp {
+                    Some(stamp) => match stamp_mcp_tenant(&frame[5..], stamp) {
+                        Ok(message) => bytes::Bytes::from(frame_grpc(&message)),
+                        Err(status) => return refuse(&mut opened_tx, &tx, status).await,
+                    },
+                    None => frame,
+                };
+                let named = match gateway_model::s2sm::rest_dispatch::route_tenant_from_wire(
+                    &frame[5..],
+                    route,
+                ) {
+                    Ok(named) => named,
+                    Err(status) => return refuse(&mut opened_tx, &tx, status).await,
+                };
+                if let Some(open) = &tenant {
+                    if *open != named {
+                        let status = tonic::Status::invalid_argument(format!(
+                            "this stream is opened for tenant {open}; a message names tenant {named}"
+                        ));
+                        return refuse(&mut opened_tx, &tx, status).await;
+                    }
+                } else {
+                    // The first message: the stream is opened for its tenant.
+                    if let Some(opened) = opened_tx.take() {
+                        if opened.send(Ok(named.clone())).is_err() {
+                            return;
+                        }
+                    }
+                    tenant = Some(named);
+                }
+                if tx.send(Ok(frame)).await.is_err() {
+                    return;
+                }
+            }
+
+            match body.frame().await {
+                Some(Ok(frame)) => {
+                    if let Some(data) = frame.data_ref() {
+                        buffer.extend_from_slice(data);
+                    }
+                }
+                Some(Err(e)) => {
+                    let status = tonic::Status::invalid_argument(format!("request body read error: {e}"));
+                    return refuse(&mut opened_tx, &tx, status).await;
+                }
+                None => break,
+            }
+        }
+
+        if !buffer.is_empty() {
+            let status = tonic::Status::invalid_argument("incomplete trailing gRPC frame");
+            return refuse(&mut opened_tx, &tx, status).await;
+        }
+        // A stream that ended before its first message names no tenant.
+        if opened_tx.is_some() {
+            if let Err(status) = gateway_model::s2sm::rest_dispatch::route_tenant_from_wire(&[], route) {
+                refuse(&mut opened_tx, &tx, status).await;
+            }
+        }
+    });
+
+    let tenant = opened_rx
+        .await
+        .map_err(|_| tonic::Status::internal("tenant-routed stream ended before it was opened"))??;
+    Ok((tenant, Body::from_stream(ReceiverStream::new(rx))))
 }
 
 pub(crate) fn status_code_to_tonic(code: StatusCode) -> tonic::Code {
@@ -192,14 +338,11 @@ fn validated_streaming_body(
 
             loop {
                 let grpc_frame = match next_grpc_frame(&mut buffer) {
-                    Ok(Some(grpc_frame)) => grpc_frame,
+                    Ok(Some(frame)) => frame,
                     Ok(None) => break,
-                    Err(msg) => {
+                    Err(why) => {
                         let _ = tx
-                            .send(Err(std::io::Error::new(
-                                std::io::ErrorKind::InvalidData,
-                                msg,
-                            )))
+                            .send(Err(std::io::Error::new(std::io::ErrorKind::InvalidData, why)))
                             .await;
                         return;
                     }
@@ -291,27 +434,6 @@ fn validated_streaming_body(
     Body::from_stream(ReceiverStream::new(rx))
 }
 
-/// Splits the next complete gRPC message frame (5-byte header and payload) off
-/// the front of `buffer`, or `Ok(None)` while it is still incomplete. Refuses a
-/// compressed frame and one over the gateway's validation limit.
-fn next_grpc_frame(buffer: &mut bytes::BytesMut) -> Result<Option<bytes::Bytes>, &'static str> {
-    if buffer.len() < 5 {
-        return Ok(None);
-    }
-    if buffer[0] != 0 {
-        return Err("compressed gRPC frames are not supported by gateway validation");
-    }
-    let msg_len = u32::from_be_bytes([buffer[1], buffer[2], buffer[3], buffer[4]]) as usize;
-    if msg_len > MAX_GRPC_MESSAGE_BYTES {
-        return Err("gRPC message exceeds gateway validation limit");
-    }
-    let frame_len = 5 + msg_len;
-    if buffer.len() < frame_len {
-        return Ok(None);
-    }
-    Ok(Some(buffer.split_to(frame_len).freeze()))
-}
-
 /// One `mcp.McpRequest` as it goes on to a tenant-owned service's MCP carrier:
 /// in the session's `tenant`, the caller token's (tacplus#170). A frame with no
 /// tenant is stamped by appending the field (protobuf's last value wins), so the
@@ -338,90 +460,6 @@ pub(crate) fn stamp_mcp_tenant(message: &[u8], tenant: &str) -> Result<Vec<u8>, 
         ..Default::default()
     }));
     Ok(stamped)
-}
-
-/// Wrap the request stream of a tenant-owned service's MCP carrier so that
-/// every frame is stamped with `tenant` (see `stamp_mcp_tenant`). A frame it
-/// refuses ends the stream there: neither it nor anything after it is
-/// forwarded.
-fn tenant_stamped_body(mut body: Body, path: String, tenant: String) -> Body {
-    let (tx, rx) = tokio::sync::mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(16);
-
-    tokio::spawn(async move {
-        let mut buffer = bytes::BytesMut::new();
-
-        while let Some(frame_result) = body.frame().await {
-            let frame = match frame_result {
-                Ok(frame) => frame,
-                Err(e) => {
-                    let _ = tx
-                        .send(Err(std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            format!("request body read error: {e}"),
-                        )))
-                        .await;
-                    return;
-                }
-            };
-
-            let Some(data) = frame.data_ref() else {
-                continue;
-            };
-            buffer.extend_from_slice(data);
-
-            loop {
-                let grpc_frame = match next_grpc_frame(&mut buffer) {
-                    Ok(Some(grpc_frame)) => grpc_frame,
-                    Ok(None) => break,
-                    Err(msg) => {
-                        let _ = tx
-                            .send(Err(std::io::Error::new(
-                                std::io::ErrorKind::InvalidData,
-                                msg,
-                            )))
-                            .await;
-                        return;
-                    }
-                };
-
-                let message = match stamp_mcp_tenant(&grpc_frame[5..], &tenant) {
-                    Ok(message) => message,
-                    Err(status) => {
-                        tracing::warn!(
-                            path = %path,
-                            tenant = %tenant,
-                            error = %status.message(),
-                            "MCP frame tenant refused"
-                        );
-                        let kind = if status.code() == tonic::Code::PermissionDenied {
-                            std::io::ErrorKind::PermissionDenied
-                        } else {
-                            std::io::ErrorKind::InvalidData
-                        };
-                        let _ = tx
-                            .send(Err(std::io::Error::new(kind, status.to_string())))
-                            .await;
-                        return;
-                    }
-                };
-
-                if tx.send(Ok(bytes::Bytes::from(frame_grpc(&message)))).await.is_err() {
-                    return;
-                }
-            }
-        }
-
-        if !buffer.is_empty() {
-            let _ = tx
-                .send(Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "incomplete trailing gRPC frame",
-                )))
-                .await;
-        }
-    });
-
-    Body::from_stream(ReceiverStream::new(rx))
 }
 
 /// Handle a gRPC request: extract frame, validate, authenticate, and forward.
@@ -504,24 +542,20 @@ async fn handle_inner(
     // before forwarding.
     let is_streaming = route_info.server_streaming || route_info.client_streaming;
 
-    // A tenant-owned service is deployed once per tenant, as `<svc>-<tenant>`
-    // (the operator's `ServiceInstance.InstanceName()`, item 4 §2.3), so the
-    // health entry to dial depends on WHOSE token this is. Every other service —
-    // the majority — keeps routing by name and never looks at the namespace
-    // claim. Resolved before the body is read: an MCP session carrier's frames
-    // are stamped with this tenant as they stream through (#15).
-    let caller_tenant = match caller_tenant(proxy, route_info, &path, auth_header.as_deref()) {
-        Ok(tenant) => tenant,
-        Err(status) => return tonic_status_to_response(status),
-    };
-
     let (parts, body) = req.into_parts();
 
     // active_trace_id is set when a unary request carries a trace_id (field 200).
     // It's used to publish a response trace event after the backend call completes.
     let mut active_trace_id = String::new();
 
-    let tonic_req = if is_streaming {
+    // `tenant` is the call's target tenant, read off the request's route field
+    // (`(spec.rpc).route_field`, a tid) for a route of a tenant-owned service,
+    // and empty for a platform route, which is never addressed by tenant. It
+    // is never taken from the caller's token: who is asking is the token's,
+    // whether they may is the target's policy, and neither moves the call.
+    // (An MCP session's route field is the one the gateway fills in, from the
+    // token, before it is read: #15, `mcp_session_tenant`.)
+    let (tonic_req, tenant) = if is_streaming {
         if streaming_validation == StreamingValidation::RequestHeader {
             if let Err((code, msg)) = proxy
                 .auth
@@ -540,6 +574,28 @@ async fn handle_inner(
             }
         }
 
+        // An MCP session of a tenant-owned service is in the caller token's
+        // tenant, never one the client or the model names (#15): its frames
+        // are stamped with the token's tid, and routed by it.
+        let stamp = match mcp_session_tenant(proxy, route_info, &path, auth_header.as_deref()) {
+            Ok(stamp) => stamp,
+            Err(status) => return tonic_status_to_response(status),
+        };
+
+        // A tenant-routed stream is opened for the tenant its first message
+        // names, so that message is read before anything is dialled.
+        let (tenant, body) = if route_info.route_field_number != 0 {
+            match route_stream(body, route_info, stamp).await {
+                Ok(opened) => opened,
+                Err(status) => {
+                    tracing::warn!(path = %path, error = %status.message(), "tenant-routed stream refused");
+                    return tonic_status_to_response(status);
+                }
+            }
+        } else {
+            (String::new(), body)
+        };
+
         let body = match streaming_validation {
             StreamingValidation::RequestHeader => validated_streaming_body(
                 body,
@@ -552,17 +608,9 @@ async fn handle_inner(
             ),
             StreamingValidation::AlreadyValidated => body,
         };
-        // An MCP session of a tenant-owned service is in the caller token's
-        // tenant, never one the client or the model names (tacplus#170).
-        let body = match &caller_tenant {
-            Some(tenant) if is_mcp_carrier(route_info) => {
-                tenant_stamped_body(body, path.clone(), tenant.clone())
-            }
-            _ => body,
-        };
         let streaming_body = StreamingBody(body);
         let tonic_body = tonic::body::Body::new(streaming_body);
-        Request::from_parts(parts, tonic_body)
+        (Request::from_parts(parts, tonic_body), tenant)
     } else {
         // Token check FIRST, on headers alone — the same ordering the streaming
         // branch above already uses. Buffering and decoding up to 10MB is work
@@ -597,7 +645,7 @@ async fn handle_inner(
         };
 
         // Extract and validate the protobuf payload from the gRPC frame.
-        let target_namespace = match unframe_grpc(&body_bytes) {
+        let (target_namespace, tenant) = match unframe_grpc(&body_bytes) {
             Ok(proto_bytes) => {
                 // Validate: deserialize into typed message and run validation.
                 if let Err(status) =
@@ -606,6 +654,19 @@ async fn handle_inner(
                     tracing::warn!(path = %path, error = %status.message(), "request validation failed");
                     return tonic_status_to_response(status);
                 }
+
+                // The target tenant: an empty or malformed one is refused
+                // here, INVALID_ARGUMENT, before anything is dialled.
+                let tenant = match gateway_model::s2sm::rest_dispatch::route_tenant_from_wire(
+                    proto_bytes,
+                    route_info,
+                ) {
+                    Ok(tenant) => tenant,
+                    Err(status) => {
+                        tracing::warn!(path = %path, error = %status.message(), "tenant-routed request refused");
+                        return tonic_status_to_response(status);
+                    }
+                };
 
                 let target_namespace =
                     match gateway_model::s2sm::proxy_dispatch::request_target_namespace(
@@ -638,7 +699,7 @@ async fn handle_inner(
                     }
                 }
 
-                target_namespace
+                (target_namespace, tenant)
             }
             Err(status) => {
                 return tonic_status_to_response(status);
@@ -678,14 +739,10 @@ async fn handle_inner(
         let new_body = Body::from(body_bytes);
         let streaming_body = StreamingBody(new_body);
         let tonic_body = tonic::body::Body::new(streaming_body);
-        Request::from_parts(parts, tonic_body)
+        (Request::from_parts(parts, tonic_body), tenant)
     };
 
-    // A shared service's `route_key` is `service_id`, and nothing below changes.
-    let route_key = match &caller_tenant {
-        Some(tenant) => std::borrow::Cow::Owned(crate::health::tenant_route_key(service_id, tenant)),
-        None => std::borrow::Cow::Borrowed(service_id),
-    };
+    let route_key = proxy.resolver.resolve_target(service_id, &tenant);
 
     // Forward to backend service.
     // Probe endpoints to find a live one — stale health entries (pods that were
@@ -693,7 +750,9 @@ async fn handle_inner(
     // errors without probing. dial_ready_any() skips unreachable endpoints.
     // Try route_key first, fall back to SPIFFE path routing. The TLS identity is
     // always `service_id`: a tenant instance's certificate names the bare
-    // service, under a `/tenants/<tenant>` namespace.
+    // service, under a `/tenants/<tid>` namespace. A tenant with no healthy
+    // instance gets no channel, so the call is UNAVAILABLE: never another
+    // tenant's instance.
     let mut channel = {
         let endpoints = proxy.resolver.health().get_endpoints(&route_key);
         if endpoints.is_empty() {
@@ -754,44 +813,32 @@ async fn handle_inner(
     }
 }
 
-/// The health entry a call to `route_info`'s service dials: the service's
-/// name, or for a tenant-owned service the caller's tenant's instance.
-pub(crate) fn route_key(
-    proxy: &ProxyState,
-    route_info: &'static gateway_model::s2sm::rest_dispatch::RouteInfo,
-    path: &str,
-    auth_header: Option<&str>,
-) -> Result<std::borrow::Cow<'static, str>, tonic::Status> {
-    let (service_id, _) = route_identity(route_info);
-    Ok(match caller_tenant(proxy, route_info, path, auth_header)? {
-        Some(tenant) => std::borrow::Cow::Owned(crate::health::tenant_route_key(service_id, &tenant)),
-        None => std::borrow::Cow::Borrowed(service_id),
-    })
-}
-
-/// The tenant a call to `route_info`'s service is in: `None` for a shared
-/// service, which never looks at the namespace claim; for a tenant-owned one
-/// the caller token's tenant, and a caller in no tenant is refused.
-pub(crate) fn caller_tenant(
+/// The tenant of an MCP session of a tenant-owned service (#15): `None` for
+/// every other route, which is never stamped; for the carrier
+/// (`Broker<Service>McpSession`) of a service routed by a target-tenant field,
+/// the caller token's tid (`GatewayAuth::caller_tid`), and a caller in no
+/// tenant is refused. The carrier is then routed by that tid like any
+/// tenant-routed stream, by its (stamped) first message.
+pub(crate) fn mcp_session_tenant(
     proxy: &ProxyState,
     route_info: &'static gateway_model::s2sm::rest_dispatch::RouteInfo,
     path: &str,
     auth_header: Option<&str>,
 ) -> Result<Option<String>, tonic::Status> {
-    let (service_id, entitlement_service) = route_identity(route_info);
-    if !proxy.tenant_owned.contains(service_id) {
+    if route_info.route_field_number == 0 || !is_mcp_carrier(route_info) {
         return Ok(None);
     }
-    match proxy.auth.caller_tenant(
+    let (service_id, entitlement_service) = route_identity(route_info);
+    match proxy.auth.caller_tid(
         route_info.auth_policy,
         service_id,
         entitlement_service,
         path,
         auth_header,
     ) {
-        Ok(tenant) => Ok(Some(tenant)),
+        Ok(tid) => Ok(Some(tid)),
         Err((code, msg)) => {
-            tracing::warn!(path = %path, service = service_id, error = %msg, "tenant-owned routing rejected");
+            tracing::warn!(path = %path, service = service_id, error = %msg, "MCP session tenant refused");
             Err(tonic::Status::new(status_code_to_tonic(code), msg))
         }
     }
@@ -910,7 +957,6 @@ mod tests {
                 unused_verifier(),
             )),
             auth: Arc::new(GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false)),
-            tenant_owned: Arc::new(Default::default()),
             trace_publisher: Arc::new(|_| {}),
             trace_round: Box::new(Default::default),
             sessions: Default::default(),
@@ -975,6 +1021,226 @@ mod tests {
 
         assert_eq!(physical_service, "eventbus");
         assert_eq!(entitlement_service, "tasks");
+    }
+
+    /// A client-streaming route of a tenant-owned service, routed by its
+    /// request's field 2, `tenant`.
+    static ROUTED_STREAM: RouteInfo = CREW_CHAT;
+    const CREW_CHAT: RouteInfo = RouteInfo {
+        http_path: "",
+        grpc_path: "/crew.Crew/Chat",
+        service_id: "crew",
+        entitlement_service: None,
+        http_methods: &[],
+        auth_policy: AuthPolicy::AnyUser,
+        entitlement_scopes: &[],
+        capability_scope: None,
+        server_streaming: true,
+        client_streaming: true,
+        target_namespace_field: None,
+        form_body: false,
+        redirect_field: None,
+        route_field: Some("tenant"),
+        route_field_json: Some("tenant"),
+        route_field_number: 2,
+    };
+
+    /// A gRPC frame of a message whose field 2 is `tenant` (absent when empty).
+    fn naming(tenant: &str) -> Vec<u8> {
+        let mut message = vec![0x0a, 2, b'h', b'i'];
+        if !tenant.is_empty() {
+            message.extend_from_slice(&[0x12, tenant.len() as u8]);
+            message.extend_from_slice(tenant.as_bytes());
+        }
+        frame_grpc(&message)
+    }
+
+    /// A request body delivered in exactly these chunks.
+    fn chunked(chunks: Vec<Vec<u8>>) -> Body {
+        Body::from_stream(futures::stream::iter(
+            chunks
+                .into_iter()
+                .map(|c| Ok::<_, std::io::Error>(bytes::Bytes::from(c))),
+        ))
+    }
+
+    /// Everything the opened body forwards, and the error that ends it, if any.
+    async fn drain(mut body: Body) -> (Vec<u8>, Option<String>) {
+        let mut forwarded = Vec::new();
+        while let Some(frame) = body.frame().await {
+            match frame {
+                Ok(frame) => forwarded.extend_from_slice(frame.data_ref().expect("data")),
+                Err(e) => return (forwarded, Some(e.to_string())),
+            }
+        }
+        (forwarded, None)
+    }
+
+    /// A stream is opened for the tenant its first message names, even when
+    /// that message arrives split across body chunks, and every message naming
+    /// it is forwarded unchanged.
+    #[tokio::test]
+    async fn a_routed_stream_opens_for_its_first_message_and_forwards_its_messages() {
+        let first = naming("acme0001");
+        let (head, tail) = first.split_at(3);
+        let mut rest = tail.to_vec();
+        rest.extend(naming("acme0001"));
+
+        let (tenant, body) = route_stream(chunked(vec![head.to_vec(), rest]), &ROUTED_STREAM, None)
+            .await
+            .expect("a first message naming a tid opens the stream");
+        assert_eq!(tenant, "acme0001");
+
+        let (forwarded, error) = drain(body).await;
+        assert_eq!(error, None);
+        assert_eq!(forwarded, [naming("acme0001"), naming("acme0001")].concat());
+    }
+
+    /// The stream is opened for one tenant: a later message naming another, or
+    /// none, ends it there, and that message is not forwarded.
+    #[tokio::test]
+    async fn a_routed_stream_ends_at_a_message_naming_another_tenant() {
+        for stray in ["beta0002", ""] {
+            let (tenant, body) = route_stream(
+                chunked(vec![naming("acme0001"), naming(stray), naming("acme0001")]),
+                &ROUTED_STREAM,
+                None,
+            )
+            .await
+            .expect("opens");
+            assert_eq!(tenant, "acme0001");
+
+            let (forwarded, error) = drain(body).await;
+            assert_eq!(forwarded, naming("acme0001"), "only the message before {stray:?} is forwarded");
+            let error = error.unwrap_or_else(|| panic!("a message naming {stray:?} must end the stream"));
+            assert!(error.contains("tenant"), "{error}");
+        }
+    }
+
+    /// A stream whose first message names no valid tenant, or that has no
+    /// message at all, is refused before it is opened: the caller dials nothing.
+    #[tokio::test]
+    async fn a_routed_stream_naming_no_tenant_is_refused_before_it_opens() {
+        for (case, chunks) in [
+            ("no tenant", vec![naming("")]),
+            ("a name, not a tid", vec![naming("acme")]),
+            ("no message", vec![]),
+            ("a truncated message", vec![naming("acme0001")[..7].to_vec()]),
+        ] {
+            let status = route_stream(chunked(chunks), &ROUTED_STREAM, None)
+                .await
+                .err()
+                .unwrap_or_else(|| panic!("{case} must be refused"));
+            assert_eq!(status.code(), tonic::Code::InvalidArgument, "{case}: {status:?}");
+        }
+    }
+
+    /// An MCP session's stream (#15) is stamped before it is routed: a first
+    /// message naming no tenant opens the stream for the stamp, and is
+    /// forwarded naming it; a message naming another tenant is refused,
+    /// PERMISSION_DENIED, before the stream opens or wherever it comes later.
+    #[tokio::test]
+    async fn a_stamped_stream_opens_for_its_stamp_and_refuses_another_tenant() {
+        let stamp = || Some("acme0001".to_string());
+        let (tenant, body) =
+            route_stream(chunked(vec![naming(""), naming("acme0001")]), &ROUTED_STREAM, stamp())
+                .await
+                .expect("an unnamed first message opens for the stamp");
+        assert_eq!(tenant, "acme0001");
+        let (forwarded, error) = drain(body).await;
+        assert_eq!(error, None);
+        assert_eq!(forwarded, [naming("acme0001"), naming("acme0001")].concat(), "stamped");
+
+        let status = route_stream(chunked(vec![naming("beta0002")]), &ROUTED_STREAM, stamp())
+            .await
+            .err()
+            .expect("a first message naming another tenant is refused");
+        assert_eq!(status.code(), tonic::Code::PermissionDenied, "{status:?}");
+
+        let (_, body) = route_stream(
+            chunked(vec![naming(""), naming("beta0002"), naming("")]),
+            &ROUTED_STREAM,
+            stamp(),
+        )
+        .await
+        .expect("opens");
+        let (forwarded, error) = drain(body).await;
+        assert_eq!(forwarded, naming("acme0001"), "nothing at or after the refused message");
+        assert!(error.is_some(), "a message naming another tenant ends the stream");
+    }
+
+    fn empty_proxy() -> ProxyState {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        ProxyState {
+            resolver: Arc::new(Resolver::plaintext_backends(
+                HealthWatcher::seeded(HashMap::new()),
+                unused_verifier(),
+            )),
+            auth: Arc::new(GatewayAuth::new(Arc::new(JwkCache::seeded(vec![])), false)),
+            trace_publisher: Arc::new(|_| {}),
+            trace_round: Box::new(Default::default),
+            sessions: Default::default(),
+        }
+    }
+
+    /// `ROUTED_STREAM` as a service's MCP session carrier, with or without a
+    /// route field.
+    static ROUTED_CARRIER: RouteInfo = RouteInfo {
+        grpc_path: "/crew.Crew/BrokerCrewMcpSession",
+        ..CREW_CHAT
+    };
+    static PLATFORM_CARRIER: RouteInfo = RouteInfo {
+        grpc_path: "/crew.Crew/BrokerCrewMcpSession",
+        route_field: None,
+        route_field_json: None,
+        route_field_number: 0,
+        ..CREW_CHAT
+    };
+
+    /// Only the carrier of a tenant-routed service has a session tenant, and
+    /// only a caller whose token names one gets it; a platform carrier and
+    /// every other stream are never stamped, and no token is read for them.
+    #[test]
+    fn only_a_tenant_routed_carrier_has_a_session_tenant() {
+        let proxy = empty_proxy();
+        for route in [&PLATFORM_CARRIER, &ROUTED_STREAM] {
+            assert!(
+                matches!(mcp_session_tenant(&proxy, route, route.grpc_path, None), Ok(None)),
+                "{} is not stamped",
+                route.grpc_path
+            );
+        }
+        let status = mcp_session_tenant(&proxy, &ROUTED_CARRIER, ROUTED_CARRIER.grpc_path, None)
+            .expect_err("a caller with no token has no tenant");
+        assert_ne!(status.code(), tonic::Code::Ok);
+    }
+
+    /// The rotating sibling (#26) of a tenant-routed stream that is not an MCP
+    /// carrier opens with an envelope that carries no request, so names no
+    /// tenant to route by, and the token is never one: UNIMPLEMENTED, and the
+    /// client falls back to the plain method, routed by its first message.
+    #[tokio::test]
+    async fn a_tenant_routed_streams_rotating_sibling_is_unimplemented() {
+        let proxy = empty_proxy();
+        let opening = crate::rotation::Envelope::default();
+        let request = Request::builder()
+            .method("POST")
+            .uri("/crew.CrewRotating/Chat")
+            .header("content-type", "application/grpc+proto")
+            .body(Body::from(frame_grpc(&prost::Message::encode_to_vec(&opening))))
+            .expect("request");
+        let response = crate::rotation::handle(
+            &proxy,
+            request,
+            &ROUTED_STREAM,
+            ROUTED_STREAM.grpc_path.to_string(),
+        )
+        .await;
+        assert_eq!(
+            response.headers().get("grpc-status").and_then(|v| v.to_str().ok()),
+            Some("12"),
+            "a tenant-routed stream's sibling must be Unimplemented (12)"
+        );
     }
 
     fn route_for(grpc_path: &str) -> Option<&'static RouteInfo> {

@@ -296,7 +296,6 @@ fn proxy_state_over(health: HealthWatcher, jwk: ImmutableJwk) -> Arc<ProxyState>
     Arc::new(ProxyState {
         resolver: Arc::new(Resolver::plaintext_backends(health, unused_verifier())),
         auth: Arc::new(GatewayAuth::new(Arc::new(JwkCache::seeded(vec![jwk])), false)),
-        tenant_owned: Arc::new(Default::default()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
         sessions: Default::default(),
