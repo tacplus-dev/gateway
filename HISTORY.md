@@ -11,3 +11,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-03 looper issue Trace: gateway.Mint's MintToken/MintX509Cert (gRPC and REST) have no test that trace_id reaches kernel (#23, dee25d0)
 - 2026-11-03 looper issue Trace: the gRPC proxy and REST translation have no test that the caller's trace_id reaches the backend (#24, b52decf)
 - 2026-11-03 looper issue TLS: cert_chain from config is the only path (hot-swapped on config change, no restart); retire letsencrypt mode (#25, 0b0743f)
+- 2026-11-22 looper release v0.1.2 (https://github.com/tacplus-dev/gateway/releases/tag/v0.1.2)
