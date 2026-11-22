@@ -23,6 +23,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use futures::{SinkExt, StreamExt};
+use rustls::pki_types::pem::PemObject;
+use rustls::pki_types::CertificateDer;
 use tokio::net::TcpListener;
 use tokio::time::{timeout, Duration};
 use tokio_stream::wrappers::TcpListenerStream;
@@ -121,7 +123,7 @@ fn unused_verifier() -> Arc<SpiffeServerCertVerifier> {
         .self_sign("unused", not_after, X509KeyUsage::CertSign, &[])
         .expect("throwaway cert");
     let mut roots = rustls::RootCertStore::empty();
-    for der in rustls_pemfile::certs(&mut cert.pem_bytes()) {
+    for der in CertificateDer::pem_slice_iter(cert.pem_bytes()) {
         roots.add(der.expect("der")).expect("add root");
     }
     SpiffeServerCertVerifier::new(TRUST_DOMAIN, roots).expect("verifier")

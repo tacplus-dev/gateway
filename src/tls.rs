@@ -11,7 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum_server::tls_rustls::RustlsConfig;
 use rustls::ServerConfig;
-use rustls::pki_types::CertificateDer;
+use rustls::pki_types::pem::{self, PemObject};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
 use gateway_model::types::services::gateway::gateway::Config as GatewayConfig;
 
@@ -28,15 +29,20 @@ pub fn build_server_config_from_pem(cert_pem: &str, key_pem: &str) -> Result<Arc
         return Err(io::Error::new(io::ErrorKind::InvalidData, "external_key_pem is empty"));
     }
 
-    let certs: Vec<CertificateDer<'static>> =
-        rustls_pemfile::certs(&mut cert_pem.as_bytes()).collect::<Result<Vec<_>, _>>()?;
+    let certs: Vec<CertificateDer<'static>> = CertificateDer::pem_slice_iter(cert_pem.as_bytes())
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("external_cert_pem: {e}")))?;
     if certs.is_empty() {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "no certificates found in external_cert_pem"));
     }
     refuse_expired(&certs[0])?;
 
-    let key = rustls_pemfile::private_key(&mut key_pem.as_bytes())?
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "no private key found in external_key_pem"))?;
+    let key = PrivateKeyDer::from_pem_slice(key_pem.as_bytes()).map_err(|e| match e {
+        pem::Error::NoItemsFound => {
+            io::Error::new(io::ErrorKind::InvalidData, "no private key found in external_key_pem")
+        }
+        e => io::Error::new(io::ErrorKind::InvalidData, format!("external_key_pem: {e}")),
+    })?;
 
     // with_single_cert refuses a key whose public half is not the leaf's.
     let mut tls_config = ServerConfig::builder()
@@ -143,7 +149,7 @@ mod tests {
             .self_sign(name, expiry, X509KeyUsage::DigitalSignature, &[])
             .expect("cert");
         let cert_pem = String::from_utf8(cert.pem_bytes().to_vec()).expect("cert pem");
-        let der = rustls_pemfile::certs(&mut cert_pem.as_bytes()).next().expect("one cert").expect("der");
+        let der = CertificateDer::from_pem_slice(cert_pem.as_bytes()).expect("one cert");
         TestCert { cert_pem, key_pem, serial: serial_of(&der) }
     }
 
@@ -367,5 +373,24 @@ mod tests {
         assert!(err.to_string().contains("does not fit"), "{err}");
 
         assert!(build_server_config_from_pem(&cert.cert_pem, &cert.key_pem).is_ok());
+    }
+
+    /// Each PEM field is read for its own kind of section and the others are
+    /// skipped, so a bundle holding the chain and the key serves from either
+    /// field; a field with none of its kind is refused by name (#31).
+    #[test]
+    fn each_pem_field_is_read_for_its_own_kind_of_section() {
+        let cert = test_cert("console.example.com", 3600);
+        let bundle = format!("{}\n{}", cert.key_pem, cert.cert_pem);
+        assert!(build_server_config_from_pem(&bundle, &bundle).is_ok());
+
+        let err = build_server_config_from_pem(&cert.key_pem, &cert.key_pem).expect_err("no cert");
+        assert!(err.to_string().contains("no certificates found in external_cert_pem"), "{err}");
+
+        let err = build_server_config_from_pem(&cert.cert_pem, &cert.cert_pem).expect_err("no key");
+        assert!(err.to_string().contains("no private key found in external_key_pem"), "{err}");
+
+        let err = build_server_config_from_pem("not pem", &cert.key_pem).expect_err("not pem");
+        assert!(err.to_string().contains("no certificates found in external_cert_pem"), "{err}");
     }
 }

@@ -659,6 +659,9 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
+    use rustls::pki_types::pem::PemObject;
+    use rustls::pki_types::CertificateDer;
+
     use gateway_grpcserver::authorizer::JwkCache;
     use gateway_key::keys;
     use gateway_model::s2sm::rest_dispatch::{AuthPolicy, RouteInfo};
@@ -701,7 +704,7 @@ mod tests {
             .self_sign("unused", expiry, X509KeyUsage::CertSign, &[])
             .expect("throwaway cert");
         let mut roots = rustls::RootCertStore::empty();
-        for der in rustls_pemfile::certs(&mut cert.pem_bytes()) {
+        for der in CertificateDer::pem_slice_iter(cert.pem_bytes()) {
             roots.add(der.expect("der")).expect("add root");
         }
         SpiffeServerCertVerifier::new("proxy.test", roots).expect("verifier")
