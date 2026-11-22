@@ -18,7 +18,7 @@
 # launcher (PID 1, HEALTH_PORT=8443, kills a deadlocked child) are the health check.
 # Decided by Jody on #42, 2026-11-17; it expires on 2027-05-17. The base image's
 # unfixed Debian advisories of the same report get no exception (same decision): they
-# are non-blocking by policy, the FROM is to be pinned by digest (#38), and the
+# are non-blocking by policy, the FROM is pinned by digest (#38), and the
 # digest moves when Debian ships their fixes.
 exceptions:
   - id: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket

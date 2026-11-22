@@ -24,6 +24,11 @@ gates:
   for f in Dockerfile Dockerfile.cross; do
     user="$(grep -E '^USER ' "$f" | tail -n1 | awk '{print $2}' || true)"
     test "$user" = "65532:65532" || { echo "$f: the last USER must be 65532:65532, not '${user:-root}'" >&2; exit 1; }
+    # Their stage takes the Debian fixes the base tag lags by weeks, from a dated snapshot, and fails the build below the floors (#38).
+    stage="$(awk 'toupper($1) == "FROM" { s = "" } { s = s $0 "\n" } END { printf "%s", s }' "$f")"
+    for want in 'http://snapshot.debian.org/archive/' 'upgrade -y' 'zlib1g=1:1.3.dfsg+really1.3.1-1+deb13u1' 'libc6=2.41-12+deb13u5'; do
+      grep -qF -e "$want" <<<"$stage" || { echo "$f: the release stage's apt step must hold '$want' (#38)" >&2; exit 1; }
+    done
   done
   before="$(git status --porcelain)"
   {{TACPLUS}} build --tag latest
