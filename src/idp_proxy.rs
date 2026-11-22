@@ -17,6 +17,7 @@ use tokio_rustls::TlsConnector;
 const GATEWAY_PROXY_PATH_REALMS: &str = "/realms";
 const GATEWAY_PROXY_PATH_ADMIN: &str = "/admin";
 
+use crate::blob_proxy::forwardable;
 use crate::health::HealthWatcher;
 
 /// IdpProxy HTTPS-proxies requests to the Keycloak IDP service.
@@ -97,68 +98,82 @@ impl IdpProxy {
             .map_err(|e| format!("invalid server name: {e}"))?;
         let tcp = TcpStream::connect(endpoint).await?;
         let tls_stream = self.tls_connector.connect(server_name, tcp).await?;
-        let io = TokioIo::new(tls_stream);
 
-        // Build an HTTP/1.1 connection over the TLS stream.
-        let (mut sender, conn) = hyper::client::conn::http1::handshake(io).await?;
-        tokio::spawn(async move {
-            if let Err(e) = conn.await {
-                tracing::debug!(error = %e, "idp_proxy: backend connection closed");
-            }
-        });
-
-        // Reconstruct the request for the backend.
-        let uri_str = format!("https://{}{}", endpoint, parts.uri.path_and_query()
-            .map(|pq| pq.as_str())
-            .unwrap_or(""));
-        let backend_uri: http::Uri = uri_str.parse()?;
-
-        let mut backend_req = Request::builder()
-            .method(parts.method.clone())
-            .uri(backend_uri)
-            .version(http::Version::HTTP_11);
-
-        // Extract the original Host header (external FQDN) for X-Forwarded-Host.
-        let original_host = parts.headers.get(http::header::HOST)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
-
-        // Copy request headers, replacing Host with the backend endpoint.
-        for (name, value) in &parts.headers {
-            if name == http::header::HOST {
-                continue;
-            }
-            backend_req = backend_req.header(name, value);
-        }
-        backend_req = backend_req.header(http::header::HOST, endpoint);
-
-        // Inject X-Forwarded-* headers so Keycloak constructs correct external URLs.
-        if !original_host.is_empty() {
-            backend_req = backend_req.header("X-Forwarded-Host", original_host.as_str());
-        }
-        backend_req = backend_req.header("X-Forwarded-Proto", "https");
-        backend_req = backend_req.header("X-Forwarded-Port", "443");
-
-        let backend_req = backend_req.body(
-            http_body_util::Full::new(body_bytes).boxed()
-        )?;
-
-        let backend_resp = sender.send_request(backend_req).await?;
-
-        // Stream the response back.
-        let (resp_parts, resp_body) = backend_resp.into_parts();
-        let response_body = resp_body
-            .map_err(|e| axum::Error::new(e))
-            .boxed_unsync();
-
-        let mut resp = Response::builder().status(resp_parts.status);
-        for (name, value) in &resp_parts.headers {
-            resp = resp.header(name, value);
-        }
-
-        Ok(resp.body(Body::new(response_body))?)
+        exchange(tls_stream, parts, body_bytes, endpoint).await
     }
+}
+
+/// Sends the request over an established connection to the backend and streams
+/// its response back. Both bodies are re-framed on this hop (the request is sent
+/// as a `Full`, the response streamed by hyper), so the hop-by-hop headers go no
+/// further than the connection they came on, in either direction.
+async fn exchange<T>(
+    stream: T,
+    parts: http::request::Parts,
+    body_bytes: bytes::Bytes,
+    endpoint: &str,
+) -> Result<Response<Body>, Box<dyn std::error::Error + Send + Sync>>
+where
+    T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
+    let io = TokioIo::new(stream);
+
+    // Build an HTTP/1.1 connection over the stream (TLS to Keycloak).
+    let (mut sender, conn) = hyper::client::conn::http1::handshake(io).await?;
+    tokio::spawn(async move {
+        if let Err(e) = conn.await {
+            tracing::debug!(error = %e, "idp_proxy: backend connection closed");
+        }
+    });
+
+    // Reconstruct the request for the backend.
+    let uri_str = format!("https://{}{}", endpoint, parts.uri.path_and_query()
+        .map(|pq| pq.as_str())
+        .unwrap_or(""));
+    let backend_uri: http::Uri = uri_str.parse()?;
+
+    let mut backend_req = Request::builder()
+        .method(parts.method.clone())
+        .uri(backend_uri)
+        .version(http::Version::HTTP_11);
+
+    // Extract the original Host header (external FQDN) for X-Forwarded-Host.
+    let original_host = parts.headers.get(http::header::HOST)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    // Copy the end-to-end request headers, replacing Host with the backend endpoint.
+    for (name, value) in forwardable(&parts.headers) {
+        backend_req = backend_req.header(name, value);
+    }
+    backend_req = backend_req.header(http::header::HOST, endpoint);
+
+    // Inject X-Forwarded-* headers so Keycloak constructs correct external URLs.
+    if !original_host.is_empty() {
+        backend_req = backend_req.header("X-Forwarded-Host", original_host.as_str());
+    }
+    backend_req = backend_req.header("X-Forwarded-Proto", "https");
+    backend_req = backend_req.header("X-Forwarded-Port", "443");
+
+    let backend_req = backend_req.body(
+        http_body_util::Full::new(body_bytes).boxed()
+    )?;
+
+    let backend_resp = sender.send_request(backend_req).await?;
+
+    // Stream the response back.
+    let (resp_parts, resp_body) = backend_resp.into_parts();
+    let response_body = resp_body
+        .map_err(|e| axum::Error::new(e))
+        .boxed_unsync();
+
+    let mut resp = Response::builder().status(resp_parts.status);
+    for (name, value) in forwardable(&resp_parts.headers) {
+        resp = resp.header(name, value);
+    }
+
+    Ok(resp.body(Body::new(response_body))?)
 }
 
 /// A TLS verifier that validates the kernel CA chain but skips DNS hostname
@@ -242,4 +257,89 @@ fn error_response(status: StatusCode, msg: &'static str) -> Response<Body> {
         .status(status)
         .body(Body::from(msg))
         .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http::{header, Method};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    fn find_headers_end(buf: &[u8]) -> Option<usize> {
+        buf.windows(4).position(|w| w == b"\r\n\r\n").map(|i| i + 4)
+    }
+
+    /// A chunked, keep-alive sign-in POST reaches Keycloak re-framed by this hop:
+    /// no transfer-encoding, connection, keep-alive or te of the client's, Host
+    /// the backend's and the X-Forwarded-* headers set. Keycloak's own
+    /// connection headers do not reach the client either.
+    #[tokio::test]
+    async fn hop_by_hop_headers_do_not_cross_the_idp_hop() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let backend = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut received = Vec::new();
+            let mut buf = vec![0u8; 4096];
+            loop {
+                let n = stream.read(&mut buf).await.unwrap();
+                assert!(n > 0, "the proxy closed before sending the request");
+                received.extend_from_slice(&buf[..n]);
+                if let Some(end) = find_headers_end(&received) {
+                    if received.len() - end >= 5 {
+                        break;
+                    }
+                }
+            }
+            stream
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nKeep-Alive: timeout=5\r\n\
+                      Content-Type: text/html\r\nContent-Length: 2\r\n\r\nok",
+                )
+                .await
+                .unwrap();
+            received
+        });
+
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/realms/fleet/login-actions/authenticate")
+            .header(header::HOST, "console.example.com")
+            .header(header::TRANSFER_ENCODING, "chunked")
+            .header(header::CONNECTION, "keep-alive")
+            .header("keep-alive", "timeout=5")
+            .header(header::TE, "trailers")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(())
+            .unwrap();
+        let (parts, ()) = req.into_parts();
+        let stream = TcpStream::connect(&addr).await.unwrap();
+
+        let resp = exchange(stream, parts, bytes::Bytes::from_static(b"a=b&c"), &addr)
+            .await
+            .expect("exchange");
+        assert_eq!(resp.status(), StatusCode::OK);
+        for dropped in ["connection", "keep-alive"] {
+            assert!(resp.headers().get(dropped).is_none(), "the backend's {dropped} must not reach the client");
+        }
+        assert_eq!(resp.headers().get(header::CONTENT_TYPE).unwrap(), "text/html");
+        let body = resp.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&body[..], b"ok");
+
+        let received = backend.await.unwrap();
+        let end = find_headers_end(&received).unwrap();
+        let head = String::from_utf8_lossy(&received[..end]).to_lowercase();
+        for dropped in ["transfer-encoding:", "connection:", "keep-alive:", "te:"] {
+            assert!(
+                !head.lines().any(|l| l.starts_with(dropped)),
+                "the client's {dropped} must not be forwarded:\n{head}"
+            );
+        }
+        assert!(head.contains(&format!("host: {addr}\r\n")), "Host must be the backend's:\n{head}");
+        assert!(head.contains("x-forwarded-host: console.example.com\r\n"), "{head}");
+        assert!(head.contains("x-forwarded-proto: https\r\n"), "{head}");
+        assert!(head.contains("content-type: application/x-www-form-urlencoded\r\n"), "{head}");
+        assert!(head.contains("content-length: 5\r\n"), "the re-framed body is sent by its length:\n{head}");
+        assert_eq!(&received[end..], b"a=b&c");
+    }
 }
