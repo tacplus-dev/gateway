@@ -181,6 +181,7 @@ async fn proxy_with_oauth() -> (ProxyState, AuthStandIn) {
         tenant_owned: Arc::new(Default::default()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
+        sessions: Default::default(),
     };
     (proxy, backend)
 }

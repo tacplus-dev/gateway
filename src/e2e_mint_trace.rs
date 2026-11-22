@@ -174,6 +174,7 @@ fn rest_router(minter: Arc<dyn KernelMinter>) -> axum::Router {
         tenant_owned: Arc::new(Default::default()),
         trace_publisher: Arc::new(|_| {}),
         trace_round: Box::new(Default::default),
+        sessions: Default::default(),
     });
     rest_translation::router(Arc::new(RestState {
         proxy,

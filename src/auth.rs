@@ -101,6 +101,29 @@ impl GatewayAuth {
         }
     }
 
+    /// Admit one leg of a rotating stream (#26): the same check as
+    /// `validate_c2s`, on the plain method's policy and path, returning who the
+    /// token names and when it expires. `None` when no token was verified
+    /// (passthrough, or `NoAuth`).
+    pub fn admit_leg(
+        &self,
+        auth_policy: gateway_model::s2sm::rest_dispatch::AuthPolicy,
+        service_id: &str,
+        entitlement_service: &str,
+        grpc_path: &str,
+        auth_header: Option<&str>,
+    ) -> Result<Option<(Subject, i64)>, (StatusCode, String)> {
+        Ok(self
+            .verify_c2s(
+                auth_policy,
+                service_id,
+                entitlement_service,
+                grpc_path,
+                auth_header,
+            )?
+            .map(|claims| (claims.subject(), claims.expiration())))
+    }
+
     /// Validate token/audience/entitlements and, when the generated proto
     /// metadata exposes a target namespace, enforce the level-or-below rule.
     pub async fn validate_c2s_with_target_namespace(
@@ -323,7 +346,7 @@ impl GatewayAuth {
 /// first" from a call-ordering convention into a compile-time requirement: a
 /// refactor that drops or reorders authentication no longer builds.
 mod verified {
-    use super::{ensure_not_expired, extract_bearer, JwkCache, StatusCode, Token};
+    use super::{ensure_not_expired, extract_bearer, JwkCache, StatusCode, Subject, Token};
 
     pub struct VerifiedClaims {
         token: Token,
@@ -424,6 +447,59 @@ mod verified {
 
         pub fn namespace(&self) -> &str {
             self.token.namespace().unwrap_or("")
+        }
+
+        /// `exp`: `authenticate` refused a token without one.
+        pub fn expiration(&self) -> i64 {
+            self.token.expiration().unwrap_or(0)
+        }
+
+        /// Who this token names, for binding a rotating stream's session to
+        /// its opening token. Parity with tacplus's `rotation::subject`
+        /// (tacplus#322), plus the `tid`.
+        pub fn subject(&self) -> Subject {
+            let t = &self.token;
+            Subject {
+                kind: t.sub_type().unwrap_or("").to_string(),
+                who: t
+                    .service_path()
+                    .unwrap_or_else(|_| t.subject().unwrap_or("").to_string()),
+                namespace: t
+                    .namespace_path()
+                    .unwrap_or_else(|_| t.namespace().unwrap_or("").to_string()),
+                tid: t
+                    .custom_field("tid")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                actor: t.actor().unwrap_or("").to_string(),
+            }
+        }
+    }
+}
+
+/// The subject a verified token names: the same kind of principal, the same
+/// service or user, the same namespace and tenant (`tid`), the same delegate.
+/// Two tokens of one subject differ only in lifetime and grants.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Subject {
+    kind: String,
+    who: String,
+    namespace: String,
+    tid: String,
+    actor: String,
+}
+
+#[cfg(test)]
+impl Subject {
+    /// A user subject named `who`, for tests of what binds to one.
+    pub fn named(who: &str) -> Self {
+        Subject {
+            kind: "user".into(),
+            who: who.into(),
+            namespace: "/tenants/acme".into(),
+            tid: "t-1".into(),
+            actor: String::new(),
         }
     }
 }
@@ -815,6 +891,64 @@ mod tests {
         assert!(
             msg.contains("unauthenticated"),
             "the rejection must name the reason, got {msg:?}"
+        );
+    }
+
+    /// A user token for `aud` naming `sub` in `namespace`, with `tid`.
+    fn user_header(key: &keys::ImmutableKey, sub: &str, namespace: &str, tid: &str) -> String {
+        let mut token = Token::new();
+        token.set_kid(key.id()).expect("kid");
+        token.set_alg(key.alg()).expect("alg");
+        token.set_issuer("unit-test").expect("iss");
+        token.set_subject(sub).expect("sub");
+        token.set_sub_type("user").expect("sub_type");
+        token.set_audience("echo").expect("aud");
+        token.set_namespace(namespace).expect("ns");
+        token
+            .set_custom_field("tid", serde_json::json!(tid))
+            .expect("tid");
+        token
+            .set_expiration(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("clock")
+                    .as_secs() as i64
+                    + 3600,
+            )
+            .expect("exp");
+        token.sign(key).expect("sign");
+        format!("Bearer {}", token.base64().expect("base64"))
+    }
+
+    /// A rotation is bound to the opening token's subject: a second token of
+    /// the same user and tenant names the same subject; another user, or the
+    /// same user name in another tenant, does not.
+    #[test]
+    fn a_leg_names_its_tokens_subject() {
+        let key = keys::generate_ec_p256_key().expect("signing key");
+        let auth = GatewayAuth::new(Arc::new(JwkCache::seeded(vec![jwk_for(&key)])), false);
+        let subject = |header: &str| {
+            auth.admit_leg(AuthPolicy::AnyUser, "echo", "echo", "/echo.Echo/Watch", Some(header))
+                .expect("admitted")
+                .expect("a verified token names a subject")
+                .0
+        };
+
+        let alice = subject(&user_header(&key, "alice", "/tenants/acme", "t-1"));
+        assert_eq!(
+            alice,
+            subject(&user_header(&key, "alice", "/tenants/acme", "t-1")),
+            "a fresh token of the same user names the same subject"
+        );
+        assert_ne!(alice, subject(&user_header(&key, "bob", "/tenants/acme", "t-1")));
+        assert_ne!(alice, subject(&user_header(&key, "alice", "/tenants/beta", "t-2")));
+        assert_ne!(alice, subject(&user_header(&key, "alice", "/tenants/acme", "t-9")));
+
+        assert!(
+            auth.admit_leg(AuthPolicy::NoAuth, "echo", "echo", "/echo.Echo/Watch", None)
+                .expect("NoAuth admits")
+                .is_none(),
+            "NoAuth verifies no token, so it names no subject"
         );
     }
 

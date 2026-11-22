@@ -18,6 +18,7 @@ mod mint;
 mod registry;
 mod resolver;
 mod rest_translation;
+mod rotation;
 mod plain_http;
 mod spa;
 mod tls;
@@ -50,6 +51,12 @@ mod e2e_mint_trace;
 /// caller's trace_id to the backend.
 #[cfg(test)]
 mod e2e_stream_trace;
+
+/// End-to-end proof that a rotated C2S stream reaches the backend instance
+/// that issued its session, across several token lifetimes, and that only
+/// the session's own subject may rotate it.
+#[cfg(test)]
+mod e2e_rotation;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -284,6 +291,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         tenant_owned: Arc::clone(&tenant_owned),
         trace_publisher: Arc::clone(&trace_publisher),
         trace_round: Box::new(move || sm_for_grpc_trace.trace_round()),
+        sessions: Default::default(),
     });
 
     let grpc_router = {
