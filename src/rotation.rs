@@ -46,8 +46,9 @@ use gateway_model::s2sm::rest_dispatch::{AuthPolicy, RouteInfo};
 
 use crate::auth::Subject;
 use crate::proxy_grpc::{
-    route_identity, route_key, status_code_to_tonic, tonic_status_to_response, ProxyState,
-    StreamingBody, MAX_GRPC_MESSAGE_BYTES,
+    caller_tenant, frame_grpc, is_mcp_carrier, route_identity, route_key, stamp_mcp_tenant,
+    status_code_to_tonic, tonic_status_to_response, ProxyState, StreamingBody,
+    MAX_GRPC_MESSAGE_BYTES,
 };
 
 /// The suffix of a rotating sibling's service name.
@@ -349,6 +350,18 @@ pub(crate) async fn handle(
         None => (None, None),
     };
 
+    // The rotating sibling of a tenant-owned service's MCP carrier stamps
+    // each payload with the caller token's tenant, as the plain carrier does
+    // (#15).
+    let mcp_tenant = if is_mcp_carrier(route) {
+        match caller_tenant(proxy, route, &plain_path, auth_header.as_deref()) {
+            Ok(tenant) => tenant,
+            Err(status) => return refuse(status.code()),
+        }
+    } else {
+        None
+    };
+
     let (parts, body) = req.into_parts();
     let mut frames = Frames::new(body);
     let first_frame = match tokio::time::timeout(OPEN_TIMEOUT, frames.next()).await {
@@ -457,14 +470,24 @@ pub(crate) async fn handle(
                     return;
                 }
             };
-            if let Err(status) = check(&auth, route, &plain, &frame, auth_header.as_deref()).await {
-                tracing::warn!(path = %checked_path, code = ?status.code(), error = %status.message(), "rotating leg envelope refused");
-                let _ = abort_tx.send(status);
-                let _ = tx
-                    .send(Err(std::io::Error::other("request body refused")))
-                    .await;
-                return;
-            }
+            let checked = match check(&auth, route, &plain, &frame, auth_header.as_deref()).await {
+                Ok(()) => match &mcp_tenant {
+                    Some(tenant) => stamped(frame, tenant),
+                    None => Ok(frame),
+                },
+                Err(status) => Err(status),
+            };
+            let frame = match checked {
+                Ok(frame) => frame,
+                Err(status) => {
+                    tracing::warn!(path = %checked_path, code = ?status.code(), error = %status.message(), "rotating leg envelope refused");
+                    let _ = abort_tx.send(status);
+                    let _ = tx
+                        .send(Err(std::io::Error::other("request body refused")))
+                        .await;
+                    return;
+                }
+            };
             if tx.send(Ok(frame)).await.is_err() {
                 return;
             }
@@ -554,6 +577,20 @@ async fn check(
         }
     };
     checked.map_err(|(code, _)| tonic::Status::new(status_code_to_tonic(code), ""))
+}
+
+/// One envelope after a leg's first, on the rotating sibling of a
+/// tenant-owned service's MCP carrier: a message's payload stamped with the
+/// session's `tenant` (`proxy_grpc::stamp_mcp_tenant`), or refused.
+fn stamped(frame: bytes::Bytes, tenant: &str) -> Result<bytes::Bytes, tonic::Status> {
+    let mut envelope = decode(&frame)?;
+    if !envelope.is_message() {
+        return Ok(frame);
+    }
+    envelope.payload = stamp_mcp_tenant(&envelope.payload, tenant)?;
+    Ok(bytes::Bytes::from(frame_grpc(&prost::Message::encode_to_vec(
+        &envelope,
+    ))))
 }
 
 /// Reads a new session's id off the backend's first envelope.

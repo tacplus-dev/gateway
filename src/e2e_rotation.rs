@@ -153,9 +153,9 @@ fn user_token(key: &keys::ImmutableKey, audience: &str, sub: &str, lifetime: i64
 
 /// What every instance saw, in the order it saw it.
 #[derive(Default)]
-struct Log {
+pub(crate) struct Log {
     /// (instance, payload) of every message envelope received.
-    received: Mutex<Vec<(&'static str, Vec<u8>)>>,
+    pub(crate) received: Mutex<Vec<(&'static str, Vec<u8>)>>,
     /// (instance, session id) of every leg admitted.
     legs: Mutex<Vec<(&'static str, String)>>,
 }
@@ -164,7 +164,7 @@ struct Log {
 /// can tell: it issues session ids of its own, admits a rotation only onto
 /// one of them, echoes each message, and answers `last` with its own `last`.
 #[derive(Clone)]
-struct Instance {
+pub(crate) struct Instance {
     name: &'static str,
     serves_sibling: bool,
     issued: Arc<Mutex<HashSet<String>>>,
@@ -184,7 +184,7 @@ fn trailers(code: tonic::Code) -> Result<Frame<Bytes>, std::convert::Infallible>
 }
 
 impl Instance {
-    async fn spawn(name: &'static str, serves_sibling: bool, log: Arc<Log>) -> ServiceEndpoint {
+    pub(crate) async fn spawn(name: &'static str, serves_sibling: bool, log: Arc<Log>) -> ServiceEndpoint {
         let instance = Instance {
             name,
             serves_sibling,
@@ -335,14 +335,14 @@ impl tonic::codec::Decoder for EnvelopeCodec {
 }
 
 /// One leg: what the client sends on it, and what it receives.
-struct ClientLeg {
+pub(crate) struct ClientLeg {
     tx: mpsc::Sender<Envelope>,
     rx: tonic::Streaming<Envelope>,
 }
 
 /// Opens a leg of `path` with `token` whose first envelope names `session_id`
 /// (empty for a new session).
-async fn open_leg(
+pub(crate) async fn open_leg(
     channel: &tonic::transport::Channel,
     path: &str,
     token: Option<&str>,
@@ -375,18 +375,18 @@ async fn open_leg(
 }
 
 impl ClientLeg {
-    async fn send(&self, envelope: Envelope) {
+    pub(crate) async fn send(&self, envelope: Envelope) {
         self.tx.send(envelope).await.expect("the leg takes it");
     }
 
-    async fn next(&mut self) -> Result<Option<Envelope>, tonic::Status> {
+    pub(crate) async fn next(&mut self) -> Result<Option<Envelope>, tonic::Status> {
         timeout(Duration::from_secs(10), self.rx.message())
             .await
             .expect("the leg answers in time")
     }
 
     /// The leg's first envelope from the server: the session id.
-    async fn session_id(&mut self) -> String {
+    pub(crate) async fn session_id(&mut self) -> String {
         let first = self
             .next()
             .await
