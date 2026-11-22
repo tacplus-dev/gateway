@@ -22,3 +22,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-22 looper issue Image: grpc-health-probe v0.4.60 -> v0.4.62 (shipped probe built with go1.27.3: GO-2026-6859, net/http) (#33)
 - 2026-11-22 looper issue CodeQL fails the policy on webapp-login's test fake DOM: js/incomplete-multi-character-sanitization and js/polynomial-redos (HIGH) in test/page.test.ts (#41)
 - 2026-11-22 looper issue Port SeaBeam gateway f3002b7..d0b7ad44 (#7)
+- 2026-11-22 looper issue MCP carrier: stamp McpRequest.tenant from the caller token, never pass a client value through (#15)
