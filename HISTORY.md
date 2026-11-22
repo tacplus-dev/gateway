@@ -17,3 +17,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-22 looper release v0.1.3 (https://github.com/tacplus-dev/gateway/releases/tag/v0.1.3)
 - 2026-11-22 looper issue The IdP hop strips the hop-by-hop headers the blob hop already strips (#44)
 - 2026-11-22 looper issue Release: tag vMAJOR.MINOR.PATCH (start at v0.1.0) and publish its image (#6)
+- 2026-11-22 looper release v0.2.0 (https://github.com/tacplus-dev/gateway/releases/tag/v0.2.0)
