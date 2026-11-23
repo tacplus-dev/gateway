@@ -9,7 +9,8 @@ import { registerHooks } from 'node:module';
 import { afterEach, beforeEach, test } from 'node:test';
 import { Window } from 'happy-dom';
 import type { Brand } from '../src/page.ts';
-import type { Identity, Provider, ProviderState, SignIn, SignedInWith } from '../src/flow.ts';
+import type { AccountSignIn, Identity, Membership, Provider, ProviderState, SignIn, SignedInWith } from '../src/flow.ts';
+const { ConfirmNeeded, StepUpNeeded } = await import('../src/flow.ts');
 
 // page.ts imports './flow.js', as its consumers' bundlers resolve it; node
 // finds the .ts source.
@@ -58,6 +59,7 @@ const stub = (redirect: Redirect, me: Identity | null = null, held: SignedInWith
     [GOOGLE, APPLE].map((provider) => ({ provider, held: held.find((s) => s.idpId === provider.name.toLowerCase())?.idpId })),
   canAdd: () => true,
   canSignOutOfOne: () => false,
+  canManageAccount: () => false,
 }) as unknown as SignIn;
 
 const settled = () => new Promise((r) => setTimeout(r, 0));
@@ -173,4 +175,107 @@ test('without modules, or when they cannot be read, the page has no apps list', 
     assert.match(c.innerHTML, /Subject/);
     assert.match(c.innerHTML, /Sign out of all/);
   }
+});
+
+// The account screens, over a SignIn that records what the page asks of it.
+
+class Account {
+  calls: string[] = [];
+  signedIn = true;
+  signIns: AccountSignIn[] = [
+    { idpId: 'google', subject: 'g-1', addedAtMs: Date.UTC(2026, 9, 1), inSession: true },
+    { idpId: 'apple', subject: 'a-<1>', addedAtMs: Date.UTC(2026, 9, 2), inSession: false },
+  ];
+  memberships: Membership[] = [{ tenant: '/tenants/beta', joinedAtMs: 1, revokedAtMs: 0 }];
+}
+
+const withAccount = (account: Account, redirect = new Redirect()) => Object.assign(
+  stub(redirect, ME, [{ idpId: 'google', subject: 'g-1', email: 'p@example.com' }]) as unknown as Record<string, unknown>, {
+    current: async () => (account.signedIn ? ME : null),
+    tenants: () => ['/tenants/people'],
+    canManageAccount: () => true,
+    linkedAccounts: async () => ({ signIns: account.signIns, memberships: account.memberships }),
+    removeSignIn: async (idpId: string, subject: string) => {
+      account.calls.push(`remove ${idpId} ${subject}`);
+      account.signIns = account.signIns.filter((s) => s.subject !== subject);
+    },
+    signOutEverywhere: async () => { account.calls.push('everywhere'); account.signedIn = false; },
+    deleteAccount: async (confirm: boolean) => {
+      account.calls.push(`delete ${confirm}`);
+      if (!confirm) throw new ConfirmNeeded('deleting this account removes its 2 sign-in(s); it cannot be undone');
+      account.signedIn = false;
+    },
+    switchTenant: async (tenant: string) => {
+      account.calls.push(`switch ${tenant}`);
+      throw new StepUpNeeded(tenant, `This session has no sign-in for ${tenant}.`);
+    },
+    startAdding: (i: number, tenant?: string) => { account.calls.push(`add ${i} for ${tenant}`); return redirect.begin(i); },
+    cancelAdding: () => {},
+  }) as unknown as SignIn;
+
+test('linked accounts list every sign-in, with Remove on those the session does not hold', async () => {
+  const account = new Account();
+  const c = await mount(withAccount(account));
+  const rows = [...c.querySelectorAll('ul.tp-linked li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+  assert.deepEqual(rows, ['Google g-1 added 2026-10-01 this session', 'Apple a-<1> added 2026-10-02 Remove']);
+  assert.deepEqual(buttons(c, 'unlink').map((b) => b.dataset.sub), ['a-<1>']);
+
+  buttons(c, 'unlink')[0].click();
+  await settled();
+  assert.deepEqual(account.calls, ['remove apple a-<1>']);
+  assert.equal(c.querySelectorAll('ul.tp-linked li').length, 1, 'the list is read again');
+});
+
+test('sign out everywhere ends the session and shows the providers', async () => {
+  const account = new Account();
+  const c = await mount(withAccount(account));
+  buttons(c, 'everywhere')[0].click();
+  await settled();
+  assert.deepEqual(account.calls, ['everywhere']);
+  assert.deepEqual(labels(c, 'p'), ['Continue with Google', 'Continue with Apple']);
+});
+
+test('delete account shows kernel\'s warning and deletes only on the second click', async () => {
+  const account = new Account();
+  const c = await mount(withAccount(account));
+  buttons(c, 'delete')[0].click();
+  await settled();
+  assert.deepEqual(account.calls, ['delete false']);
+  assert.match(c.textContent ?? '', /deleting this account removes its 2 sign-in\(s\); it cannot be undone/);
+  assert.equal(buttons(c, 'merge').length, 0, 'not the merge confirmation');
+
+  buttons(c, 'delete-confirm')[0].click();
+  await settled();
+  assert.deepEqual(account.calls, ['delete false', 'delete true']);
+  assert.deepEqual(labels(c, 'p'), ['Continue with Google', 'Continue with Apple']);
+});
+
+test('cancelling the delete keeps the account', async () => {
+  const account = new Account();
+  const c = await mount(withAccount(account));
+  buttons(c, 'delete')[0].click();
+  await settled();
+  buttons(c, 'cancel')[0].click();
+  await settled();
+  assert.deepEqual(account.calls, ['delete false']);
+  assert.match(c.innerHTML, /Subject/);
+});
+
+test('a membership the session has no sign-in for can be asked for, and asks for the step-up', async () => {
+  const account = new Account();
+  const c = await mount(withAccount(account));
+  assert.deepEqual(buttons(c, 'switch').map((b) => b.dataset.t), ['/tenants/beta']);
+  buttons(c, 'switch')[0].click();
+  await settled();
+  assert.deepEqual(account.calls, ['switch /tenants/beta']);
+  assert.match(c.textContent ?? '', /no sign-in for \/tenants\/beta/);
+  assert.deepEqual(labels(c, 'step-up'), ['Sign in with Google', 'Sign in with Apple']);
+  buttons(c, 'step-up')[1].click();
+  assert.deepEqual(account.calls, ['switch /tenants/beta', 'add 1 for /tenants/beta']);
+});
+
+test('without an account manager the page offers no account screens', async () => {
+  const c = await mount(stub(new Redirect(), ME));
+  for (const kind of ['unlink', 'everywhere', 'delete']) assert.equal(buttons(c, kind).length, 0, kind);
+  assert.doesNotMatch(c.innerHTML, /Linked accounts/);
 });

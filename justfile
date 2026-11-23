@@ -1,6 +1,10 @@
 # Local development builds only — not used in CI/CD.
 
 TACPLUS := env_var_or_default("TACPLUS_BIN", "tacplus")
+# The fleet whose merged protos (build/proto) the gates build the console
+# against: tacplus-dev/fleet-seatrials, at its relock to 2.6 (fleet-seatrials#1).
+FLEET_REPO := "https://github.com/tacplus-dev/fleet-seatrials.git"
+FLEET_COMMIT := "4730899829a799ac107970ba511a0177c25d6492"
 
 default: generate
 
@@ -14,7 +18,8 @@ verify:
 
 # What every change must pass: regenerate with the floor's compiler (generated
 # code lives only in target/, so generation touching any file git sees is a
-# failure), then build and test the gateway and webapp-login. The release
+# failure), then build and test the gateway and webapp-login, and build the
+# console against the fleet's merged protos (FLEET_COMMIT). The release
 # build is the binary the image ships (target/release/gateway), and the only
 # build that trips main.rs's compile_error! should dev-bypass ever be on.
 gates:
@@ -38,7 +43,13 @@ gates:
   cargo build --locked --all-targets
   cargo build --locked --release
   cargo test --locked
-  cd webapp-login && npm ci && npm test
+  (cd webapp-login && npm ci && npm test)
+  # The console's model, generated against the fleet's merged protos, type-checks and builds (#2).
+  fleet="$(mktemp -d)"
+  git -C "$fleet" init -q
+  git -C "$fleet" fetch -q --depth 1 "{{FLEET_REPO}}" "{{FLEET_COMMIT}}"
+  git -C "$fleet" checkout -q FETCH_HEAD
+  just webapp "$fleet/build/proto"
 
 clean:
   rm -rf target
@@ -57,7 +68,7 @@ stage-web dist:
 # webapp-dist/, which the image serves from /opt/tacplus/webapp. FLEET_PROTO
 # is the fleet's merged tree the model generates against.
 webapp fleet_proto:
-  cd webapp && tacplus build --src "{{fleet_proto}}" && npm ci && npm run build
+  cd webapp && {{TACPLUS}} build --src "{{fleet_proto}}" && npm ci && npm run build
   rm -rf webapp-dist && cp -R webapp/dist webapp-dist
 
 # The release image, as the fleet builder builds it (see Dockerfile): twice,

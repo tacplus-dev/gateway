@@ -20,6 +20,15 @@ Sign-in for a tacplus fleet's web app, as a library. Two layers:
   provider's sign-ins and keeps the session in the tenant kernel's new access token is for;
   signing out of the last one is `signOut()`, which ends the session. The page offers "Sign out
   of <provider>" for a held provider, "Add <provider>" for the others, and "Sign out of all".
+- The account: with an `AccountManager` (over kernel.UserMint, each write presenting the session
+  credential), `linkedAccounts()` lists the person's linked sign-ins (marking those the session
+  holds) and live tenant memberships, `removeSignIn(idpId, subject)` removes one the session does
+  not hold (DeleteIdentityLink), `signOutEverywhere()` ends every session (RevokeSessions) and
+  forgets this one, and `deleteAccount(confirm)` is two steps: without `confirm` kernel's warning
+  (`ConfirmNeeded`, its message what would be lost), with it the account is gone. The page lists
+  "Linked accounts" with Remove, offers each membership's tenant to switch to (one the session has
+  no sign-in for is the step-up), "Sign out everywhere", and "Delete account", which shows kernel's
+  warning and deletes only on a second click.
 - `mountSignIn` (page.ts): a page that renders the flow into a container under a `Brand`
   (title, subtitle, logo, accent, labels, footer, and what to do once signed in). A clicked
   provider button says "Signing in with <provider>…" (`providerPendingLabel`), or "Adding

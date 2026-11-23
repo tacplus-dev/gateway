@@ -6,7 +6,7 @@
 // with PERMISSION_DENIED, as kernel does (the step-up).
 import assert from 'node:assert/strict';
 import { beforeEach, test } from 'node:test';
-import { SignIn, StepUpNeeded, providerStates, signedInWith, vouchedTenants, type LoginAuth, type SessionTokens } from '../src/flow.ts';
+import { ConfirmNeeded, SignIn, StepUpNeeded, providerStates, signedInWith, vouchedTenants, type LoginAuth, type SessionTokens } from '../src/flow.ts';
 
 const ALPHA = '/tenants/alpha';
 const PEOPLE = '/tenants/people';
@@ -274,4 +274,98 @@ test('a session kernel ends while signing out of one is signed out of all', asyn
   await signIn.signOutOf('google');
   assert.deepEqual(revoked, ['session']);
   assert.equal(await signIn.current(), null);
+});
+
+// The person's account: kernel.UserMint's GetLinkedAccounts, DeleteIdentityLink,
+// RevokeSessions and DeleteAccount, each presented the session credential.
+
+/** Answers as kernel does: the links and memberships, a refusal to remove the
+ * sign-in the presented credential holds, and DeleteAccount's warning first. */
+class FakeAccount {
+  readonly calls: string[] = [];
+  links = [
+    { idpId: 'google', subject: 'google-1', addedAtMs: Date.UTC(2026, 9, 1) },
+    { idpId: 'apple', subject: 'apple-1', addedAtMs: Date.UTC(2026, 9, 2) },
+    { idpId: 'apple', subject: 'apple-2', addedAtMs: Date.UTC(2026, 9, 3) },
+  ];
+  memberships = [
+    { tenant: ALPHA, joinedAtMs: 1, revokedAtMs: 0 },
+    { tenant: BETA, joinedAtMs: 2, revokedAtMs: 0 },
+    { tenant: '/tenants/gone', joinedAtMs: 3, revokedAtMs: 4 },
+  ];
+  async linkedAccounts() {
+    this.calls.push('get');
+    return { signIns: this.links, memberships: this.memberships };
+  }
+  async deleteIdentityLink(credential: string, idpId: string, subject: string) {
+    this.calls.push(`unlink ${idpId} ${subject} with ${signedInWith(credential).map((s) => s.idpId).join(',')}`);
+    if (signedInWith(credential).some((s) => s.idpId === idpId && s.subject === subject)) {
+      throw Object.assign(new Error('that is the sign-in this session uses'), { code: 9 });
+    }
+    this.links = this.links.filter((l) => !(l.idpId === idpId && l.subject === subject));
+  }
+  async revokeSessions(credential: string) {
+    this.calls.push(`revoke with ${signedInWith(credential).map((s) => s.idpId).join(',')}`);
+  }
+  async deleteAccount(credential: string, confirm: boolean) {
+    this.calls.push(`delete ${confirm} with ${signedInWith(credential).map((s) => s.idpId).join(',')}`);
+    if (!confirm) throw new ConfirmNeeded('deleting this account removes its 3 sign-in(s) and 2 tenant membership(s)');
+  }
+}
+
+async function signedInWithAccount(cred: string, firstTenant: string) {
+  const ended: string[] = [];
+  const auth: LoginAuth = { ...authReturning(cred, firstTenant), async revokeSession() { ended.push('oauth'); } };
+  const tokens = new FakeTokens(local);
+  const account = new FakeAccount();
+  const signIn = new SignIn(auth, tokens, 'https://fleet.example/', undefined, undefined, account);
+  await signIn.complete('?code=c&state=s');
+  return { signIn, tokens, account, ended };
+}
+
+test('a session credential\'s sign-ins carry their provider subjects', () => {
+  assert.deepEqual(signedInWith(credentialOf(['google', PEOPLE])), [{ idpId: 'google', subject: 'google-1', email: 'p@google.example' }]);
+});
+
+test('linked accounts mark the sign-ins the session holds, and list live memberships', async () => {
+  const { signIn } = await signedInWithAccount(credentialOf(['google', PEOPLE], ['apple', PEOPLE]), PEOPLE);
+  assert.equal(signIn.canManageAccount(), true);
+  const linked = await signIn.linkedAccounts();
+  assert.deepEqual(linked.signIns.map((s) => [s.idpId, s.subject, s.inSession]),
+    [['google', 'google-1', true], ['apple', 'apple-1', true], ['apple', 'apple-2', false]]);
+  assert.deepEqual(linked.memberships.map((m) => m.tenant), [ALPHA, BETA], 'a revoked membership is not listed');
+});
+
+test('removing a sign-in presents the session credential, and kernel refuses the session\'s own', async () => {
+  const { signIn, account } = await signedInWithAccount(credentialOf(['google', PEOPLE], ['apple', PEOPLE]), PEOPLE);
+  await signIn.removeSignIn('apple', 'apple-2');
+  assert.deepEqual(account.calls, ['unlink apple apple-2 with google,apple']);
+  assert.deepEqual((await signIn.linkedAccounts()).signIns.map((s) => s.subject), ['google-1', 'apple-1']);
+  await assert.rejects(signIn.removeSignIn('google', 'google-1'), /this session uses/);
+  assert.notEqual(await signIn.current(), null, 'the session stays');
+});
+
+test('signing out everywhere revokes every session, then forgets this one', async () => {
+  const { signIn, account } = await signedInWithAccount(credentialOf(['google', ALPHA, PEOPLE]), ALPHA);
+  await signIn.signOutEverywhere();
+  assert.deepEqual(account.calls, ['revoke with google']);
+  assert.equal(await signIn.current(), null);
+  assert.equal(signIn.activeTenant(), null);
+});
+
+test('deleting the account warns first, and deletes only when confirmed', async () => {
+  const { signIn, account } = await signedInWithAccount(credentialOf(['google', PEOPLE]), PEOPLE);
+  await assert.rejects(signIn.deleteAccount(false),
+    (e: unknown) => e instanceof ConfirmNeeded && /removes its 3 sign-in/.test(e.message));
+  assert.notEqual(await signIn.current(), null, 'the warning deletes nothing');
+  await signIn.deleteAccount(true);
+  assert.deepEqual(account.calls, ['delete false with google', 'delete true with google']);
+  assert.equal(await signIn.current(), null);
+  assert.equal(signIn.activeTenant(), null);
+});
+
+test('without an account manager, the account screens are not offered', async () => {
+  const { signIn } = await signedIn(credential(PEOPLE), PEOPLE);
+  assert.equal(signIn.canManageAccount(), false);
+  await assert.rejects(signIn.linkedAccounts());
 });

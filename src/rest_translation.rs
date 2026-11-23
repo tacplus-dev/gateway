@@ -479,13 +479,61 @@ fn json_error_response(status: StatusCode, message: impl AsRef<str>) -> axum::re
         .into_response()
 }
 
+/// A backend's gRPC error, keeping its code: HTTP cannot carry most of them
+/// (FAILED_PRECONDITION is a 500 like any other), so the `grpc-status` header
+/// and the body's `code` do, which the generated W2S clients read before the
+/// HTTP status.
+fn grpc_json_error_response(grpc_status: i32, message: &str) -> axum::response::Response {
+    (
+        grpc_status_to_http(grpc_status),
+        [
+            (
+                axum::http::header::CONTENT_TYPE,
+                "application/json".to_string(),
+            ),
+            (
+                axum::http::HeaderName::from_static("grpc-status"),
+                grpc_status.to_string(),
+            ),
+        ],
+        serde_json::json!({ "error": message, "code": grpc_status }).to_string(),
+    )
+        .into_response()
+}
+
 fn grpc_message_from_headers(headers: &http::HeaderMap) -> String {
     headers
         .get("grpc-message")
         .and_then(|v| v.to_str().ok())
         .filter(|s| !s.is_empty())
-        .unwrap_or("unknown gRPC error")
-        .to_string()
+        .map(percent_decode)
+        .unwrap_or_else(|| "unknown gRPC error".to_string())
+}
+
+/// `grpc-message` is percent-encoded (the gRPC HTTP/2 protocol: every byte
+/// outside printable ASCII, and `%`, as `%XX`); a malformed escape stays as sent.
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let hex = bytes
+            .get(i + 1..i + 3)
+            .filter(|h| h.iter().all(u8::is_ascii_hexdigit))
+            .and_then(|h| std::str::from_utf8(h).ok())
+            .and_then(|h| u8::from_str_radix(h, 16).ok());
+        match (bytes[i], hex) {
+            (b'%', Some(b)) => {
+                out.push(b);
+                i += 3;
+            }
+            (b, _) => {
+                out.push(b);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 fn grpc_error_from_headers(headers: &http::HeaderMap) -> Option<GrpcBodyError> {
@@ -511,11 +559,10 @@ fn grpc_error_response_from_headers(headers: &http::HeaderMap) -> Option<axum::r
 }
 
 fn grpc_body_error_response(error: GrpcBodyError) -> axum::response::Response {
-    let status = error
-        .grpc_status
-        .map(grpc_status_to_http)
-        .unwrap_or(StatusCode::BAD_GATEWAY);
-    json_error_response(status, error.message)
+    match error.grpc_status {
+        Some(grpc_status) => grpc_json_error_response(grpc_status, &error.message),
+        None => json_error_response(StatusCode::BAD_GATEWAY, error.message),
+    }
 }
 
 async fn read_grpc_response_body(mut body: axum::body::Body) -> Result<Vec<u8>, GrpcBodyError> {
@@ -1596,6 +1643,40 @@ mod tests {
         let response = send("POST", "/nope").await;
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert_eq!(body_text(response).await, r#"{"error":"unknown route: /nope"}"#);
+    }
+
+    /// A backend's gRPC status survives the translation: HTTP cannot carry
+    /// FAILED_PRECONDITION (a 500 like any other), so the response carries the
+    /// code itself, as the `grpc-status` header and the body's `code`, which
+    /// the generated W2S clients read; and its message as the backend sent
+    /// it, percent-decoded from the `grpc-message` trailer.
+    #[tokio::test]
+    async fn a_grpc_error_carries_its_status_and_decoded_message() {
+        let mut trailers = http::HeaderMap::new();
+        trailers.insert("grpc-status", http::HeaderValue::from_static("9"));
+        trailers.insert(
+            "grpc-message",
+            http::HeaderValue::from_static("it cannot be undone %E2%80%94 confirm to proceed"),
+        );
+        let response = grpc_error_response_from_headers(&trailers).expect("an error");
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(response.headers().get("grpc-status").unwrap(), "9");
+        let body: serde_json::Value =
+            serde_json::from_str(&body_text(response).await).expect("a JSON body");
+        assert_eq!(
+            body,
+            serde_json::json!({"error": "it cannot be undone — confirm to proceed", "code": 9})
+        );
+    }
+
+    /// A failure with no gRPC status (the backend unreachable, a malformed
+    /// reply) has no code to carry, and its body stays the plain error.
+    #[tokio::test]
+    async fn a_transport_error_carries_no_grpc_status() {
+        let response = grpc_body_error_response(GrpcBodyError::transport("body read error"));
+        assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+        assert!(response.headers().get("grpc-status").is_none());
+        assert_eq!(body_text(response).await, r#"{"error":"body read error"}"#);
     }
 
     /// The request's Host has to survive the REST fallback for the SPA to pick

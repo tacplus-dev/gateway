@@ -5,12 +5,19 @@
 // under the default brand. It generates its own W2S clients (model/w2sm:
 // oauth.Auth, gateway.Mint and kernel.UserMint, declared in
 // proto/clients/webapp.proto) and
-// hands them to the library through its two small interfaces; the library
-// itself imports no generated code.
+// hands them to the library through its small interfaces; the library itself
+// imports no generated code.
 import { create } from '@bufbuild/protobuf';
-import { ConfirmNeeded, SignIn, fleetApps, mountSignIn, type AccountMerger, type LoginAuth, type ProofRevoker } from '@tacplus-dev/webapp-login';
+import { ConfirmNeeded, SignIn, fleetApps, mountSignIn, type AccountManager, type AccountMerger, type LoginAuth, type ProofRevoker } from '@tacplus-dev/webapp-login';
 import { MintTokenProvider, ServiceManager, W2SError } from '../model/w2sm/index.js';
-import { MergePeopleRequestSchema, RevokeCredentialProofRequestSchema } from '../model/types/services/kernel/services/index.js';
+import {
+  DeleteAccountRequestSchema,
+  DeleteIdentityLinkRequestSchema,
+  GetLinkedAccountsRequestSchema,
+  MergePeopleRequestSchema,
+  RevokeCredentialProofRequestSchema,
+  RevokeSessionsRequestSchema,
+} from '../model/types/services/kernel/services/index.js';
 import {
   AuthorizeRequestSchema,
   CallbackRequestSchema,
@@ -74,7 +81,36 @@ const revoker: ProofRevoker = {
   },
 };
 
-const signIn = new SignIn(auth, tokens, `${window.location.origin}/`, merger, revoker);
+// kernel.UserMint's account RPCs, as the library's AccountManager. Each write
+// presents the session credential; DeleteAccount without confirm is kernel's
+// warning, FAILED_PRECONDITION, its message what would be lost.
+const account: AccountManager = {
+  async linkedAccounts() {
+    const resp = await userMint.getLinkedAccounts(create(GetLinkedAccountsRequestSchema, {}));
+    return {
+      signIns: resp.links.map((l) => ({ idpId: l.idpId, subject: l.providerSubject, addedAtMs: Number(l.createdAtMs) })),
+      memberships: resp.memberships.map((m) => ({
+        tenant: m.tenantNamespace, joinedAtMs: Number(m.createdAtMs), revokedAtMs: Number(m.revokedAtMs),
+      })),
+    };
+  },
+  async deleteIdentityLink(credential, idpId, providerSubject) {
+    await userMint.deleteIdentityLink(create(DeleteIdentityLinkRequestSchema, { credential, idpId, providerSubject }));
+  },
+  async revokeSessions(credential) {
+    await userMint.revokeSessions(create(RevokeSessionsRequestSchema, { credential }));
+  },
+  async deleteAccount(credential, confirm) {
+    try {
+      await userMint.deleteAccount(create(DeleteAccountRequestSchema, { credential, confirm }));
+    } catch (e) {
+      if (e instanceof W2SError && e.code === FAILED_PRECONDITION && !confirm) throw new ConfirmNeeded(e.message);
+      throw e;
+    }
+  },
+};
+
+const signIn = new SignIn(auth, tokens, `${window.location.origin}/`, merger, revoker, account);
 // Signed in, the page links to the modules the fleet's services contribute
 // (/-/apps/<service>/, listed in /-/apps.json): same origin, same session.
 mountSignIn(document.getElementById('app') as HTMLElement, signIn, { title: 'Sign in', apps: () => fleetApps() });

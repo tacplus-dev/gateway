@@ -25,6 +25,13 @@
 // org's when the login routed to one), and lets the person switch. A tenant no
 // live proof vouches for is refused PERMISSION_DENIED: the step-up, signing in
 // with that tenant's identity provider.
+//
+// The account is the person's, not the session's (an AccountManager over
+// kernel.UserMint, each call presenting the session credential): the sign-ins
+// linked to them and their tenant memberships (GetLinkedAccounts), removing a
+// sign-in the session does not hold (DeleteIdentityLink), signing out of every
+// session (RevokeSessions) and deleting the account, warned first
+// (DeleteAccount).
 
 export interface Provider {
   name: string;
@@ -85,7 +92,51 @@ export interface ProofRevoker {
   revokeProof(credential: string, idpId: string): Promise<RemainingSession | null>;
 }
 
-/** Kernel's warning path: the added sign-in belongs to an account with its own history. */
+/** A sign-in linked to the person (kernel's IdentityLink). */
+export interface LinkedSignIn {
+  idpId: string;
+  /** The provider's own subject for the person. */
+  subject: string;
+  /** When it was linked, in ms since the epoch. */
+  addedAtMs: number;
+}
+
+/** A tenant the person is a member of (kernel's PersonMembership). */
+export interface Membership {
+  /** The tenant's namespace, /tenants/<name>. */
+  tenant: string;
+  joinedAtMs: number;
+  /** 0 while the membership is live. */
+  revokedAtMs: number;
+}
+
+export interface LinkedAccounts {
+  signIns: LinkedSignIn[];
+  memberships: Membership[];
+}
+
+/** A linked sign-in, and whether the session's credential holds it (kernel
+ * refuses removing one it does). */
+export interface AccountSignIn extends LinkedSignIn {
+  inSession: boolean;
+}
+
+/** The person's account (kernel.UserMint). Each write presents the session
+ * credential, as kernel asks. */
+export interface AccountManager {
+  /** GetLinkedAccounts: the bearer's own sign-ins and memberships. */
+  linkedAccounts(): Promise<LinkedAccounts>;
+  /** DeleteIdentityLink: removes a sign-in the credential does not hold. */
+  deleteIdentityLink(credential: string, idpId: string, subject: string): Promise<void>;
+  /** RevokeSessions: every credential of the person, this one included, mints nothing more. */
+  revokeSessions(credential: string): Promise<void>;
+  /** DeleteAccount: without `confirm` kernel only warns, which is ConfirmNeeded
+   * with kernel's message; with it the account is gone. */
+  deleteAccount(credential: string, confirm: boolean): Promise<void>;
+}
+
+/** Kernel's warning path: the added sign-in belongs to an account with its own
+ * history, or deleting the account, which says what would be lost. */
 export class ConfirmNeeded extends Error {}
 
 /** Kernel refused a tenant no live proof vouches for: sign in with that tenant's
@@ -101,6 +152,8 @@ export class StepUpNeeded extends Error {
 /** One sign-in the session holds, as the credential's proofs record it. */
 export interface SignedInWith {
   idpId: string;
+  /** The provider's subject (the proof's `sub`). */
+  subject?: string;
   email?: string;
 }
 
@@ -120,7 +173,11 @@ function proofsOf(credential: string | null): Array<Record<string, unknown>> {
 export function signedInWith(credential: string | null): SignedInWith[] {
   return proofsOf(credential).map((p) => {
     const c = (p.claims ?? {}) as Record<string, unknown>;
-    return { idpId: String(p.idp_id ?? ''), email: typeof c.email === 'string' ? c.email : undefined };
+    return {
+      idpId: String(p.idp_id ?? ''),
+      subject: typeof p.sub === 'string' ? p.sub : undefined,
+      email: typeof c.email === 'string' ? c.email : undefined,
+    };
   });
 }
 
@@ -192,6 +249,8 @@ export class SignIn {
   private readonly merger?: AccountMerger;
   /** Present when the app lets a person sign out of one provider. */
   private readonly revoker?: ProofRevoker;
+  /** Present when the app lets a person manage their account. */
+  private readonly account?: AccountManager;
 
   constructor(
     auth: LoginAuth,
@@ -199,12 +258,14 @@ export class SignIn {
     callbackUrl: string,
     merger?: AccountMerger,
     revoker?: ProofRevoker,
+    account?: AccountManager,
   ) {
     this.auth = auth;
     this.tokens = tokens;
     this.callbackUrl = callbackUrl;
     this.merger = merger;
     this.revoker = revoker;
+    this.account = account;
   }
 
   /** A fresh sign-in waiting for the person to confirm the merge. */
@@ -377,9 +438,61 @@ export class SignIn {
     try {
       await this.auth.revokeSession(this.callbackUrl);
     } finally {
-      this.tokens.clear();
-      localStorage.removeItem(TENANT_KEY);
-      this.tokens.setTenantNamespace(null);
+      this.forget();
     }
+  }
+
+  /** Forgets the session here. */
+  private forget(): void {
+    this.tokens.clear();
+    localStorage.removeItem(TENANT_KEY);
+    this.tokens.setTenantNamespace(null);
+  }
+
+  /** Whether this app lets a person manage their account. */
+  canManageAccount(): boolean {
+    return this.account !== undefined;
+  }
+
+  private requireAccount(): { account: AccountManager; credential: string } {
+    const credential = this.tokens.getRefreshToken();
+    if (!this.account || !credential) throw new Error('No account to manage: sign in first.');
+    return { account: this.account, credential };
+  }
+
+  /** The person's linked sign-ins, each marked when this session holds it,
+   * and their live tenant memberships. */
+  async linkedAccounts(): Promise<{ signIns: AccountSignIn[]; memberships: Membership[] }> {
+    const { account } = this.requireAccount();
+    const held = this.signedInWith();
+    const linked = await account.linkedAccounts();
+    return {
+      signIns: linked.signIns.map((s) => ({
+        ...s,
+        inSession: held.some((h) => h.idpId === s.idpId && h.subject === s.subject),
+      })),
+      memberships: linked.memberships.filter((m) => !m.revokedAtMs),
+    };
+  }
+
+  /** Removes a sign-in from the person; kernel refuses one this session holds. */
+  async removeSignIn(idpId: string, subject: string): Promise<void> {
+    const { account, credential } = this.requireAccount();
+    await account.deleteIdentityLink(credential, idpId, subject);
+  }
+
+  /** Signs the person out of every session, this one included, and forgets it here. */
+  async signOutEverywhere(): Promise<void> {
+    const { account, credential } = this.requireAccount();
+    await account.revokeSessions(credential);
+    this.forget();
+  }
+
+  /** Deletes the account. Without `confirm` kernel only warns: ConfirmNeeded,
+   * with what would be lost. Deleted, the session is forgotten here. */
+  async deleteAccount(confirm: boolean): Promise<void> {
+    const { account, credential } = this.requireAccount();
+    await account.deleteAccount(credential, confirm);
+    this.forget();
   }
 }

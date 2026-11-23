@@ -18,5 +18,7 @@ option (spec.grpc_w2s_client) = {service: "oauth.Auth"};
 option (spec.grpc_w2s_client) = {service: "gateway.Mint"};
 // Adding a sign-in to the session: two credentials become one person
 // (kernel.UserMint.MergePeople, the identity record's Link); signing out of one
-// provider drops its proofs (kernel.UserMint.RevokeCredentialProof).
+// provider drops its proofs (kernel.UserMint.RevokeCredentialProof). The
+// account: linked sign-ins (GetLinkedAccounts, DeleteIdentityLink), sign out
+// everywhere (RevokeSessions) and delete account (DeleteAccount).
 option (spec.grpc_w2s_client) = {service: "kernel.UserMint"};

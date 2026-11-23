@@ -4,7 +4,7 @@
 // The sign-in page: one function that owns a container element and renders
 // the flow into it under the consumer's brand. A consumer that wants its own
 // markup uses SignIn (flow.ts) directly and never calls this.
-import { SignIn, ConfirmNeeded, StepUpNeeded, isCallback, type Identity, type Provider } from './flow.js';
+import { SignIn, ConfirmNeeded, StepUpNeeded, isCallback, type AccountSignIn, type Identity, type Membership, type Provider } from './flow.js';
 import type { FleetApp } from './apps.js';
 
 export interface Brand {
@@ -29,9 +29,12 @@ export interface Brand {
   /** Rendered under the providers (terms, help). */
   footerHtml?: string;
   /** Called once someone is signed in; defaults to showing the identity, the
-   * tenants the session vouches for with a switch to each, the sign-ins it
-   * holds with a sign-out of each provider, buttons to add a provider it does
-   * not hold, the brand's apps, and sign out of all. */
+   * tenants the session vouches for and the person's memberships with a
+   * switch to each, the sign-ins it holds with a sign-out of each provider,
+   * buttons to add a provider it does not hold, the brand's apps, and sign out
+   * of all; with an account manager, the person's linked sign-ins with Remove
+   * on those the session does not hold, sign out everywhere, and delete
+   * account. */
   onSignedIn?: (identity: Identity, signOut: () => Promise<void>) => void;
 }
 
@@ -69,6 +72,12 @@ const STYLE = `
 .tp-login ul.tp-tenants { list-style: none; padding: 0; margin: 0; }
 .tp-login ul.tp-tenants li { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.35rem 0; word-break: break-all; }
 .tp-login ul.tp-tenants button { display: inline-block; width: auto; margin: 0; padding: 0.35rem 0.75rem; }
+.tp-login ul.tp-linked { list-style: none; padding: 0; margin: 0; }
+.tp-login ul.tp-linked li { display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0; }
+.tp-login ul.tp-linked .tp-who { flex: 1; word-break: break-all; }
+.tp-login ul.tp-linked .tp-when, .tp-login ul.tp-linked .tp-here { opacity: 0.7; font-size: 0.85rem; }
+.tp-login ul.tp-linked button { display: inline-block; width: auto; margin: 0; padding: 0.35rem 0.75rem; }
+.tp-login button.tp-danger { background: transparent; color: #b00020; border-color: #b00020; }
 .tp-login ul.tp-apps { list-style: none; padding: 0; margin: 0; }
 .tp-login ul.tp-apps li { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding: 0.35rem 0; }
 .tp-login ul.tp-apps a { color: var(--tp-accent, #333); }
@@ -135,7 +144,15 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
       brand.onSignedIn(me, () => signIn.signOut().then(run));
       return;
     }
-    const tenants = signIn.tenants().map((t) => t === me.tenant
+    // The person's account, when the app manages it: their linked sign-ins
+    // and memberships. Like the apps, a list that cannot be read is left out.
+    const linked = signIn.canManageAccount()
+      ? await signIn.linkedAccounts().catch(() => null)
+      : null;
+    // A membership no sign-in of the session vouches for is switched to all
+    // the same: kernel refuses it, and the step-up adds the sign-in it needs.
+    const tenantNames = [...new Set([...signIn.tenants(), ...(linked?.memberships ?? []).map((m: Membership) => m.tenant)])];
+    const tenants = tenantNames.map((t) => t === me.tenant
       ? `<li><strong>${escape(t)}</strong><span>active</span></li>`
       : `<li>${escape(t)}<button class="tp-secondary" data-tp="switch" data-t="${escape(t)}">Switch</button></li>`).join('');
     // Per provider: one the session holds is signed out of (every sign-in with
@@ -153,6 +170,21 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
     // The apps are a convenience: one that cannot be read leaves them out.
     const apps = (await (brand.apps?.() ?? Promise.resolve([])).catch(() => [] as FleetApp[]))
       .map((a) => `<li><a href="${escape(a.path)}">${escape(a.title)}</a><span class="tp-version">${escape(a.version)}</span></li>`).join('');
+    const providerName = (idpId: string) =>
+      states.find((p) => p.provider.name.toLowerCase().includes(idpId.toLowerCase()))?.provider.name ?? idpId;
+    const linkedRows = (linked?.signIns ?? []).map((s: AccountSignIn) => `<li>
+      <span class="tp-icon">${providerIcon(s.idpId)}</span>
+      <span class="tp-who">${escape(providerName(s.idpId))} ${escape(s.subject)}</span>
+      <span class="tp-when">added ${s.addedAtMs ? new Date(s.addedAtMs).toISOString().slice(0, 10) : 'earlier'}</span>
+      ${s.inSession
+        ? '<span class="tp-here">this session</span>'
+        : `<button class="tp-secondary" data-tp="unlink" data-idp="${escape(s.idpId)}" data-sub="${escape(s.subject)}">Remove</button>`}
+      </li>`).join('');
+    const account = signIn.canManageAccount()
+      ? `${linkedRows ? `<h2>Linked accounts</h2><ul class="tp-linked">${linkedRows}</ul>` : ''}
+        <button class="tp-secondary" data-tp="everywhere">Sign out everywhere</button>
+        <button class="tp-danger" data-tp="delete">Delete account</button>`
+      : '';
     const addable = states.filter((p) => !p.held).map((p) => p.provider);
     const adding = signIn.canAdd() && addable.length > 0
       ? `<h2>Add another sign-in</h2>${providerButtons(addable, (p) => `Add ${p.name}`, 'add')}`
@@ -162,7 +194,8 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
       ${tenants ? `<h2>Tenants</h2><ul class="tp-tenants">${tenants}</ul>` : ''}
       ${signins ? `<h2>Signed in with</h2><ul class="tp-signins">${signins}</ul>` : ''}
       ${adding}${adding ? errorLine : ''}
-      <button class="tp-secondary" data-tp="out">Sign out of all</button>`);
+      <button class="tp-secondary" data-tp="out">Sign out of all</button>
+      ${account}`);
     container.querySelector('[data-tp="out"]')?.addEventListener('click', () => signIn.signOut().then(run));
     for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="out-of"]')) {
       b.addEventListener('click', () => signIn.signOutOf(b.dataset.idp ?? '').then(run, fail));
@@ -171,6 +204,24 @@ export function mountSignIn(container: HTMLElement, signIn: SignIn, brand: Brand
     for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="switch"]')) {
       b.addEventListener('click', () => signIn.switchTenant(b.dataset.t ?? '').then(run, fail));
     }
+    for (const b of container.querySelectorAll<HTMLButtonElement>('button[data-tp="unlink"]')) {
+      b.addEventListener('click', () => signIn.removeSignIn(b.dataset.idp ?? '', b.dataset.sub ?? '').then(run, fail));
+    }
+    container.querySelector('[data-tp="everywhere"]')?.addEventListener('click', () =>
+      signIn.signOutEverywhere().then(run, fail));
+    // Deleting is two steps: kernel's warning first, the delete only on a second click.
+    container.querySelector('[data-tp="delete"]')?.addEventListener('click', () =>
+      signIn.deleteAccount(false).then(run, (err) => (err instanceof ConfirmNeeded ? showDelete(err.message) : fail(err))));
+  };
+
+  // Kernel's warning before deleting the account: what would be lost.
+  const showDelete = (warning: string) => {
+    render(`<p class="tp-error">${escape(warning)}</p>
+      <button class="tp-danger" data-tp="delete-confirm">Delete the account</button>
+      <button class="tp-secondary" data-tp="cancel">Cancel</button>`);
+    container.querySelector('[data-tp="delete-confirm"]')?.addEventListener('click', () =>
+      signIn.deleteAccount(true).then(run, fail));
+    container.querySelector('[data-tp="cancel"]')?.addEventListener('click', run);
   };
 
   const showProviders = async () => {
