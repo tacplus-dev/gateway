@@ -30,3 +30,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-23 looper issue Dependencies: rustix 1.1.4 (RUSTSEC-2026-0486, unsound xattr) via prost-build's tempfile: update to 1.1.6, lockfile-only (#30)
 - 2026-11-23 looper issue Security checks: 6 new non-blocking findings in gateway's build (semgrep insecure-websocket at src/e2e_stream_trace.rs:302; unmaintained pin-utils, rustls-pemfile, backoff, instant, unsafe-libyaml) (#31)
 - 2026-11-23 looper issue Dockerfile.cross's unused builder stage (FROM rust:trixie) puts 2695 findings, 108 of them blocking, in every nightly security report (#40)
+- 2026-11-23 looper issue Release image base debian:trixie-slim ships zlib1g 1:1.3.1-1+b1 (CVE-2026-85091 HIGH, blocking; CVE-2026-27171): Debian's fixed 1+deb13u1 is never applied, and the scan reads the tag (#38)
