@@ -26,3 +26,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-22 looper issue Trace: the REST SPIFFE-path fallback (rest_translation::fallback) has no test that the caller's trace_id reaches the backend (#32)
 - 2026-11-22 looper issue Serve fleet-contributed webapp modules and clients under /-/ (tacplus#195) (#21)
 - 2026-11-22 looper issue Route tenant-owned calls by the request's target-tenant field (#3)
+- 2026-11-23 looper issue Login page: show "Signing in with <provider>…" once a provider button is clicked (#17)
