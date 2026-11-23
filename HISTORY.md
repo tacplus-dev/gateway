@@ -27,3 +27,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-22 looper issue Serve fleet-contributed webapp modules and clients under /-/ (tacplus#195) (#21)
 - 2026-11-22 looper issue Route tenant-owned calls by the request's target-tenant field (#3)
 - 2026-11-23 looper issue Login page: show "Signing in with <provider>…" once a provider button is clicked (#17)
+- 2026-11-23 looper issue Dependencies: rustix 1.1.4 (RUSTSEC-2026-0486, unsound xattr) via prost-build's tempfile: update to 1.1.6, lockfile-only (#30)
