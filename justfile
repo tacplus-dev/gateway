@@ -49,7 +49,12 @@ gates:
   git -C "$fleet" init -q
   git -C "$fleet" fetch -q --depth 1 "{{FLEET_REPO}}" "{{FLEET_COMMIT}}"
   git -C "$fleet" checkout -q FETCH_HEAD
-  just webapp "$fleet/build/proto"
+  (cd webapp && {{TACPLUS}} build --src "$fleet/build/proto" && npm ci)
+  # A build's verdict quotes the log's last two lines: on a type error, the
+  # first of tsc's is the line before just's own.
+  log="$(mktemp)"
+  (cd webapp && npm run build) > "$log" 2>&1 || { cat "$log"; echo "webapp: $(grep -c 'error TS' "$log") type error(s), the first: $(grep -m1 'error TS' "$log")" >&2; exit 1; }
+  cat "$log"
 
 clean:
   rm -rf target
