@@ -45,6 +45,8 @@ gates:
   cargo test --locked
   (cd webapp-login && npm ci && npm test)
   # The console's model, generated against the fleet's merged protos, type-checks and builds (#2).
+  # webapp/ is a tacplus project of its own, whose pin is the gateway's: they move together.
+  cmp -s tacplus.lock webapp/tacplus.lock || { echo "webapp/tacplus.lock must be tacplus.lock: move both with \`tacplus pin\`" >&2; exit 1; }
   fleet="$(mktemp -d)"
   git -C "$fleet" init -q
   git -C "$fleet" fetch -q --depth 1 "{{FLEET_REPO}}" "{{FLEET_COMMIT}}"
