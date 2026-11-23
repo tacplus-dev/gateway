@@ -29,3 +29,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-23 looper issue Login page: show "Signing in with <provider>…" once a provider button is clicked (#17)
 - 2026-11-23 looper issue Dependencies: rustix 1.1.4 (RUSTSEC-2026-0486, unsound xattr) via prost-build's tempfile: update to 1.1.6, lockfile-only (#30)
 - 2026-11-23 looper issue Security checks: 6 new non-blocking findings in gateway's build (semgrep insecure-websocket at src/e2e_stream_trace.rs:302; unmaintained pin-utils, rustls-pemfile, backoff, instant, unsafe-libyaml) (#31)
+- 2026-11-23 looper issue Dockerfile.cross's unused builder stage (FROM rust:trixie) puts 2695 findings, 108 of them blocking, in every nightly security report (#40)
