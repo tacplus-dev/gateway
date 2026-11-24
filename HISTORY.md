@@ -34,3 +34,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-23 looper issue Security checks: 158 new non-blocking findings (debian:trixie-slim base MEDIUM/LOW/UNKNOWN CVEs with no Debian fix, DS-0026 no HEALTHCHECK) to fix or except (#42)
 - 2026-11-23 looper issue Identity step 4: linked accounts, sign out everywhere, delete account, tenant step-up in the console (#2)
 - 2026-11-23 looper release v0.3.0 (https://github.com/tacplus-dev/gateway/releases/tag/v0.3.0)
+- 2026-11-23 looper issue Pinned images behind their lines: relock (tacplus.lock: tacplus 2.6.13 → 2.6.14, and 1 more) (#58)
