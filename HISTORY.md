@@ -35,3 +35,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-23 looper issue Identity step 4: linked accounts, sign out everywhere, delete account, tenant step-up in the console (#2)
 - 2026-11-23 looper release v0.3.0 (https://github.com/tacplus-dev/gateway/releases/tag/v0.3.0)
 - 2026-11-23 looper issue Pinned images behind their lines: relock (tacplus.lock: tacplus 2.6.13 → 2.6.14, and 1 more) (#58)
+- 2026-11-23 looper issue Dependencies: url 2.5.8 (RUSTSEC-2026-0592 / GHSA-hrj5-67jp-wqp9, stack overflow in Url::origin on nested blob: URLs): update to 2.5.9, lockfile-only (#59)
