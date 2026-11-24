@@ -38,3 +38,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-23 looper issue Dependencies: url 2.5.8 (RUSTSEC-2026-0592 / GHSA-hrj5-67jp-wqp9, stack overflow in Url::origin on nested blob: URLs): update to 2.5.9, lockfile-only (#59)
 - 2026-11-23 looper issue STATE.md: the Blocked on line names 7 closed issues (#2, #34, #41, #29, #38, #35, #42) (#60)
 - 2026-11-24 looper issue Release v0.3.0: the first tag that serves fleet contributions under /-/ (#21, tacplus#195) (#61)
+- 2026-11-24 looper issue Pinned images behind their lines: relock (Dockerfile: debian:trixie-slim → debian:trixie-slim) (#66)
