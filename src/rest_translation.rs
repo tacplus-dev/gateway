@@ -21,8 +21,13 @@ use gateway_model::types::sys::x509::x509::X509Cert;
 
 use crate::auth::GatewayAuth;
 use crate::proxy_grpc::{self, ProxyState};
+use crate::rotation::{Carrier, Received, W2sLeg};
 
 const MAX_JSON_BODY_BYTES: usize = 10 * 1024 * 1024;
+
+/// The request header by which an SSE stream rotates (#67): `new` opens a
+/// session on the backend's rotating sibling, a session id carries one on.
+const SESSION_HEADER: &str = "x-tacplus-session";
 const ID_TOKEN_SIGNING_ALGS_SUPPORTED: &[&str] = &["EdDSA", "ES256"];
 
 fn is_mint_token_grpc_path(path: &str) -> bool {
@@ -152,9 +157,10 @@ pub(crate) fn rest_routes<S: Clone + Send + Sync + 'static>(
     router: Router<S>,
     handler: MethodRouter<S>,
 ) -> Router<S> {
-    ROUTES
-        .iter()
-        .map(|r| r.http_path)
+    let paths = ROUTES.iter().map(|r| r.http_path);
+    #[cfg(test)]
+    let paths = paths.chain(crate::rotation::stand_in_rest_paths());
+    paths
         .filter(|p| !p.is_empty())
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
@@ -250,7 +256,10 @@ async fn rest_handler(
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
     // Look up route. Only registered paths reach this handler (`rest_routes`).
-    let Some(route) = ROUTES.iter().find(|r| r.http_path == path) else {
+    let route = ROUTES.iter().find(|r| r.http_path == path);
+    #[cfg(test)]
+    let route = route.or_else(|| crate::rotation::stand_in_rest_route(&path));
+    let Some(route) = route else {
         tracing::warn!(path = %path, "no route found");
         return (
             StatusCode::NOT_FOUND,
@@ -315,13 +324,28 @@ async fn rest_handler(
     }
 
     if route.server_streaming {
-        dispatch_stream_via_proxy(
-            &state,
-            route.grpc_path,
-            &body_bytes,
-            auth_header_value.as_deref(),
-        )
-        .await
+        match parts.headers.get(SESSION_HEADER) {
+            Some(session) => {
+                dispatch_rotating_stream(
+                    &state,
+                    route,
+                    session,
+                    &body_bytes,
+                    auth_header_value.as_deref(),
+                    &request_id,
+                )
+                .await
+            }
+            None => {
+                dispatch_stream_via_proxy(
+                    &state,
+                    route.grpc_path,
+                    &body_bytes,
+                    auth_header_value.as_deref(),
+                )
+                .await
+            }
+        }
     } else {
         dispatch_unary(
             &state.proxy,
@@ -807,6 +831,166 @@ async fn dispatch_stream_via_proxy(
     Sse::new(sse_stream).into_response()
 }
 
+/// A rotating SSE stream (#67), by `x-tacplus-session`. `new` carries the
+/// request on a new session of the backend's rotating sibling; a session id
+/// carries that session on, with this request's token, on a new leg (the
+/// session holds the request, so the body is not read). Either way the stream
+/// opens with `event: session` (the id), then the leg's data events. Once a
+/// newer request's leg of the session is admitted, this one sends its `last`,
+/// and ends with `event: last` after the backend's own `last`: the client
+/// reads it to there, then the newer stream on.
+///
+/// A refused leg is answered before any event, as REST answers a gRPC error:
+/// an unknown or ended session, or a bad token, `UNAUTHENTICATED` (401);
+/// another subject's token, `PERMISSION_DENIED` (403); neither with a
+/// description. A backend without the sibling (or a method with none through
+/// the gateway) is served by the plain method, with no `event: session`: the
+/// stream does not rotate.
+async fn dispatch_rotating_stream(
+    state: &RestState,
+    route: &'static RouteInfo,
+    session: &axum::http::HeaderValue,
+    json_body: &[u8],
+    auth_header: Option<&str>,
+    request_id: &str,
+) -> axum::response::Response {
+    let session = match session.to_str() {
+        Ok(session) if !session.is_empty() => session,
+        _ => return grpc_json_error_response(tonic::Code::Unauthenticated as i32, ""),
+    };
+    let leg = if session == "new" {
+        // An auth-disabled method has no subject to bind a session to, so
+        // nothing could rotate onto it: it is served as it always was.
+        if matches!(route.auth_policy, AuthPolicy::NoAuth) {
+            return dispatch_stream_via_proxy(state, route.grpc_path, json_body, auth_header)
+                .await;
+        }
+        let proto_bytes = match gateway_model::s2sm::proxy_dispatch::request_json_to_proto(
+            route.grpc_path,
+            json_body,
+        ) {
+            Ok(b) => b,
+            Err(e) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    format!("{{\"error\":\"invalid request body: {}\"}}", e),
+                )
+                    .into_response();
+            }
+        };
+        match W2sLeg::open(&state.proxy, route, auth_header, request_id, "").await {
+            Ok(leg) => {
+                leg.send_message(proto_bytes).await;
+                leg.send_fin().await;
+                leg
+            }
+            Err(status) if status.code() == tonic::Code::Unimplemented => {
+                return dispatch_stream_via_proxy(state, route.grpc_path, json_body, auth_header)
+                    .await;
+            }
+            Err(status) => {
+                tracing::warn!(path = %route.http_path, code = ?status.code(), "rotating SSE stream refused");
+                return grpc_json_error_response(status.code() as i32, status.message());
+            }
+        }
+    } else {
+        // trace: a rotation's leg carries no message, so no trace_id: the
+        // session's request (and its trace_id) went on the opening leg.
+        match W2sLeg::open(&state.proxy, route, auth_header, request_id, session).await {
+            Ok(leg) => leg,
+            Err(status) => {
+                tracing::warn!(path = %route.http_path, code = ?status.code(), "SSE rotation refused");
+                return grpc_json_error_response(status.code() as i32, status.message());
+            }
+        }
+    };
+    let carrier = state.proxy.sessions.carry(leg.session_id());
+    let (tx, rx) = mpsc::channel(16);
+    tokio::spawn(carry_sse(leg, carrier, route.grpc_path, tx));
+    Sse::new(ReceiverStream::new(rx)).into_response()
+}
+
+/// One step of a W2S stream carried on rotating legs.
+enum LegStep<T> {
+    /// Its client is gone, or has something for it.
+    Client(T),
+    /// The leg it reads has a message, its `last`, or its end.
+    Leg(Result<Option<Received>, tonic::Status>),
+}
+
+/// The events of one SSE leg: `session` first, then its data, then `last`
+/// if the session moved on to a newer stream, or the logical stream's end.
+async fn carry_sse(
+    mut leg: W2sLeg,
+    mut carrier: Carrier,
+    grpc_path: &'static str,
+    tx: mpsc::Sender<Result<Event, std::convert::Infallible>>,
+) {
+    let session = leg.session_id().to_string();
+    if tx
+        .send(Ok(Event::default().event("session").data(&session)))
+        .await
+        .is_err()
+    {
+        return;
+    }
+    let mut cutting_over = false;
+    loop {
+        let step = tokio::select! {
+            cut = &mut carrier.cut_over, if !cutting_over => LegStep::Client(Some(cut.is_ok())),
+            _ = tx.closed() => LegStep::Client(None),
+            received = leg.next() => LegStep::Leg(received),
+        };
+        let event = match step {
+            // The session's next leg is admitted: this one cuts over.
+            LegStep::Client(Some(cut)) => {
+                cutting_over = true;
+                if cut {
+                    leg.send_last().await;
+                }
+                continue;
+            }
+            // The client is gone: so is the leg, and the logical stream.
+            LegStep::Client(None) => return,
+            LegStep::Leg(Ok(Some(Received::Message(proto_bytes)))) => {
+                match gateway_model::s2sm::proxy_dispatch::response_to_json(
+                    grpc_path,
+                    &proto_bytes,
+                ) {
+                    Ok(json) => Event::default().data(json),
+                    Err(e) => {
+                        let _ = tx
+                            .send(Ok(Event::default().event("error").data(json_error_body(
+                                format!("failed to serialize response: {e}"),
+                            ))))
+                            .await;
+                        return;
+                    }
+                }
+            }
+            LegStep::Leg(Ok(Some(Received::Last))) => {
+                let _ = tx
+                    .send(Ok(Event::default().event("last").data(&session)))
+                    .await;
+                return;
+            }
+            LegStep::Leg(Ok(None)) => return,
+            LegStep::Leg(Err(status)) => {
+                let _ = tx
+                    .send(Ok(Event::default().event("error").data(
+                        serde_json::json!({ "error": status.message(), "code": status.code() as i32 })
+                            .to_string(),
+                    )))
+                    .await;
+                return;
+            }
+        };
+        if tx.send(Ok(event)).await.is_err() {
+            return;
+        }
+    }
+}
+
 async fn handle_websocket_stream(
     socket: WebSocket,
     state: Arc<RestState>,
@@ -877,6 +1061,43 @@ async fn handle_websocket_stream(
         return;
     }
 
+    // An authenticated stream is carried on the backend's rotating sibling
+    // when it serves one (#67), so the socket outlives its start token. An
+    // auth-disabled one has no subject to bind a session to: nothing could
+    // rotate onto it.
+    if !matches!(route.auth_policy, AuthPolicy::NoAuth) {
+        match W2sLeg::open(
+            &state.proxy,
+            route,
+            backend_auth_header.as_deref(),
+            &request_id,
+            "",
+        )
+        .await
+        {
+            Ok(leg) => {
+                return carry_rotating_websocket(
+                    ws_sender,
+                    ws_receiver,
+                    state,
+                    route,
+                    leg,
+                    initial_frame,
+                    request_id,
+                )
+                .await
+            }
+            // No sibling: the plain method, below.
+            Err(status) if status.code() == tonic::Code::Unimplemented => {}
+            Err(status) => {
+                tracing::warn!(path = %route.http_path, code = ?status.code(), "rotating WebSocket stream refused");
+                let _ = ws_sender.send(ws_status_error(&status)).await;
+                let _ = ws_sender.close().await;
+                return;
+            }
+        }
+    }
+
     let mut builder = http::Request::builder()
         .method(http::Method::POST)
         .uri(route.grpc_path)
@@ -892,6 +1113,7 @@ async fn handle_websocket_stream(
 
     let (body_tx, body_rx) = mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(16);
     let (reader_error_tx, mut reader_error_rx) = mpsc::channel::<String>(1);
+    let (reply_tx, mut reply_rx) = mpsc::channel::<Message>(4);
     let reader_state = Arc::clone(&state);
 
     let reader_task = tokio::spawn(async move {
@@ -909,6 +1131,15 @@ async fn handle_websocket_stream(
                 Ok(Message::Text(text)) => {
                     if is_ws_complete(text.as_str()) {
                         break;
+                    }
+                    if ws_rotate(text.as_str()).is_some() {
+                        // The plain method's stream does not rotate: it goes
+                        // on as it is, to its token's exp.
+                        let refused = tonic::Status::unimplemented("this stream does not rotate");
+                        if reply_tx.send(ws_rotation_refused(&refused)).await.is_err() {
+                            return;
+                        }
+                        continue;
                     }
                     let frame = match parse_ws_data_frame(route, text.as_str()) {
                         Ok(frame) => frame,
@@ -987,6 +1218,12 @@ async fn handle_websocket_stream(
                 reader_task.abort();
                 return;
             }
+            Some(reply) = reply_rx.recv() => {
+                if ws_sender.send(reply).await.is_err() {
+                    reader_task.abort();
+                    return;
+                }
+            }
             frame = frames.next() => {
                 let Some(frame) = frame else {
                     break;
@@ -1032,6 +1269,190 @@ async fn handle_websocket_stream(
 
     let _ = ws_sender.close().await;
     reader_task.abort();
+}
+
+/// What a rotating WebSocket stream's client sent (#67).
+enum WsInbound {
+    /// One message of the plain method's request type, validated.
+    Message(Vec<u8>),
+    /// `{"type":"rotate","authorization":…}`: carry the session on with this
+    /// token.
+    Rotate(Option<String>),
+    /// `complete`, or the socket's close: the client's half-close.
+    Fin,
+}
+
+/// A WebSocket stream carried on the backend's rotating sibling (#67), in
+/// place on its one socket. The client's data frames go on the current leg.
+/// A `rotate` frame opens the session's next leg with its token, through the
+/// same admission as any leg (the session's instance, its subject only); once
+/// it is admitted the old leg sends its `last`, its messages are forwarded to
+/// the backend's own `last`, then the new leg's, and the gateway acknowledges
+/// with `{"type":"rotated"}`. A refused rotation is answered with a `rotated`
+/// frame carrying `error` and the gRPC `code`, and the stream goes on, on its
+/// current leg, to that leg's token's exp. The session id never leaves the
+/// gateway.
+async fn carry_rotating_websocket(
+    mut ws_sender: futures::stream::SplitSink<WebSocket, Message>,
+    mut ws_receiver: futures::stream::SplitStream<WebSocket>,
+    state: Arc<RestState>,
+    route: &'static RouteInfo,
+    leg: W2sLeg,
+    initial_frame: Option<WsDataFrame>,
+    request_id: String,
+) {
+    let (inbound_tx, mut inbound_rx) = mpsc::channel::<WsInbound>(16);
+    let (reader_error_tx, mut reader_error_rx) = mpsc::channel::<String>(1);
+    let reader_state = Arc::clone(&state);
+
+    let reader_task = tokio::spawn(async move {
+        if let Some(frame) = initial_frame {
+            match ws_frame_to_proto(&reader_state, route, frame).await {
+                Ok(proto_bytes) => {
+                    if inbound_tx.send(WsInbound::Message(proto_bytes)).await.is_err() {
+                        return;
+                    }
+                }
+                Err(e) => {
+                    let _ = send_ws_reader_error(&reader_error_tx, e).await;
+                    return;
+                }
+            }
+        }
+
+        // After `complete` the stream may still outlive its token (the
+        // backend's half of a bidi): only `rotate` frames are read then.
+        let mut fin = false;
+        while let Some(msg) = ws_receiver.next().await {
+            let inbound = match msg {
+                Ok(Message::Text(text)) => {
+                    if let Some(auth) = ws_rotate(text.as_str()) {
+                        WsInbound::Rotate(auth)
+                    } else if fin {
+                        let _ = send_ws_reader_error(
+                            &reader_error_tx,
+                            "only rotate frames may follow complete",
+                        )
+                        .await;
+                        return;
+                    } else if is_ws_complete(text.as_str()) {
+                        fin = true;
+                        WsInbound::Fin
+                    } else {
+                        let proto_bytes = match parse_ws_data_frame(route, text.as_str()) {
+                            Ok(frame) => ws_frame_to_proto(&reader_state, route, frame).await,
+                            Err(e) => Err(e),
+                        };
+                        match proto_bytes {
+                            Ok(proto_bytes) => WsInbound::Message(proto_bytes),
+                            Err(e) => {
+                                let _ = send_ws_reader_error(&reader_error_tx, e).await;
+                                return;
+                            }
+                        }
+                    }
+                }
+                Ok(Message::Close(_)) | Err(_) => break,
+                Ok(Message::Ping(_)) | Ok(Message::Pong(_)) => continue,
+                Ok(Message::Binary(_)) => {
+                    let _ = send_ws_reader_error(
+                        &reader_error_tx,
+                        "binary WebSocket messages are not supported",
+                    )
+                    .await;
+                    return;
+                }
+            };
+            if inbound_tx.send(inbound).await.is_err() {
+                return;
+            }
+        }
+        if !fin {
+            let _ = inbound_tx.send(WsInbound::Fin).await;
+        }
+    });
+
+    let session = leg.session_id().to_string();
+    let mut current = leg;
+    // The leg being cut over: read to its `last` before anything of `current`.
+    let mut draining: Option<W2sLeg> = None;
+    loop {
+        let step = tokio::select! {
+            Some(error) = reader_error_rx.recv() => LegStep::Client(Err(error)),
+            Some(inbound) = inbound_rx.recv() => LegStep::Client(Ok(inbound)),
+            received = draining.as_mut().unwrap_or(&mut current).next() => LegStep::Leg(received),
+        };
+        match step {
+            LegStep::Client(Err(error)) => {
+                reader_task.abort();
+                return ws_close(ws_sender, Some(ws_error(error))).await;
+            }
+            LegStep::Client(Ok(WsInbound::Message(proto_bytes))) => {
+                current.send_message(proto_bytes).await
+            }
+            LegStep::Client(Ok(WsInbound::Fin)) => current.send_fin().await,
+            LegStep::Client(Ok(WsInbound::Rotate(auth))) => {
+                let refused = if draining.is_some() {
+                    tonic::Status::failed_precondition("a rotation is already in progress")
+                } else {
+                    match W2sLeg::open(&state.proxy, route, auth.as_deref(), &request_id, &session)
+                        .await
+                    {
+                        Ok(next) => {
+                            current.send_last().await;
+                            draining = Some(std::mem::replace(&mut current, next));
+                            continue;
+                        }
+                        Err(status) => status,
+                    }
+                };
+                tracing::warn!(path = %route.http_path, code = ?refused.code(), "WebSocket rotation refused");
+                if ws_sender.send(ws_rotation_refused(&refused)).await.is_err() {
+                    reader_task.abort();
+                    return;
+                }
+            }
+            LegStep::Leg(Ok(Some(Received::Message(proto_bytes)))) => {
+                let json = match gateway_model::s2sm::proxy_dispatch::response_to_json(
+                    route.grpc_path,
+                    &proto_bytes,
+                ) {
+                    Ok(json) => json,
+                    Err(e) => {
+                        reader_task.abort();
+                        let message = ws_error(format!("failed to serialize response: {e}"));
+                        return ws_close(ws_sender, Some(message)).await;
+                    }
+                };
+                if ws_sender.send(Message::Text(json.into())).await.is_err() {
+                    reader_task.abort();
+                    return;
+                }
+            }
+            LegStep::Leg(Ok(Some(Received::Last))) => {
+                if draining.take().is_none() {
+                    reader_task.abort();
+                    let message = ws_error("the backend cut over with no rotation");
+                    return ws_close(ws_sender, Some(message)).await;
+                }
+                if ws_sender.send(ws_rotated()).await.is_err() {
+                    reader_task.abort();
+                    return;
+                }
+            }
+            LegStep::Leg(Ok(None)) => {
+                reader_task.abort();
+                let message = draining
+                    .is_some()
+                    .then(|| ws_error("the backend ended a leg without its last"));
+                return ws_close(ws_sender, message).await;
+            }
+            LegStep::Leg(Err(status)) => {
+                reader_task.abort();
+                return ws_close(ws_sender, Some(ws_status_error(&status))).await;
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -1200,6 +1621,60 @@ async fn send_ws_reader_error(
     message: impl Into<String>,
 ) -> Result<(), ()> {
     tx.send(message.into()).await.map_err(|_| ())
+}
+
+/// Ends a WebSocket stream, with `message` last if there is one.
+async fn ws_close(
+    mut ws_sender: futures::stream::SplitSink<WebSocket, Message>,
+    message: Option<Message>,
+) {
+    if let Some(message) = message {
+        let _ = ws_sender.send(message).await;
+    }
+    let _ = ws_sender.close().await;
+}
+
+/// A `{"type":"rotate","authorization":…}` frame's token (#67): `Some` for a
+/// rotate frame (`Some(None)` if it carries none), `None` for any other.
+fn ws_rotate(text: &str) -> Option<Option<String>> {
+    let value = serde_json::from_str::<serde_json::Value>(text).ok()?;
+    if value.get("type").and_then(|t| t.as_str()) != Some("rotate") {
+        return None;
+    }
+    Some(
+        value
+            .get("authorization")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(str::to_string),
+    )
+}
+
+/// The answer to a `rotate` that is done: the new token is the one in force.
+fn ws_rotated() -> Message {
+    Message::Text(serde_json::json!({ "type": "rotated" }).to_string().into())
+}
+
+/// The answer to a refused `rotate`: the stream goes on, on its current leg.
+fn ws_rotation_refused(status: &tonic::Status) -> Message {
+    Message::Text(
+        serde_json::json!({
+            "type": "rotated",
+            "error": status.message(),
+            "code": status.code() as i32,
+        })
+        .to_string()
+        .into(),
+    )
+}
+
+/// A rotating stream's end in a gRPC error, its code kept.
+fn ws_status_error(status: &tonic::Status) -> Message {
+    Message::Text(
+        serde_json::json!({ "error": status.message(), "code": status.code() as i32 })
+            .to_string()
+            .into(),
+    )
 }
 
 fn ws_error(message: impl AsRef<str>) -> Message {

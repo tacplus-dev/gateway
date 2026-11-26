@@ -27,10 +27,16 @@
 //! A session is forgotten when its last leg ends. A rotation opens on the same
 //! connection as the leg it replaces (tacplus#322), so on the same gateway:
 //! the table is this process's own.
+//!
+//! A W2S stream (SSE, WebSocket) rotates on the same legs, which the gateway
+//! itself opens on the client's behalf (#67, `W2sLeg`): it is the sibling's
+//! client, so it sends the leg's `last` once the next leg is admitted, and
+//! translates the backend's `last` into the W2S carrier's own end of a leg.
 
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
@@ -129,7 +135,10 @@ static STAND_IN_ROUTES: Mutex<Vec<&'static RouteInfo>> = Mutex::new(Vec::new());
 #[cfg(test)]
 pub(crate) fn stand_in(route: RouteInfo) -> &'static RouteInfo {
     let mut routes = STAND_IN_ROUTES.lock().unwrap();
-    if let Some(existing) = routes.iter().find(|r| r.grpc_path == route.grpc_path) {
+    if let Some(existing) = routes
+        .iter()
+        .find(|r| r.grpc_path == route.grpc_path && r.http_path == route.http_path)
+    {
         return *existing;
     }
     let route: &'static RouteInfo = Box::leak(Box::new(route));
@@ -152,10 +161,37 @@ fn stand_in_route(_path: &str) -> Option<&'static RouteInfo> {
     None
 }
 
+/// Test-only: the stand-ins with REST paths of their own (no generated route
+/// has them), so that the REST layer can carry a W2S stream on one (#67)
+/// while the generated route of the same gRPC path stays as it is.
+#[cfg(test)]
+pub(crate) fn stand_in_rest_route(http_path: &str) -> Option<&'static RouteInfo> {
+    STAND_IN_ROUTES
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|r| r.http_path == http_path)
+        .copied()
+}
+
+#[cfg(test)]
+pub(crate) fn stand_in_rest_paths() -> Vec<&'static str> {
+    STAND_IN_ROUTES
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|r| r.http_path)
+        .collect()
+}
+
 /// The rotating sessions this gateway carries.
 #[derive(Default)]
 pub struct Sessions {
     sessions: Mutex<HashMap<String, Session>>,
+    /// The SSE stream carrying each session's current leg (#67), by serial:
+    /// told to cut over when the session's next leg is admitted.
+    carriers: Mutex<HashMap<String, (u64, tokio::sync::oneshot::Sender<()>)>>,
+    serial: AtomicU64,
 }
 
 struct Session {
@@ -239,9 +275,51 @@ impl Sessions {
         ))
     }
 
+    /// The SSE stream now carrying session `id` (#67): the stream that carried
+    /// it before is told to cut over, and this one will be when the next is.
+    /// Called only once this stream's leg has been admitted.
+    pub(crate) fn carry(self: &Arc<Self>, id: &str) -> Carrier {
+        let serial = self.serial.fetch_add(1, Ordering::Relaxed);
+        let (tx, cut_over) = tokio::sync::oneshot::channel();
+        let previous = self
+            .carriers
+            .lock()
+            .unwrap()
+            .insert(id.to_string(), (serial, tx));
+        if let Some((_, previous)) = previous {
+            let _ = previous.send(());
+        }
+        Carrier {
+            sessions: Arc::clone(self),
+            id: id.to_string(),
+            serial,
+            cut_over,
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.sessions.lock().unwrap().len()
+    }
+}
+
+/// An SSE stream's hold on its session (`Sessions::carry`); dropping it lets
+/// go, unless a newer stream already carries the session.
+pub(crate) struct Carrier {
+    sessions: Arc<Sessions>,
+    id: String,
+    serial: u64,
+    /// Fires when the session's next leg is admitted: this stream's leg is to
+    /// send its `last`.
+    pub(crate) cut_over: tokio::sync::oneshot::Receiver<()>,
+}
+
+impl Drop for Carrier {
+    fn drop(&mut self) {
+        let mut carriers = self.sessions.carriers.lock().unwrap();
+        if carriers.get(&self.id).is_some_and(|(serial, _)| *serial == self.serial) {
+            carriers.remove(&self.id);
+        }
     }
 }
 
@@ -255,6 +333,8 @@ fn refuse(code: tonic::Code) -> Response {
 pub(crate) struct Frames {
     body: Body,
     buffer: bytes::BytesMut,
+    /// A response's status, once its trailers are in.
+    status: Option<tonic::Status>,
 }
 
 impl Frames {
@@ -262,7 +342,15 @@ impl Frames {
         Self {
             body,
             buffer: bytes::BytesMut::new(),
+            status: None,
         }
+    }
+
+    /// The status a response body's trailers carried, if it is not OK.
+    fn failed(&self) -> Option<tonic::Status> {
+        self.status
+            .clone()
+            .filter(|status| status.code() != tonic::Code::Ok)
     }
 
     pub(crate) async fn next(&mut self) -> Result<Option<bytes::Bytes>, tonic::Status> {
@@ -303,6 +391,8 @@ impl Frames {
                 Some(Ok(frame)) => {
                     if let Some(data) = frame.data_ref() {
                         self.buffer.extend_from_slice(data);
+                    } else if let Some(trailers) = frame.trailers_ref() {
+                        self.status = tonic::Status::from_header_map(trailers);
                     }
                 }
             }
@@ -702,6 +792,178 @@ impl http_body::Body for LegBody {
     }
 }
 
+// ── W2S legs (#67) ──────────────────────────────────────────────────────────
+
+/// What a W2S leg receives from the backend.
+pub(crate) enum Received {
+    /// One message of the plain method's response type.
+    Message(Vec<u8>),
+    /// The backend's `last`: it has moved to the session's next leg, and
+    /// nothing more comes on this one.
+    Last,
+}
+
+/// One leg of a rotating session that the gateway opens itself, as the
+/// sibling's client, for a W2S stream (#67). It goes through `handle` as any
+/// leg does, so the same token check, routing by session id, same-subject
+/// admission and per-envelope validation apply; the payloads, and the
+/// `trace_id` in them, reach the backend unchanged.
+///
+/// The request body stays open as long as the leg is held: the sibling's
+/// client half-closes the logical stream with `fin`, never by ending a leg's
+/// body (a leg that ends without its `last` ends the logical stream).
+pub(crate) struct W2sLeg {
+    tx: tokio::sync::mpsc::Sender<Result<bytes::Bytes, std::io::Error>>,
+    frames: Frames,
+    session_id: String,
+}
+
+fn envelope_frame(envelope: &Envelope) -> bytes::Bytes {
+    bytes::Bytes::from(frame_grpc(&prost::Message::encode_to_vec(envelope)))
+}
+
+impl W2sLeg {
+    /// Opens a leg of the sibling of `route` (a plain streaming method) with
+    /// `auth_header`: of a new session when `session_id` is empty, else a
+    /// rotation onto it. `Ok` once the backend's first envelope has named the
+    /// session; a refusal is the leg's status (`UNIMPLEMENTED` from a backend
+    /// without the sibling, or for a method with none through the gateway).
+    pub(crate) async fn open(
+        proxy: &ProxyState,
+        route: &'static RouteInfo,
+        auth_header: Option<&str>,
+        request_id: &str,
+        session_id: &str,
+    ) -> Result<Self, tonic::Status> {
+        let (service, method) = route
+            .grpc_path
+            .strip_prefix('/')
+            .and_then(|path| path.split_once('/'))
+            .ok_or_else(|| tonic::Status::unimplemented(""))?;
+        let sibling = format!("/{service}{SIBLING_SUFFIX}/{method}");
+
+        let (tx, rx) = tokio::sync::mpsc::channel(16);
+        let opening = Envelope {
+            session_id: session_id.to_string(),
+            ..Default::default()
+        };
+        tx.send(Ok(envelope_frame(&opening)))
+            .await
+            .map_err(|_| tonic::Status::internal("the leg's body is gone"))?;
+        let mut builder = Request::builder()
+            .method(http::Method::POST)
+            .uri(sibling)
+            .header("content-type", "application/grpc+proto")
+            .header("te", "trailers");
+        if let Some(auth) = auth_header {
+            builder = builder.header("authorization", auth);
+        }
+        if let Ok(id) = http::HeaderValue::from_str(request_id) {
+            builder = builder.header("x-request-id", id);
+        }
+        let request = builder
+            .body(Body::from_stream(ReceiverStream::new(rx)))
+            .map_err(|e| tonic::Status::internal(format!("failed to build the leg: {e}")))?;
+
+        let response = handle(proxy, request, route, route.grpc_path.to_string()).await;
+        if let Some(status) = tonic::Status::from_header_map(response.headers()) {
+            if status.code() != tonic::Code::Ok {
+                return Err(status);
+            }
+        }
+        let mut frames = Frames::new(response.into_body());
+        let first = match tokio::time::timeout(OPEN_TIMEOUT, frames.next()).await {
+            Ok(Ok(Some(frame))) => decode(&frame)?,
+            Ok(Ok(None)) => {
+                return Err(frames
+                    .failed()
+                    .unwrap_or_else(|| tonic::Status::unavailable("the leg ended before it opened")))
+            }
+            Ok(Err(status)) => return Err(status),
+            Err(_) => return Err(tonic::Status::deadline_exceeded("the leg did not open in time")),
+        };
+        if first.session_id.is_empty()
+            || !first.opens_a_leg()
+            || (!session_id.is_empty() && first.session_id != session_id)
+        {
+            return Err(tonic::Status::internal(
+                "the backend's first envelope names no session",
+            ));
+        }
+        Ok(Self {
+            tx,
+            frames,
+            session_id: first.session_id,
+        })
+    }
+
+    /// The session this leg carries.
+    pub(crate) fn session_id(&self) -> &str {
+        &self.session_id
+    }
+
+    /// Sends one message of the plain method's request type. A leg the
+    /// backend or the gateway has ended takes nothing; `next` says how it
+    /// ended.
+    pub(crate) fn send_message(
+        &self,
+        payload: Vec<u8>,
+    ) -> impl Future<Output = ()> + Send + 'static {
+        self.send(Envelope {
+            payload,
+            ..Default::default()
+        })
+    }
+
+    /// The client's half-close of the logical stream.
+    pub(crate) fn send_fin(&self) -> impl Future<Output = ()> + Send + 'static {
+        self.send(Envelope {
+            fin: true,
+            ..Default::default()
+        })
+    }
+
+    /// The client's cut-over: the session's next leg is admitted, and nothing
+    /// more is sent on this one.
+    pub(crate) fn send_last(&self) -> impl Future<Output = ()> + Send + 'static {
+        self.send(Envelope {
+            last: true,
+            ..Default::default()
+        })
+    }
+
+    /// The future holds a sender of its own, not the leg: a leg is not
+    /// `Sync` (its response body), and the carriers' futures must be `Send`.
+    fn send(&self, envelope: Envelope) -> impl Future<Output = ()> + Send + 'static {
+        let tx = self.tx.clone();
+        let frame = envelope_frame(&envelope);
+        async move {
+            let _ = tx.send(Ok(frame)).await;
+        }
+    }
+
+    /// The backend's next envelope; `None` once the leg has ended OK (the
+    /// logical stream's end), the leg's status if it ended in an error.
+    pub(crate) async fn next(&mut self) -> Result<Option<Received>, tonic::Status> {
+        let Some(frame) = self.frames.next().await? else {
+            return match self.frames.failed() {
+                Some(status) => Err(status),
+                None => Ok(None),
+            };
+        };
+        let envelope = decode(&frame)?;
+        if envelope.is_message() {
+            Ok(Some(Received::Message(envelope.payload)))
+        } else if envelope.last && !envelope.malformed() {
+            Ok(Some(Received::Last))
+        } else {
+            Err(tonic::Status::internal(
+                "malformed rotation envelope from the backend",
+            ))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -774,6 +1036,24 @@ mod tests {
             Some(tonic::Code::Unauthenticated),
             "an ended session is unknown"
         );
+    }
+
+    #[test]
+    fn a_new_carrier_cuts_the_one_before_over() {
+        let sessions = Arc::new(Sessions::default());
+        let mut first = sessions.carry("s-1");
+        assert!(first.cut_over.try_recv().is_err(), "nothing to cut over yet");
+        let mut second = sessions.carry("s-1");
+        assert!(first.cut_over.try_recv().is_ok(), "the next leg is admitted");
+        drop(first);
+        assert_eq!(
+            sessions.carriers.lock().unwrap().len(),
+            1,
+            "the carrier before lets go of nothing the next one holds"
+        );
+        assert!(second.cut_over.try_recv().is_err());
+        drop(second);
+        assert!(sessions.carriers.lock().unwrap().is_empty());
     }
 
     #[test]

@@ -166,7 +166,7 @@ async fn spawn_backends(backend: Arc<StandIn>) -> Arc<ProxyState> {
 
 /// The REST router, in front of the proxy. Neither route is a gateway.Mint
 /// route, so the minter is never consulted.
-fn rest_router(proxy: Arc<ProxyState>) -> axum::Router {
+pub(crate) fn rest_router(proxy: Arc<ProxyState>) -> axum::Router {
     struct NoMinter;
 
     #[tonic::async_trait]
@@ -197,7 +197,7 @@ fn rest_router(proxy: Arc<ProxyState>) -> axum::Router {
 }
 
 /// Serves `app` on a real port and returns its address.
-async fn serve(app: axum::Router) -> std::net::SocketAddr {
+pub(crate) async fn serve(app: axum::Router) -> std::net::SocketAddr {
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind gateway");
     let addr = listener.local_addr().expect("gateway addr");
     tokio::spawn(async move {

@@ -145,9 +145,15 @@ A stream that must outlive its token rotates instead (make-before-break, tacplus
 - **Pass-through:** both directions are proxied unchanged, including `UNIMPLEMENTED` from a backend without the sibling: the client then falls back to the plain method.
 - **The session table** is in-process: a rotation opens on the same connection as the leg it replaces, so it reaches the same gateway. A session is forgotten when its last leg ends.
 
+A W2S stream rotates on the same legs (#67, tacplus#323). The gateway opens them itself, as the sibling's client (`rotation::W2sLeg`), through the same `rotation::handle`, so the token check, routing by session id, same-subject admission and per-envelope validation are the ones above. It sends a leg's `last` once the session's next leg is admitted, and turns the backend's `last` into the W2S carrier's end of a leg. It sends a request's half-close as `fin` and keeps each leg's body open until the leg ends. The wire is in README.md, "W2S stream rotation".
+
+- **SSE** opts in per request with `x-tacplus-session`. With `new` the request is carried on a new session, and the stream names it first (`event: session`). A rotation is a new request with the fresh token and the session id. The session holds the request, so a rotation's body is not read. Once its leg is admitted, the stream it replaces sends its `last`, and that stream ends with `event: last` after its leg's final event. A refused rotation is answered before any event: 401 with `grpc-status: 16` for an unknown or ended session or a bad token, 403 with `grpc-status: 7` for another subject's token, neither with a description. An SSE rotation is a new HTTP request, so it must reach the gateway that holds the session: the session table is per process (PROPOSALS.md, "The gateway's session table is per process").
+- **WebSocket** rotates in place on its one socket. An authenticated stream is opened on the sibling. The client's `{"type":"rotate","authorization":…}` frame opens the next leg with that token, and the gateway answers with `{"type":"rotated"}` once the old leg has been read to its `last`, or with a `rotated` frame carrying `error` and `code` if the rotation was refused. A refused rotation leaves the stream on its current leg. The session id never leaves the gateway.
+- **Fallback:** a backend without the sibling (`UNIMPLEMENTED`), a tenant-routed method, or an auth-disabled one (no subject) is served by the plain method, exactly as before. Its SSE stream sends no `event: session`, and its WebSocket refuses a `rotate` with `code` 12, so the client knows the stream does not rotate.
+
 W2S WebSocket streams are message-tokened instead of header-tokened:
 
-- The WebSocket channel may stay open across token rotations.
+- The WebSocket channel may stay open across token rotations. On the rotating sibling the backend leg rotates with it (`rotate`, above); on the plain method the backend leg still ends at its start token's `exp`.
 - Every authenticated data frame must carry a current bearer token in its `authorization` field.
 - If the identity manager cannot provide a valid token for a message, the client must not send that message.
 - Auth-disabled routes are exempt, but message constraints are still validated.

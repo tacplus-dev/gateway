@@ -105,7 +105,7 @@ fn sibling_path(route: &RouteInfo) -> String {
 
 // ── tokens ──────────────────────────────────────────────────────────────────
 
-fn jwk_for(key: &keys::ImmutableKey) -> ImmutableJwk {
+pub(crate) fn jwk_for(key: &keys::ImmutableKey) -> ImmutableJwk {
     let keys::PublicKey::EcP256(ec) = key.public_key() else {
         panic!("this test signs with P-256");
     };
@@ -125,7 +125,7 @@ fn jwk_for(key: &keys::ImmutableKey) -> ImmutableJwk {
     .expect("jwk")
 }
 
-fn unix_now() -> i64 {
+pub(crate) fn unix_now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
@@ -134,7 +134,12 @@ fn unix_now() -> i64 {
 
 /// A user token for `audience` naming `sub`, expiring `lifetime` seconds from
 /// now.
-fn user_token(key: &keys::ImmutableKey, audience: &str, sub: &str, lifetime: i64) -> String {
+pub(crate) fn user_token(
+    key: &keys::ImmutableKey,
+    audience: &str,
+    sub: &str,
+    lifetime: i64,
+) -> String {
     let mut token = Token::new();
     token.set_kid(key.id()).expect("kid");
     token.set_alg(key.alg()).expect("alg");
@@ -402,7 +407,7 @@ impl ClientLeg {
 
 // ── wiring ──────────────────────────────────────────────────────────────────
 
-fn unused_verifier() -> Arc<SpiffeServerCertVerifier> {
+pub(crate) fn unused_verifier() -> Arc<SpiffeServerCertVerifier> {
     let key = keys::generate_ec_p256_key().expect("throwaway key");
     let cert = ImmutableCertChain::for_self_signing(key)
         .self_sign("unused", unix_now() + 3600, X509KeyUsage::CertSign, &[])

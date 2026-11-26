@@ -66,6 +66,12 @@ mod e2e_stream_trace;
 #[cfg(test)]
 mod e2e_rotation;
 
+/// End-to-end proof that a W2S stream, SSE or WebSocket, rotates through the
+/// gateway on the backend's rotating sibling across several token lifetimes,
+/// with nothing lost, duplicated or reordered, and only for its subject (#67).
+#[cfg(test)]
+mod e2e_w2s_rotation;
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 

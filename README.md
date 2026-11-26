@@ -42,6 +42,33 @@ route at the origin root. The handler deserializes JSON, dispatches via
 gRPC to the backend service, and returns JSON. Server-streaming RPCs are
 supported via `dispatch_stream`.
 
+**W2S stream rotation** (#67): a W2S stream outlives its token by rotating
+make-before-break on the backend's `<pkg>.<Svc>Rotating` sibling (tacplus#322),
+as a native gRPC stream does. The gateway carries the legs, and a backend
+without the sibling is served by the plain method, as before.
+
+- *SSE (server-streaming).* Send `x-tacplus-session: new` with the request to
+  open a session. The stream's first event is `event: session`, whose data is
+  the session id, then the data events. To rotate (at about 75% of the token's
+  lifetime), send a new request to the same path with the fresh token and
+  `x-tacplus-session: <id>`. Its body is ignored, because the session holds
+  the request. The new stream starts with the same `event: session`. The old
+  stream ends with `event: last` (data: the id) after its final data event.
+  Read the old stream to `last`, then the new one: nothing is lost, duplicated
+  or reordered. A refused rotation is answered before any event, with the REST
+  error body `{"error":"","code":N}` and a `grpc-status` header: 401/16 for an
+  unknown or ended session (or a bad token), 403/7 for another subject's token.
+  If the first response has no `event: session`, the stream does not rotate
+  and ends at its token's `exp`. The rotation request must reach the same
+  gateway replica.
+- *WebSocket (client-streaming, bidi).* Nothing changes until the token runs
+  low. Then send `{"type":"rotate","authorization":"Bearer <new>"}` on the
+  same socket and carry the new token on the data frames from then on. The
+  gateway answers `{"type":"rotated"}` when the new token is the one in force.
+  A refused rotation is answered `{"type":"rotated","error":"…","code":N}`
+  (`7` another subject, `16` a bad token, `12` a stream that does not rotate),
+  and the stream goes on, to its current token's `exp`.
+
 **gRPC proxy**: Requests with `content-type: application/grpc` are forwarded
 as raw HTTP/2 frames without deserializing the protobuf body. The target
 service is extracted from the gRPC method path (`/package.Service/Method`).
