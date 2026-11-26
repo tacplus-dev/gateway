@@ -17,6 +17,7 @@ Also serves the sign-in webapp. Unreleased; tacplus floor 2.5 (#18).
 -  (#15). Agent, at Jody's request, 2026-11-06.
 - Release v0.3.0 from main: the first tag that serves fleet contributions under /-/ (#21), for tacplus-dev/tacplus#195's `tacplus fleet gateway` (#61). Hub, on Jody's standing authority (parent tacplus#195 approved), 2026-11-23.
 - Rotate W2S streams (SSE, WebSocket) through the gateway on the backend's Rotating sibling (#67). Hub, on its recommendation with Jody's standing agreement (tp-act-on-recommendations), 2026-11-26.
+- e2e rotation with a generated C2S backend and generated client through the gateway (#68). Hub, on its recommendation with Jody's standing agreement (tp-act-on-recommendations), 2026-11-26.
 
 ## Later
 - Image: grpc-health-probe v0.4.48 to v0.4.60 (#11; blocked on #14)
