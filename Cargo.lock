@@ -21,11 +21,7 @@ dependencies = [
 name = "am"
 version = "0.1.0"
 dependencies = [
- "base64 0.21.7",
- "diskstore",
  "gateway-model-types",
- "prost",
- "tokio",
  "tonic",
  "tracing",
 ]
@@ -44,14 +40,6 @@ name = "anyhow"
 version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
-
-[[package]]
-name = "approval"
-version = "1.0.0"
-dependencies = [
- "sha2 0.11.1",
- "tonic",
-]
 
 [[package]]
 name = "arc-swap"
@@ -300,19 +288,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "c2d"
-version = "0.1.0"
-dependencies = [
- "hyper",
- "hyper-util",
- "tokio",
- "tokio-stream",
- "tonic",
- "tower",
- "tracing",
-]
-
-[[package]]
 name = "cc"
 version = "1.2.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -362,17 +337,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "client_im"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "gateway-model-types",
- "tokio",
- "tonic",
- "tracing",
-]
-
-[[package]]
 name = "cmake"
 version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -401,16 +365,6 @@ name = "const-oid"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
-
-[[package]]
-name = "core-foundation"
-version = "0.9.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e195e091a93c46f7102ec7818a2aa394e1e1771c3ab4825963fa03e45afb8f"
-dependencies = [
- "core-foundation-sys",
- "libc",
-]
 
 [[package]]
 name = "core-foundation-sys"
@@ -581,7 +535,6 @@ version = "1.0.0"
 dependencies = [
  "bzip2",
  "flate2",
- "gateway-model-types",
  "log",
  "serde",
  "serde_json",
@@ -878,13 +831,10 @@ name = "gateway-model"
 version = "1.0.0"
 dependencies = [
  "am",
- "approval",
  "async-trait",
  "aws-lc-rs",
  "axum",
  "base64 0.21.7",
- "c2d",
- "client_im",
  "collection",
  "diskstore",
  "futures",
@@ -892,15 +842,9 @@ dependencies = [
  "grpcconfig",
  "grpcserver",
  "healthreporter",
- "httpclient",
- "ip",
- "jwk",
- "key",
- "logger",
  "prost",
  "rand 0.8.8",
  "regex",
- "reqwest",
  "rustls",
  "rustls-pemfile",
  "serde",
@@ -908,18 +852,13 @@ dependencies = [
  "service_im",
  "servicemanager",
  "spiffe",
- "tags",
- "tinyvec",
  "token",
  "tokio",
  "tokio-rustls",
  "tokio-stream",
- "tokio-util",
  "tonic",
  "tonic-health",
- "tonic-prost",
  "tracing",
- "x509",
  "x509-cert",
 ]
 
@@ -928,19 +867,13 @@ name = "gateway-model-types"
 version = "1.0.0"
 dependencies = [
  "base64 0.21.7",
- "bytes",
- "hex",
- "hmac",
  "pbjson",
- "pbjson-types",
  "prost",
- "prost-types",
  "prost-wkt-types",
  "regex",
  "serde",
  "serde_json",
  "serde_yaml",
- "sha2 0.11.1",
  "toml",
  "tonic",
  "tonic-prost",
@@ -1003,9 +936,6 @@ version = "0.1.0"
 dependencies = [
  "gateway-model-types",
  "logger",
- "serde",
- "serde_json",
- "serde_yaml",
 ]
 
 [[package]]
@@ -1015,23 +945,18 @@ dependencies = [
  "async-trait",
  "axum",
  "base64 0.22.1",
- "futures",
  "gateway-model-types",
  "hyper",
- "hyper-util",
  "jwk",
- "prost",
  "regex",
  "serde",
  "serde_json",
  "serde_yaml",
  "servicemanager",
  "spiffe",
- "thiserror 1.0.69",
  "token",
  "tokio",
  "tokio-stream",
- "tokio-util",
  "tonic",
  "tower",
  "tower-http",
@@ -1144,22 +1069,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87"
 
 [[package]]
-name = "httpclient"
-version = "1.0.0"
-dependencies = [
- "base64 0.21.7",
- "gateway-model-types",
- "log",
- "reqwest",
- "rustls",
- "rustls-pemfile",
- "serde",
- "serde_json",
- "tokio",
- "webpki-roots 0.26.11",
-]
-
-[[package]]
 name = "httpdate"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1211,7 +1120,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower-service",
- "webpki-roots 1.0.11",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -1245,12 +1154,9 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "socket2",
- "system-configuration",
  "tokio",
- "tower-layer",
  "tower-service",
  "tracing",
- "windows-registry",
 ]
 
 [[package]]
@@ -1407,10 +1313,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ip"
-version = "0.1.0"
-
-[[package]]
 name = "ipnet"
 version = "2.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1465,11 +1367,9 @@ dependencies = [
 name = "jwk"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
  "ed25519-dalek",
  "key",
  "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -1482,7 +1382,6 @@ dependencies = [
  "pem",
  "pkcs8",
  "rand 0.8.8",
- "serde",
  "serde_json",
  "signature",
 ]
@@ -1536,11 +1435,9 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 name = "logger"
 version = "1.0.0"
 dependencies = [
- "chrono",
  "gateway-model-types",
  "once_cell",
  "regex",
- "serde",
  "serde_json",
  "tracing",
  "tracing-subscriber",
@@ -1720,33 +1617,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "898bac3fa00d0ba57a4e8289837e965baa2dee8c3749f3b11d45a64b4223d9c3"
 dependencies = [
  "base64 0.22.1",
- "serde",
-]
-
-[[package]]
-name = "pbjson-build"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af22d08a625a2213a78dbb0ffa253318c5c79ce3133d32d296655a7bdfb02095"
-dependencies = [
- "heck",
- "itertools",
- "prost",
- "prost-types",
-]
-
-[[package]]
-name = "pbjson-types"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e748e28374f10a330ee3bb9f29b828c0ac79831a32bab65015ad9b661ead526"
-dependencies = [
- "bytes",
- "chrono",
- "pbjson",
- "pbjson-build",
- "prost",
- "prost-build",
  "serde",
 ]
 
@@ -2183,7 +2053,6 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "futures-core",
- "futures-util",
  "http",
  "http-body",
  "http-body-util",
@@ -2203,16 +2072,14 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
- "tokio-util",
  "tower",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-streams",
  "web-sys",
- "webpki-roots 1.0.11",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -2473,20 +2340,12 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
- "ed25519-dalek",
  "gateway-model-types",
- "grpcconfig",
  "hex",
  "hmac",
- "key",
- "prost",
- "prost-wkt-types",
- "rand 0.8.8",
  "reqwest",
- "serde",
  "serde_json",
  "sha2 0.11.1",
- "token",
  "tokio",
  "tonic",
  "tracing",
@@ -2500,7 +2359,6 @@ version = "0.1.0"
 dependencies = [
  "gateway-model-types",
  "jwk",
- "prost",
  "rustls",
  "rustls-pemfile",
  "spiffe",
@@ -2692,36 +2550,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "system-configuration"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a13f3d0daba03132c0aa9767f98351b3488edc2c100cda2d2ec2b04f3d8d3c8b"
-dependencies = [
- "bitflags",
- "core-foundation",
- "system-configuration-sys",
-]
-
-[[package]]
-name = "system-configuration-sys"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e1d1b10ced5ca923a1fcb8d03e96b8d3268065d724548c0211415ff6ac6bac4"
-dependencies = [
- "core-foundation-sys",
- "libc",
-]
-
-[[package]]
-name = "tags"
-version = "0.1.0"
-dependencies = [
- "gateway-model-types",
- "once_cell",
- "regex",
-]
-
-[[package]]
 name = "tempfile"
 version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2864,7 +2692,6 @@ dependencies = [
 name = "token"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
  "chrono",
  "ed25519-dalek",
  "gateway-model-types",
@@ -3454,19 +3281,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wasm-streams"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15053d8d85c7eccdbefef60f06769760a563c7f0a9d6902a13d35c7800b0ad65"
-dependencies = [
- "futures-util",
- "js-sys",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "wasmparser"
 version = "0.244.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3496,15 +3310,6 @@ checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "webpki-roots"
-version = "0.26.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "521bc38abb08001b01866da9f51eb7c5d647a19260e00054a8c7fd5f9e57f7a9"
-dependencies = [
- "webpki-roots 1.0.11",
 ]
 
 [[package]]
@@ -3565,17 +3370,6 @@ name = "windows-link"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
-
-[[package]]
-name = "windows-registry"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02752bf7fbdcce7f2a27a742f798510f3e5ad88dbe84871e5168e2120c3d5720"
-dependencies = [
- "windows-link",
- "windows-result",
- "windows-strings",
-]
 
 [[package]]
 name = "windows-result"
@@ -3858,7 +3652,6 @@ checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
 name = "x509"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
  "const-oid",
  "der",
  "ed25519-dalek",
@@ -3866,7 +3659,6 @@ dependencies = [
  "pem",
  "rand 0.8.8",
  "rustls",
- "serde",
  "signature",
  "spiffe",
  "spki",
