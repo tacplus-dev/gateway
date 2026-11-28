@@ -42,3 +42,4 @@ Append-only: add entries at the end, never edit or remove one (CI enforces it). 
 - 2026-11-26 looper issue STATE.md: Blocked on names closed tacplus-dev/tacplus#368; the exceptions now wait on its 2.6 backport tacplus#390 (#69)
 - 2026-11-26 looper issue Rotate W2S streams (SSE, WebSocket) through the gateway on the backend's <Svc>Rotating sibling (tacplus#323) (#67)
 - 2026-11-28 looper issue STATE.md: Blocked on names closed tacplus-dev/tacplus#368 and v2.6.14 as the newest 2.6 patch (v2.6.16 and v2.7.0 are out) (#70)
+- 2026-11-28 looper issue Pinned images behind their lines: relock (tacplus.lock: tacplus 2.6.14 → 2.6.16, and 2 more) (#71)
